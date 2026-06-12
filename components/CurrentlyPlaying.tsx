@@ -6,6 +6,7 @@ import { Check, Copy, Library } from "lucide-react";
 import { GameLibrary } from "@/components/GameLibrary";
 import { usePolling } from "@/lib/usePolling";
 import { timeAgo } from "@/lib/format";
+import { useWidget } from "@/components/framework/WidgetContext";
 import type { CurrentlyPlaying as CurrentlyPlayingData } from "@/lib/steam";
 
 /* eslint-disable @next/next/no-img-element -- steam avatars are tiny external images */
@@ -13,7 +14,31 @@ import type { CurrentlyPlaying as CurrentlyPlayingData } from "@/lib/steam";
 const POLL_URL = "/api/currently-playing";
 const POLL_MS = 60_000;
 
+/** L-tier addition: games played in the last two weeks */
+function RecentlyPlayed({ data }: { data: CurrentlyPlayingData | undefined }) {
+  const recentlyPlayed = data?.recentlyPlayed ?? [];
+
+  if (recentlyPlayed.length === 0) {
+    return <div className="block-sub">nothing played recently</div>;
+  }
+
+  return (
+    <>
+      <div className="more-head">last 2 weeks</div>
+      {recentlyPlayed.map((g) => (
+        <div className="more-row" key={g.gameName}>
+          <span>{g.gameName}</span>
+          <span className="more-meta">
+            {g.hours2w}h · {g.hoursTotal}h total
+          </span>
+        </div>
+      ))}
+    </>
+  );
+}
+
 export function CurrentlyPlaying() {
+  const { size } = useWidget();
   const { data } = usePolling<CurrentlyPlayingData>(POLL_URL, POLL_MS);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -24,6 +49,20 @@ export function CurrentlyPlaying() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     }).catch(() => {});
+  }
+
+  if (size === "S") {
+    return (
+      <div className="steam-s-shell">
+        <div className="steam-s-title">{data?.gameName ?? "—"}</div>
+        {data && (
+          <span className={`status-chip ${data.status}`}>
+            <span className="status-dot" />
+            {data.status}
+          </span>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -99,30 +138,13 @@ export function CurrentlyPlaying() {
         </div>
       </div>
 
-      <GameLibrary open={libraryOpen} onClose={() => setLibraryOpen(false)} />
-    </>
-  );
-}
-
-export function CurrentlyPlayingMore() {
-  const { data } = usePolling<CurrentlyPlayingData>(POLL_URL, POLL_MS);
-  const recentlyPlayed = data?.recentlyPlayed ?? [];
-
-  if (recentlyPlayed.length === 0) {
-    return <div className="block-sub">nothing played recently</div>;
-  }
-
-  return (
-    <>
-      <div className="more-head">last 2 weeks</div>
-      {recentlyPlayed.map((g) => (
-        <div className="more-row" key={g.gameName}>
-          <span>{g.gameName}</span>
-          <span className="more-meta">
-            {g.hours2w}h · {g.hoursTotal}h total
-          </span>
+      {size === "L" && (
+        <div className="size-l-more">
+          <RecentlyPlayed data={data} />
         </div>
-      ))}
+      )}
+
+      <GameLibrary open={libraryOpen} onClose={() => setLibraryOpen(false)} />
     </>
   );
 }

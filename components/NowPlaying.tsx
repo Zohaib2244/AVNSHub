@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
 import { timeAgo } from "@/lib/format";
+import { useWidget } from "@/components/framework/WidgetContext";
 import type { NowPlaying as NowPlayingData, PlayerAction } from "@/lib/spotify";
 
 const POLL_URL = "/api/now-playing";
@@ -28,13 +29,75 @@ async function spotifyControl(action: PlayerAction, uri: string | undefined, ref
   }
 }
 
+/** L-tier addition: recently played tracks, or the live queue while playing */
+function RecentTracks({ data, onPlayTrack }: { data: NowPlayingData | undefined; onPlayTrack: (uri: string) => void }) {
+  const queue = data?.queue ?? [];
+  const recentTracks = data?.recentTracks ?? [];
+  const showQueue = !!data?.isPlaying && queue.length > 0;
+
+  if (!showQueue && recentTracks.length === 0) {
+    return <div className="block-sub">no recent tracks</div>;
+  }
+
+  return (
+    <>
+      <div className="more-head">Recently Played / Queue</div>
+      {showQueue
+        ? queue.map((t, i) => (
+            <div className="more-row" key={i}>
+              <span>{t.trackName}</span>
+              <span className="more-meta">{t.artist}</span>
+            </div>
+          ))
+        : recentTracks.map((t, i) => (
+            <div
+              className="more-row clickable"
+              key={i}
+              onClick={() => onPlayTrack(t.uri)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onPlayTrack(t.uri);
+              }}
+            >
+              <span>{t.trackName}</span>
+              <span className="more-meta">{t.artist}</span>
+            </div>
+          ))}
+    </>
+  );
+}
+
 export function NowPlaying() {
+  const { size } = useWidget();
   const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS);
   const [controlError, setControlError] = useState<string | null>(null);
 
   async function control(action: PlayerAction) {
     setControlError(null);
     setControlError(await spotifyControl(action, undefined, refresh));
+  }
+
+  async function playTrack(uri: string) {
+    setControlError(null);
+    setControlError(await spotifyControl("play-track", uri, refresh));
+  }
+
+  if (size === "S") {
+    return (
+      <div className="spotify-s-shell">
+        <div className="spotify-art-frame spotify-art-s">
+          {data?.albumArtUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- spotify album art is a tiny external image
+            <img src={data.albumArtUrl} alt="" />
+          ) : (
+            <Music size={18} strokeWidth={1.75} />
+          )}
+          {data?.isPlaying && <span className="spotify-live-dot" aria-hidden="true" />}
+        </div>
+        <div className="spotify-s-title">{data?.trackName ?? "—"}</div>
+      </div>
+    );
   }
 
   const progressPercent =
@@ -135,53 +198,12 @@ export function NowPlaying() {
       </AnimatePresence>
 
       {controlError && <div className="control-error">{controlError}</div>}
-    </>
-  );
-}
 
-export function NowPlayingMore() {
-  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS);
-  const [controlError, setControlError] = useState<string | null>(null);
-
-  async function playTrack(uri: string) {
-    setControlError(null);
-    setControlError(await spotifyControl("play-track", uri, refresh));
-  }
-
-  const queue = data?.queue ?? [];
-  const recentTracks = data?.recentTracks ?? [];
-  const showQueue = !!data?.isPlaying && queue.length > 0;
-
-  if (!showQueue && recentTracks.length === 0) {
-    return <div className="block-sub">no recent tracks</div>;
-  }
-
-  return (
-    <>
-      <div className="more-head">Recently Played / Queue</div>
-      {showQueue
-        ? queue.map((t, i) => (
-            <div className="more-row" key={i}>
-              <span>{t.trackName}</span>
-              <span className="more-meta">{t.artist}</span>
-            </div>
-          ))
-        : recentTracks.map((t, i) => (
-            <div
-              className="more-row clickable"
-              key={i}
-              onClick={() => playTrack(t.uri)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") playTrack(t.uri);
-              }}
-            >
-              <span>{t.trackName}</span>
-              <span className="more-meta">{t.artist}</span>
-            </div>
-          ))}
-      {controlError && <div className="control-error">{controlError}</div>}
+      {size === "L" && (
+        <div className="size-l-more">
+          <RecentTracks data={data} onPlayTrack={playTrack} />
+        </div>
+      )}
     </>
   );
 }

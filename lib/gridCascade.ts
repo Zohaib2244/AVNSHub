@@ -25,6 +25,11 @@ export type CascadeOverride = {
   rowSpan: number;
   /** squeezed to S-span without supporting "S" content — render the micro view */
   micro: boolean;
+  /** explicit grid anchor for the hovered widget — pins it in place so dense
+      re-placement can't move it out from under the pointer (which would fire
+      mouseleave → revert → mouseenter → grow → … an oscillation loop) */
+  colStart?: number;
+  rowStart?: number;
 };
 
 /** cascade-grow needs a row-mate to squeeze; not meaningful at 1-2 columns */
@@ -90,7 +95,8 @@ export function computeCascade(
 
     const shrunkSize = prevSize(w.size);
     const [shrunkCols, shrunkRows] = SPAN_MAP[`${shrunkSize}-${w.orientation}`];
-    const micro = shrunkSize === "S" && !WIDGETS[w.id].sizes.includes("S");
+    const supportedSizes: WidgetSize[] = WIDGETS[w.id].sizes;
+    const micro = shrunkSize === "S" && !supportedSizes.includes("S");
     overrides.set(w.id, {
       size: shrunkSize,
       colSpan: Math.min(shrunkCols, gridCols),
@@ -99,6 +105,16 @@ export function computeCascade(
     });
   }
 
-  overrides.set(hoveredId, { size: targetSize, colSpan, rowSpan: targetRows, micro: false });
+  // pinned to its measured anchor — the claim always contains the original
+  // rect (colStart only ever shifts left to stay in bounds), so the pointer
+  // stays inside the grown widget and hover can't oscillate
+  overrides.set(hoveredId, {
+    size: targetSize,
+    colSpan,
+    rowSpan: targetRows,
+    micro: false,
+    colStart,
+    rowStart: baseRect.rowStart,
+  });
   return overrides;
 }
