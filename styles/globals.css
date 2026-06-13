@@ -339,41 +339,9 @@ body {
   flex-direction: column;
 }
 
-/* while a hover/cascade override's reflow is in flight (Dashboard.tsx), the
-   grid can shift a different widget under a stationary pointer; suspending
-   pointer events on those *other* slots stops the reflow itself from firing
-   mouseenter/leave and feeding back into another override (oscillation).
-   The actively-hovered slot (.active-hover) keeps pointer-events so real
-   mouse-leave from the user still closes it normally. */
-.widget-grid.reflowing > .widget-slot:not(.active-hover) {
-  pointer-events: none;
-}
-
-/* ─── view transitions (hover-expand / cascade movement) ─────────
-   Span/position overrides apply inside document.startViewTransition()
-   (Dashboard.tsx) — the browser FLIP-animates each named slot at the
-   compositor level. This is the only sanctioned animation system for
-   grid movement; JS measure-and-write systems loop (see CLAUDE.md). */
-::view-transition {
-  pointer-events: none; /* keep the page interactive mid-transition */
-}
-
-::view-transition-group(*) {
-  animation-duration: 0.32s;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
-    animation: none;
-  }
-}
-
 /* ─── blocks ("sticker" cards) ──────────────────────────────────── */
 
-/* shell wrapper around every widget card — the flyout/overlay anchor */
+/* shell wrapper around every widget card — fills the grid slot */
 .capsule {
   min-width: 0;
   flex: 1;
@@ -402,12 +370,7 @@ body {
   border-left: 3px solid var(--accent-orange);
 }
 
-.block-expandable {
-  cursor: pointer;
-}
-
-.block:hover,
-.capsule.open .block {
+.block:hover {
   border-color: var(--accent-orange);
   box-shadow: 5px 5px 0 var(--shadow);
 }
@@ -510,26 +473,10 @@ body {
   color: var(--text-primary);
 }
 
-/* ─── expansion surfaces ─────────────────────────────────────────
-   hover → .inline-expand grows inside the card (animated height), so
-   the grid row grows and surrounding widgets reflow to make room;
-   overlay → centered modal via portal */
-
-.inline-expand {
-  overflow: hidden;
-}
-
-.inline-expand-body {
-  padding-top: 10px;
-  /* long lists scroll inside the expansion instead of growing the card forever */
-  max-height: 300px;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-/* L-tier addition for "grow" widgets — the content that used to live in the
-   hover flyout, now rendered inline below the M-tier content */
+/* ─── L-size detail ──────────────────────────────────────────────
+   extra content rendered below the main content at L size — either the
+   manifest's `detail` component (auto-rendered by WidgetShell) or a widget's
+   own size==="L" branch (now-playing, currently-playing) */
 .size-l-more {
   margin-top: 10px;
   padding-top: 10px;
@@ -540,82 +487,7 @@ body {
   scrollbar-color: var(--border) transparent;
 }
 
-/* ─── micro view ─────────────────────────────────────────────────
-   fallback for a widget squeezed by the cascade engine below its
-   smallest supported size: its normal content renders as a blurred,
-   dimmed ghost, with the manifest icon as a glanceable badge on top */
-
-.micro-view {
-  position: relative;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-
-.micro-ghost {
-  position: absolute;
-  inset: 0;
-  filter: blur(6px);
-  opacity: 0.35;
-  pointer-events: none;
-  transform: scale(0.92);
-}
-
-.micro-badge {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--border);
-  color: var(--text-muted);
-  box-shadow: 2px 2px 0 var(--shadow);
-}
-
-.overlay-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 50;
-}
-
-.overlay-card {
-  position: fixed;
-  left: 50%;
-  top: 50%;
-  translate: -50% -50%;
-  z-index: 51;
-  width: min(720px, calc(100vw - 32px));
-  max-height: min(620px, calc(100vh - 48px));
-  display: flex;
-  flex-direction: column;
-  background: var(--bg-card);
-  border: 1.5px solid var(--accent-orange);
-  border-radius: 14px;
-  padding: 16px 18px;
-  box-shadow: 6px 6px 0 var(--shadow);
-}
-
-.overlay-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.overlay-head .overlay-title {
-  margin-bottom: 0;
-}
-
+/* close button — shared by the edit-mode settings popover */
 .overlay-close {
   display: inline-flex;
   align-items: center;
@@ -635,14 +507,9 @@ body {
   border-color: var(--accent-orange);
 }
 
-.overlay-body {
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
-.overlay-body > .more-head:first-child {
+/* first detail heading inside the L-size detail area drops its top rule —
+   the .size-l-more container already provides the separator */
+.size-l-more > .more-head:first-child {
   border-top: none;
   padding-top: 0;
 }
@@ -939,7 +806,7 @@ body {
 
 /* ─── nutbot terminal ─────────────────────────────────────────── */
 
-/* compact face-only nutbot card — terminal lives in its overlay */
+/* compact face-only nutbot card (S/M) — the terminal renders at L size */
 .nutbot-mini {
   display: flex;
   flex-direction: column;
@@ -2477,62 +2344,115 @@ body {
   border-radius: 50%;
 }
 
-.hub-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 10px;
-  font-size: 0.66rem;
-  color: var(--text-muted);
+.hub-reset:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
 }
 
-.hub-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+/* ─── widget manager ─────────────────────────────────────────────
+   the add/remove gallery (components/widgets/WidgetManager.tsx) */
+
+.wm {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  margin-bottom: 4px;
 }
 
-.hub-item {
+.wm-summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  height: 100%;
+}
+
+.wm-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.wm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wm-item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   padding: 5px 8px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-nested);
-  color: var(--text-primary);
-  font-family: inherit;
-  font-size: 0.66rem;
-  text-align: left;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 
-.hub-item:hover:not(:disabled) {
-  border-color: var(--accent-orange);
+.wm-item-icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
-.hub-item:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-
-.hub-item.off {
-  color: var(--text-muted-dim);
-  opacity: 0.6;
-}
-
-.hub-item-title {
-  flex: 1;
+.wm-item-text {
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  flex: 1;
+}
+
+.wm-item-title {
+  font-size: 0.72rem;
+  color: var(--text-primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.hub-reset:hover {
+.wm-item-id {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.56rem;
+  color: var(--text-muted-dim);
+}
+
+.wm-item-desc {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.wm-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.wm-btn-add {
+  color: var(--accent-cyan);
+}
+
+.wm-btn-add:hover {
+  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-cyan) 12%, var(--bg-card));
+}
+
+.wm-btn-remove {
+  color: var(--text-muted);
+}
+
+.wm-btn-remove:hover {
   color: var(--accent-orange);
   border-color: var(--accent-orange);
+}
+
+.wm-btn:disabled {
+  cursor: default;
+  color: var(--text-muted-dim);
+  opacity: 0.7;
 }
 

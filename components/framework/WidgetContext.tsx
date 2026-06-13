@@ -10,16 +10,10 @@ import type { Orientation, SettingsValues, WidgetSize } from "@/config/widgets";
 
 export type WidgetCtx = {
   id: string;
-  /** effective size — the persisted size, or the cascade-adjusted size while
-      a "grow" widget (or one of its displaced neighbors) is hovered */
+  /** the instance's current size tier — branch on this to render distinct
+      S/M/L layouts (the framework's primary per-widget customization lever) */
   size: WidgetSize;
   orientation: Orientation;
-  /** flyout open, overlay open, or cascade-active (grown/shrunk) */
-  expanded: boolean;
-  /** true while rendering inside the centered overlay modal */
-  inOverlay: boolean;
-  /** squeezed to S-span without supporting "S" — render a MicroView instead */
-  micro: boolean;
   /** manifest schema defaults merged with the user's stored values */
   settings: SettingsValues;
 };

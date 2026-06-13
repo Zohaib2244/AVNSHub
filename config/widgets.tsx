@@ -9,6 +9,7 @@ import {
   GitCommitHorizontal,
   HardDrive,
   IdCard,
+  LayoutGrid,
   Link2,
   Music,
   Network,
@@ -29,27 +30,29 @@ import { Jellyfin, JellyfinMore } from "@/components/Jellyfin";
 import { ArrStack, ArrStackMore } from "@/components/ArrStack";
 import { StorageApps } from "@/components/StorageApps";
 import { NutBotFaceWidget } from "@/components/widgets/NutBotFaceWidget";
-import { NutBotTerminal } from "@/components/NutBotTerminal";
+import { WidgetManager } from "@/components/widgets/WidgetManager";
 import { IdentityBlock } from "@/components/IdentityBlock";
 import { NowPlaying } from "@/components/NowPlaying";
 import { CurrentlyPlaying } from "@/components/CurrentlyPlaying";
 import { GitHubActivity, GitHubActivityMore } from "@/components/GitHubActivity";
 import { SessionTracker, SessionTrackerMore } from "@/components/SessionTracker";
-import { HubSettings, HubSettingsMore } from "@/components/widgets/HubSettings";
+import { HubSettings } from "@/components/widgets/HubSettings";
 
 /* ─── widget framework contracts ─────────────────────────────────────
    A widget = a content component + a manifest entry here. The shell
    (components/framework/WidgetShell.tsx) supplies the card chrome, label,
-   grid placement, and expansion behavior; per-instance overrides (size,
-   orientation, expand mode, settings) come from the layout store.
+   and grid placement; per-instance overrides (size, orientation, settings)
+   come from the layout store. Widgets are resizable (S/M/L × h/v, limited to
+   what the manifest declares) and rearrangeable in edit mode — that's the
+   whole interaction model. There is no hover/click expansion: a widget that
+   wants a richer large layout reads useWidget().size and/or declares a
+   `detail` component (rendered automatically at L size).
+
+   See docs/CREATING_WIDGETS.md for the full authoring guide.
 ──────────────────────────────────────────────────────────────────── */
 
 export type WidgetSize = "S" | "M" | "L";
 export type Orientation = "h" | "v";
-/** "grow" bumps the widget one size tier on hover and cascades a shrink to
-    whichever neighbor(s) it displaces — see lib/gridCascade.ts */
-export type ExpandMode = "none" | "hover" | "overlay" | "grow";
-export type ExpandDirection = "down" | "up";
 
 export type SettingsField =
   | { key: string; label: string; type: "toggle"; default: boolean }
@@ -60,20 +63,25 @@ export type SettingsField =
 export type SettingsValues = Record<string, string | number | boolean>;
 
 export type WidgetManifest = {
+  /** stable unique identifier — the object key, the layout/persistence key,
+      and the DOM id of the card. Must be unique across the whole registry. */
   id: string;
-  /** rendered by the shell as the block label (and the overlay title) */
+  /** human-readable name, shown as the card label and in the widget manager */
   title: string;
   icon: LucideIcon;
-  /** card content only — no .block markup, no label, no fetch boilerplate */
+  /** card content only — no .block markup, no label, no fetch boilerplate.
+      Reads placement/settings via useWidget(); render different markup per
+      size for distinct S/M/L layouts. */
   component: ComponentType;
-  /** content of the hover flyout / overlay modal */
-  expandedComponent?: ComponentType;
-  /** sizes/orientations this widget formats correctly in */
+  /** optional extra content rendered by the shell BELOW the main content when
+      the instance is at L size — the lowest-effort way to add a richer large
+      layout (e.g. a detail list) without size-branching the main component */
+  detail?: ComponentType;
+  /** sizes/orientations this widget formats correctly in — these double as the
+      resize limits surfaced in the per-widget settings popover */
   sizes: WidgetSize[];
   orientations: Orientation[];
-  /** expansion capabilities; ["none"] when there is no expanded content */
-  expandModes: ExpandMode[];
-  defaults: { size: WidgetSize; orientation: Orientation; expand: ExpandMode; hidden?: boolean };
+  defaults: { size: WidgetSize; orientation: Orientation; hidden?: boolean };
   /** widget-specific options — drives the auto-generated settings form */
   settings?: SettingsField[];
   flags?: {
@@ -115,18 +123,6 @@ export const SPAN_MAP: Record<`${WidgetSize}-${Orientation}`, [cols: number, row
   "L-v": [2, 3],
 };
 
-const SIZE_LADDER: WidgetSize[] = ["S", "M", "L"];
-
-/** one size tier up; "L" is the ceiling and maps to itself */
-export function nextSize(size: WidgetSize): WidgetSize {
-  return SIZE_LADDER[Math.min(SIZE_LADDER.indexOf(size) + 1, SIZE_LADDER.length - 1)];
-}
-
-/** one size tier down; "S" is the floor and maps to itself */
-export function prevSize(size: WidgetSize): WidgetSize {
-  return SIZE_LADDER[Math.max(SIZE_LADDER.indexOf(size) - 1, 0)];
-}
-
 export const WIDGETS = {
   clock: {
     id: "clock",
@@ -135,8 +131,7 @@ export const WIDGETS = {
     component: ClockWidget,
     sizes: ["S", "M"],
     orientations: ["h", "v"],
-    expandModes: ["none"],
-    defaults: { size: "S", orientation: "v", expand: "none" },
+    defaults: { size: "S", orientation: "v" },
     settings: [
       { key: "showCalendar", label: "mini calendar", type: "toggle", default: true },
       { key: "showLofi", label: "lofi radio", type: "toggle", default: true },
@@ -149,8 +144,7 @@ export const WIDGETS = {
     component: QuickLinks,
     sizes: ["S", "M"],
     orientations: ["h", "v"],
-    expandModes: ["none"],
-    defaults: { size: "S", orientation: "h", expand: "none" },
+    defaults: { size: "S", orientation: "h" },
     flags: { className: "quicklinks-compact" },
   },
   milestones: {
@@ -160,19 +154,17 @@ export const WIDGETS = {
     component: UptimeMilestones,
     sizes: ["S", "M"],
     orientations: ["v"],
-    expandModes: ["none"],
-    defaults: { size: "S", orientation: "v", expand: "none" },
+    defaults: { size: "S", orientation: "v" },
   },
   homelab: {
     id: "homelab",
     title: "a very nutty home server",
     icon: Server,
     component: HomelabStatus,
-    expandedComponent: HomelabStatusMore,
-    sizes: ["S", "M"],
+    detail: HomelabStatusMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
     settings: [
       {
         key: "pollSeconds",
@@ -192,44 +184,40 @@ export const WIDGETS = {
     title: "server stats",
     icon: Cpu,
     component: ServerStats,
-    expandedComponent: ServerStatsMore,
-    sizes: ["S", "M"],
+    detail: ServerStatsMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
   },
   "disk-storage": {
     id: "disk-storage",
     title: "disk storage",
     icon: HardDrive,
     component: DiskStorage,
-    expandedComponent: DiskStorageMore,
-    sizes: ["S", "M"],
+    detail: DiskStorageMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
   },
   "network-stats": {
     id: "network-stats",
     title: "network stats",
     icon: Network,
     component: NetworkStats,
-    expandedComponent: NetworkStatsMore,
-    sizes: ["S", "M"],
+    detail: NetworkStatsMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
   },
   jellyfin: {
     id: "jellyfin",
     title: "jellyfin",
     icon: Tv,
     component: Jellyfin,
-    expandedComponent: JellyfinMore,
-    sizes: ["S", "M"],
+    detail: JellyfinMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
     flags: { accent: true },
   },
   "arr-stack": {
@@ -237,11 +225,10 @@ export const WIDGETS = {
     title: "arr stack",
     icon: Download,
     component: ArrStack,
-    expandedComponent: ArrStackMore,
-    sizes: ["S", "M"],
+    detail: ArrStackMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "hover" },
+    defaults: { size: "S", orientation: "h" },
   },
   "storage-apps": {
     id: "storage-apps",
@@ -250,19 +237,18 @@ export const WIDGETS = {
     component: StorageApps,
     sizes: ["S", "M"],
     orientations: ["h", "v"],
-    expandModes: ["none"],
-    defaults: { size: "S", orientation: "h", expand: "none" },
+    defaults: { size: "S", orientation: "h" },
   },
   nutbot: {
     id: "nutbot",
     title: "nutbot v1.4",
     icon: SquareTerminal,
     component: NutBotFaceWidget,
-    expandedComponent: NutBotTerminal,
-    sizes: ["S", "M"],
+    // no `detail` — the component renders the face at S/M and the full
+    // terminal at L (see NutBotFaceWidget); a per-size layout example
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "overlay"],
-    defaults: { size: "S", orientation: "h", expand: "overlay" },
+    defaults: { size: "S", orientation: "h" },
   },
   identity: {
     id: "identity",
@@ -271,8 +257,7 @@ export const WIDGETS = {
     component: IdentityBlock,
     sizes: ["M", "L"],
     orientations: ["h"],
-    expandModes: ["none"],
-    defaults: { size: "M", orientation: "h", expand: "none" },
+    defaults: { size: "M", orientation: "h" },
     flags: { plainChrome: true },
   },
   "now-playing": {
@@ -282,8 +267,7 @@ export const WIDGETS = {
     component: NowPlaying,
     sizes: ["S", "M", "L"],
     orientations: ["h"],
-    expandModes: ["none", "grow"],
-    defaults: { size: "M", orientation: "h", expand: "grow" },
+    defaults: { size: "M", orientation: "h" },
     flags: { customHeader: true, className: "spotify-capsule" },
   },
   "currently-playing": {
@@ -293,8 +277,7 @@ export const WIDGETS = {
     component: CurrentlyPlaying,
     sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "grow"],
-    defaults: { size: "M", orientation: "v", expand: "grow" },
+    defaults: { size: "M", orientation: "v" },
     flags: { customHeader: true, className: "steam-card" },
   },
   github: {
@@ -302,35 +285,41 @@ export const WIDGETS = {
     title: "github activity",
     icon: GitCommitHorizontal,
     component: GitHubActivity,
-    expandedComponent: GitHubActivityMore,
+    detail: GitHubActivityMore,
     sizes: ["S", "M", "L"],
     orientations: ["h"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "M", orientation: "h", expand: "hover" },
+    defaults: { size: "M", orientation: "h" },
     settings: [{ key: "flyoutCommits", label: "commits shown", type: "number", default: 5, min: 1, max: 15 }],
     flags: { customHeader: true, accent: true },
+  },
+  widgets: {
+    id: "widgets",
+    title: "widget manager",
+    icon: LayoutGrid,
+    component: WidgetManager,
+    sizes: ["S", "M", "L"],
+    orientations: ["h", "v"],
+    defaults: { size: "M", orientation: "v" },
   },
   "hub-settings": {
     id: "hub-settings",
     title: "avn hub settings",
     icon: SlidersHorizontal,
     component: HubSettings,
-    expandedComponent: HubSettingsMore,
-    sizes: ["S", "M"],
+    // component renders quick controls at S/M and the full panel at L
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["overlay"],
-    defaults: { size: "S", orientation: "h", expand: "overlay" },
+    defaults: { size: "S", orientation: "h" },
   },
   tracker: {
     id: "tracker",
     title: "session tracker",
     icon: Gamepad2,
     component: SessionTracker,
-    expandedComponent: SessionTrackerMore,
-    sizes: ["S", "M"],
+    detail: SessionTrackerMore,
+    sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
-    expandModes: ["none", "hover", "overlay"],
-    defaults: { size: "S", orientation: "v", expand: "hover" },
+    defaults: { size: "S", orientation: "v" },
   },
 } satisfies Record<string, WidgetManifest>;
 
@@ -355,5 +344,6 @@ export const DEFAULT_ORDER: WidgetId[] = [
   "quicklinks",
   "milestones",
   "tracker",
+  "widgets",
   "hub-settings",
 ];

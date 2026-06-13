@@ -1,12 +1,13 @@
 "use client";
 
-// The hub's own control surface — itself a widget. The card shows quick
-// theme controls and a visibility summary; the overlay (click to open) is
-// the full panel: widget visibility checklist, global prefs, layout reset.
+// The hub's own control surface — itself a widget. Per size:
+//   S → theme mode toggle only
+//   M → theme mode + palette picker
+//   L → the full panel: theme, palette, global prefs, layout reset
+// (Adding/removing widgets lives in the separate widget manager.)
 
 import { useSyncExternalStore } from "react";
-import { Eye, EyeOff, Moon, RotateCcw, SlidersHorizontal, Sun, SunMoon } from "lucide-react";
-import { WIDGETS, DEFAULT_ORDER } from "@/config/widgets";
+import { Moon, RotateCcw, Sun, SunMoon } from "lucide-react";
 import { THEME_PACKS } from "@/config/themes";
 import {
   getPalette,
@@ -19,6 +20,7 @@ import {
   type ThemeMode,
 } from "@/lib/theme";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
+import { useWidget } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/LayoutProvider";
 
 const THEME_OPTIONS: { mode: ThemeMode; Icon: typeof Sun }[] = [
@@ -69,66 +71,11 @@ function PaletteRow() {
   );
 }
 
-export function HubSettings() {
-  const { layout } = useLayout();
-  const visibleCount = layout.widgets.filter((w) => !w.hidden).length;
-
-  return (
-    <>
-      <div className="wset-row">
-        <span>theme</span>
-        <ThemeModeRow />
-      </div>
-      <PaletteRow />
-      <div className="hub-summary">
-        <SlidersHorizontal size={12} strokeWidth={1.75} />
-        {visibleCount}/{layout.widgets.length} widgets shown · click to configure
-      </div>
-    </>
-  );
-}
-
-export function HubSettingsMore() {
-  const { layout, updateInstance, resetLayout } = useLayout();
+function GeneralPrefs() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
-
+  const { resetLayout } = useLayout();
   return (
     <>
-      <div className="more-head">theme</div>
-      <div className="wset-row">
-        <span>mode</span>
-        <ThemeModeRow />
-      </div>
-      <div className="wset-row">
-        <span>palette</span>
-        <PaletteRow />
-      </div>
-
-      <div className="more-head">widgets</div>
-      <div className="hub-list">
-        {DEFAULT_ORDER.map((id) => {
-          const manifest = WIDGETS[id];
-          const instance = layout.widgets.find((w) => w.id === id);
-          if (!instance) return null;
-          const Icon = manifest.icon;
-          const locked = id === "hub-settings";
-          return (
-            <button
-              key={id}
-              type="button"
-              className={`hub-item${instance.hidden ? " off" : ""}`}
-              disabled={locked}
-              onClick={() => updateInstance(id, { hidden: !instance.hidden })}
-              title={locked ? "the hub can't hide itself" : instance.hidden ? "show widget" : "hide widget"}
-            >
-              <Icon size={13} strokeWidth={1.75} />
-              <span className="hub-item-title">{manifest.title}</span>
-              {instance.hidden ? <EyeOff size={12} strokeWidth={1.75} /> : <Eye size={12} strokeWidth={1.75} />}
-            </button>
-          );
-        })}
-      </div>
-
       <div className="more-head">general</div>
       <label className="wset-row">
         <span>live data polling</span>
@@ -146,11 +93,25 @@ export function HubSettingsMore() {
           onChange={(e) => setPrefs({ bootSequence: e.target.checked })}
         />
       </label>
-
       <button type="button" className="wset-hide-btn hub-reset" onClick={resetLayout}>
         <RotateCcw size={12} strokeWidth={1.75} />
         reset layout & widget config
       </button>
+    </>
+  );
+}
+
+export function HubSettings() {
+  const { size } = useWidget();
+
+  return (
+    <>
+      <div className="wset-row">
+        <span>theme</span>
+        <ThemeModeRow />
+      </div>
+      {size !== "S" && <PaletteRow />}
+      {size === "L" && <GeneralPrefs />}
     </>
   );
 }

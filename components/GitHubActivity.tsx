@@ -62,7 +62,7 @@ export function GitHubActivityMore() {
   const [tab, setTab] = useState<Tab>("commits");
   const [copiedRepo, setCopiedRepo] = useState<string | null>(null);
 
-  // the flyout only mounts while open, so this lazy-loads on first expand
+  // only mounts at L size (the detail area), so this lazy-loads on first reveal
   useEffect(() => {
     fetch("/api/github-repos")
       .then((r) => r.json())

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,53 +14,23 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable } from "@dnd-kit/sortable";
 import { GripHorizontal, Settings2 } from "lucide-react";
-import { SPAN_MAP, WIDGETS, type ExpandMode, type WidgetId, type WidgetManifest } from "@/config/widgets";
+import { SPAN_MAP, WIDGETS, type WidgetId, type WidgetManifest } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
-import { computeCascade, readGridRect, type CascadeOverride, type GridRect } from "@/lib/gridCascade";
 import { useGridColumns } from "@/lib/useGridColumns";
 import { useLayout } from "@/components/LayoutProvider";
 import { WidgetShell } from "@/components/framework/WidgetShell";
 import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
 
-/** mirrors WidgetShell's resolution: a mode is only honored when the widget
-    ships expanded content or drives its own size tiers via "grow" */
-function effectiveExpand(instance: WidgetInstance): ExpandMode {
-  const manifest: WidgetManifest = WIDGETS[instance.id];
-  return manifest.expandedComponent || manifest.expandModes.includes("grow") ? instance.expand : "none";
-}
-
-function spanStyle(instance: WidgetInstance, gridCols: number, cascade?: CascadeOverride) {
-  const [cols, rows] = cascade ? [cascade.colSpan, cascade.rowSpan] : SPAN_MAP[`${instance.size}-${instance.orientation}`];
+/** size × orientation → grid spans (column span clamped to the live column
+    count so a wide widget never overflows a narrow breakpoint) */
+function spanStyle(instance: WidgetInstance, gridCols: number) {
+  const [cols, rows] = SPAN_MAP[`${instance.size}-${instance.orientation}`];
   const colSpan = Math.min(cols, gridCols);
   return {
-    // an override may pin an explicit anchor (hovered widget) so dense
-    // re-placement can't relocate it mid-hover; everything else stays auto
-    gridColumn: cascade?.colStart != null ? `${cascade.colStart} / span ${colSpan}` : `span ${colSpan}`,
-    gridRow:
-      gridCols === 1 ? undefined : cascade?.rowStart != null ? `${cascade.rowStart} / span ${rows}` : `span ${rows}`,
+    gridColumn: `span ${colSpan}`,
+    // single-column breakpoints stack everything; row spans would leave gaps
+    gridRow: gridCols === 1 ? undefined : `span ${rows}`,
   };
-}
-
-/** runs a state update inside a View Transition when the browser supports it,
-    so widget span/position changes glide (compositor-level FLIP). Safe where
-    JS layout-animation systems loop: nothing measures + setStates per item.
-    The dense reflow this triggers can shift a *different* widget under a
-    stationary pointer; browsers recompute :hover (and fire mouseenter/leave)
-    after such a layout change, which would feed back into another override —
-    expand → reflow → re-hover → expand → … an oscillation loop. Suspending
-    pointer events on the grid for the reflow's duration breaks that cycle:
-    only real pointer movement can change the hovered widget. */
-function applyWithTransition(gridEl: HTMLDivElement | null, apply: () => void) {
-  const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
-  if (!doc.startViewTransition) {
-    gridEl?.classList.add("reflowing");
-    apply();
-    requestAnimationFrame(() => requestAnimationFrame(() => gridEl?.classList.remove("reflowing")));
-    return;
-  }
-  gridEl?.classList.add("reflowing");
-  const transition = doc.startViewTransition(() => flushSync(apply));
-  transition.finished.finally(() => gridEl?.classList.remove("reflowing"));
 }
 
 function GridWidget({
@@ -69,17 +38,11 @@ function GridWidget({
   editMode,
   gridCols,
   slotRefs,
-  cascade,
-  grown,
-  onHoverChange,
 }: {
   instance: WidgetInstance;
   editMode: boolean;
   gridCols: number;
   slotRefs: { current: Map<WidgetId, HTMLDivElement> };
-  cascade?: CascadeOverride;
-  grown: boolean;
-  onHoverChange: (id: WidgetId, hovering: boolean) => void;
 }) {
   // no sortable transform strategy — with variable spans + dense flow the
   // grid itself reflows on live reorder; the DragOverlay carries the visual.
@@ -96,7 +59,6 @@ function GridWidget({
   if (!editMode && settingsOpen) setSettingsOpen(false);
 
   const manifest: WidgetManifest = WIDGETS[instance.id];
-  const expandMode = effectiveExpand(instance);
 
   const setRefs = (el: HTMLDivElement | null) => {
     setNodeRef(el);
@@ -107,10 +69,8 @@ function GridWidget({
   return (
     <div
       ref={setRefs}
-      className={`widget-slot${editMode ? " editing" : ""}${isDragging ? " dragging" : ""}${grown ? " active-hover" : ""}`}
-      // viewTransitionName lets the View Transitions API track each slot
-      // individually, so override changes FLIP-animate per widget
-      style={{ ...spanStyle(instance, gridCols, cascade), viewTransitionName: `widget-${instance.id}` }}
+      className={`widget-slot${editMode ? " editing" : ""}${isDragging ? " dragging" : ""}`}
+      style={spanStyle(instance, gridCols)}
     >
       {editMode && (
         <>
@@ -136,20 +96,7 @@ function GridWidget({
           )}
         </>
       )}
-      <WidgetShell
-        manifest={manifest}
-        config={instance}
-        cascade={cascade}
-        grown={grown}
-        onHoverChange={
-          // "grow" hovers drive the cascade; "hover" (inline expand) claims an
-          // extra row span so the expansion pushes rows below instead of
-          // inflating its own row (which would stretch same-row neighbors)
-          expandMode === "grow" || expandMode === "hover"
-            ? (hovering) => onHoverChange(instance.id, hovering)
-            : undefined
-        }
-      />
+      <WidgetShell manifest={manifest} config={instance} />
     </div>
   );
 }
@@ -158,10 +105,7 @@ export function Dashboard() {
   const { layout, reorderWidget, editMode } = useLayout();
   const gridCols = useGridColumns();
   const [activeId, setActiveId] = useState<WidgetId | null>(null);
-  const [hoveredId, setHoveredId] = useState<WidgetId | null>(null);
-  const [overrides, setOverrides] = useState<Map<WidgetId, CascadeOverride>>(new Map());
   const slotRefs = useRef(new Map<WidgetId, HTMLDivElement>());
-  const gridRef = useRef<HTMLDivElement>(null);
   // last (active, over) pair we reordered for — dedupes onDragOver storms so a
   // dense-reflow-triggered re-measure can't feed back into another reorder
   const lastOverPair = useRef<string | null>(null);
@@ -171,80 +115,6 @@ export function Dashboard() {
 
   const visible = layout.widgets.filter((w) => !w.hidden);
   const activeInstance = activeId ? visible.find((w) => w.id === activeId) : null;
-  // signature of the cascade-relevant fields of `visible` — used as an
-  // effect dependency so the cascade only recomputes when these actually change
-  const visibleSig = visible.map((w) => `${w.id}:${w.size}:${w.orientation}`).join("|");
-  // hover expansion is inert while rearranging — it would fight the drag
-  const activeHoveredId = editMode ? null : hoveredId;
-  // mirror of `overrides`, readable inside the deferred effect without a dep;
-  // stays in sync because overrides is only ever written through commitOverrides
-  const overridesRef = useRef<Map<WidgetId, CascadeOverride>>(new Map());
-  const commitOverrides = useCallback((next: Map<WidgetId, CascadeOverride>) => {
-    overridesRef.current = next;
-    setOverrides(next);
-  }, []);
-
-  const handleHoverChange = useCallback((id: WidgetId, hovering: boolean) => {
-    setHoveredId((current) => {
-      if (hovering) return id;
-      return current === id ? null : current;
-    });
-  }, []);
-
-  // recompute the span overrides whenever the hovered widget, breakpoint, or
-  // relevant widget placements change — deferred to a frame so the DOM has
-  // settled (and setState doesn't run synchronously in the effect)
-  useEffect(() => {
-    const frame = requestAnimationFrame(() => {
-      const hovered = activeHoveredId ? visible.find((w) => w.id === activeHoveredId) : undefined;
-      if (!hovered) {
-        if (overridesRef.current.size > 0) applyWithTransition(gridRef.current, () => commitOverrides(new Map()));
-        return;
-      }
-
-      const baseRect = (() => {
-        const el = slotRefs.current.get(hovered.id);
-        return el ? readGridRect(el) : null;
-      })();
-
-      if (effectiveExpand(hovered) === "hover") {
-        // inline expand: claim one extra row so the expansion pushes the rows
-        // below down (dense reflow) instead of inflating this widget's own
-        // row, which would stretch every same-row neighbor; pinned to its
-        // measured anchor so re-placement can't move it off the pointer
-        const [cols, rows] = SPAN_MAP[`${hovered.size}-${hovered.orientation}`];
-        applyWithTransition(gridRef.current, () =>
-          commitOverrides(
-            new Map([
-              [
-                hovered.id,
-                {
-                  size: hovered.size,
-                  colSpan: Math.min(cols, gridCols),
-                  rowSpan: rows + 1,
-                  micro: false,
-                  colStart: baseRect?.colStart,
-                  rowStart: baseRect?.rowStart,
-                },
-              ],
-            ]),
-          ),
-        );
-        return;
-      }
-
-      // "grow": full cascade — bump the hovered widget a tier, squeeze neighbors
-      const rects = new Map<WidgetId, GridRect>();
-      for (const w of visible) {
-        const el = slotRefs.current.get(w.id);
-        const rect = el ? readGridRect(el) : null;
-        if (rect) rects.set(w.id, rect);
-      }
-      applyWithTransition(gridRef.current, () => commitOverrides(computeCascade(hovered.id, visible, rects, gridCols)));
-    });
-    return () => cancelAnimationFrame(frame);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleSig mirrors the parts of `visible` the overrides depend on
-  }, [activeHoveredId, gridCols, visibleSig, commitOverrides]);
 
   function handleDragStart(event: DragStartEvent) {
     setActiveId(event.active.id as WidgetId);
@@ -275,7 +145,7 @@ export function Dashboard() {
         <div className="frame">
           <div className="frame-inner">
             <SortableContext items={visible.map((w) => w.id)} strategy={() => null}>
-              <div className="widget-grid" ref={gridRef}>
+              <div className="widget-grid">
                 {visible.map((instance) => (
                   <GridWidget
                     key={instance.id}
@@ -283,9 +153,6 @@ export function Dashboard() {
                     editMode={editMode}
                     gridCols={gridCols}
                     slotRefs={slotRefs}
-                    cascade={overrides.get(instance.id)}
-                    grown={instance.id === activeHoveredId}
-                    onHoverChange={handleHoverChange}
                   />
                 ))}
               </div>

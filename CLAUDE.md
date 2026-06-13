@@ -35,7 +35,7 @@ A living developer identity card for NutMag2469. A single webpage that shows rea
 - **Card treatment ("sticker/stamp")**: `border-radius: 12–16px`, `border: 1.5px solid` (border token), hard offset `box-shadow: 3-5px 3-5px 0` (shadow token, **no blur**)
 - **Typography**: `DotGothic16` for the logo (`1.7rem`), section/field labels (`0.62rem`, uppercase, `letter-spacing: 0.14em`), and headline stat numbers (`2.2rem`, `line-height: 1` — the largest text on the page). `JetBrains Mono` for primary data values (`1.25rem`, `font-weight: 500`), sub text (`0.75rem`), and chips/pills/badges (`0.6–0.65rem`, uppercase)
 - **Icons**: Lucide, 14×14px, `stroke-width: 1.75`, prefixed to section labels, links, and badges
-- **Motion**: Subtle data transitions plus the shell-owned expansion surfaces (flyout/overlay — below). No scanlines, no grain, no phosphor glow
+- **Motion**: Subtle data transitions and per-size content swaps. No scanlines, no grain, no phosphor glow. (There is no hover/click expansion — see Widget Framework.)
 - **Theme packs**: the token table above is the default **ember** palette. Alternate packs (slate, moss, plum — each with dark+light variants) live as `[data-palette="…"]` blocks in `globals.css` with metadata in `config/themes.ts`; picked from the hub settings widget, persisted to `localStorage["nutmag-palette"]`, applied pre-paint by the inline script in `app/layout.tsx`. New packs must define the full 14-token set for both modes and respect every other rule in this section
 - **Never use**: Inter, Roboto, Arial, system fonts, purple gradients, centered portfolio layouts, pure black/white, neon glow, CRT scanlines/grain, blurred shadows
 
@@ -43,26 +43,32 @@ A living developer identity card for NutMag2469. A single webpage that shows rea
 
 ## Widget Framework — how everything on the page is built
 
-A widget = **one content component + one manifest entry** in `config/widgets.tsx`. The framework supplies everything else: card chrome, label header, grid placement, expansion, polling, settings UI, persistence. Never hand-roll `.block` markup, fetch loops, or expansion logic inside a widget.
+> **Authoring guide**: [`docs/CREATING_WIDGETS.md`](./docs/CREATING_WIDGETS.md) is the step-by-step spec for adding a widget — written so any developer or LLM can follow it literally. Keep it in sync with this section.
 
-**Manifest (`WidgetManifest`)**: `{ id, title, icon, component, expandedComponent?, sizes, orientations, expandModes, defaults, settings?, flags? }`. Flags: `plainChrome` (no card chrome — identity), `customHeader` (chrome but widget renders its own header — github, steam), `accent` (orange left border), `className` (extra class on `.block`).
+A widget = **one content component + one manifest entry** in `config/widgets.tsx`. The framework supplies everything else: card chrome, label header, grid placement, polling, settings UI, persistence. Never hand-roll `.block` markup or fetch loops inside a widget.
 
-**Adding a widget**: write the content component (data + markup only, no shell), optionally an expanded component, register a manifest, append the id to `DEFAULT_ORDER`. Done — it's draggable, resizable, hideable, and configurable automatically.
+**Interaction model**: widgets are **resizable** (S/M/L × h/v) and **rearrangeable** (drag in edit mode). That is the entire model. There is **no hover/click/grow expansion, no flyout, no overlay modal** — that whole subsystem was removed (it caused a hover-oscillation loop and added complexity). Do not reintroduce it. A widget shows more when bigger by **rendering different markup per size**.
+
+**Manifest (`WidgetManifest`)**: `{ id, title, icon, component, detail?, sizes, orientations, defaults, settings?, flags? }`. `id` is the unique key (also the persistence key + card DOM id). `detail?` is a component the shell auto-renders below the main content **at L size only** (the low-effort path to a rich large layout). Flags: `plainChrome` (no card chrome — identity), `customHeader` (chrome but widget renders its own header — github, steam), `accent` (orange left border), `className` (extra class on `.block`).
+
+**Adding a widget**: write the content component (data + markup only, no shell), optionally a `detail` component, register a manifest, append the id to `DEFAULT_ORDER`. Done — it's draggable, resizable, hideable, and configurable automatically.
 
 **Inside a widget**:
-- `useWidget()` (`components/framework/WidgetContext.tsx`) → `{ id, size, orientation, expanded, inOverlay, settings }`
-- `usePolling<T>(url, intervalMs)` (`lib/usePolling.ts`) → shared per-URL cache + timer (the card and its flyout share one request); honors the global polling pref; never commits non-OK responses
+- `useWidget()` (`components/framework/WidgetContext.tsx`) → `{ id, size, orientation, settings }` — **branch on `size` for distinct S/M/L layouts** (the core customization lever)
+- `usePolling<T>(url, intervalMs)` (`lib/usePolling.ts`) → shared per-URL cache + timer; honors the global polling pref; never commits non-OK responses
 - shared formatters in `lib/format.ts` (`timeAgo`, `formatDuration`, `formatMins`)
 
-**Grid engine** (`components/Dashboard.tsx` + `.widget-grid` in `globals.css`): CSS grid, 6 columns at full width (4 ≤1440px, 2 ≤1023px, 1 ≤640px — mirrored in `lib/useGridColumns.ts`), `grid-auto-flow: row dense`, rows `minmax(128px, auto)` so content can never clip. `SPAN_MAP` converts size×orientation presets to spans: S-h 1×1 · S-v 1×2 · M-h 2×1 · M-v 2×2 · L-h 3×2 · L-v 2×3. Drag/drop is dnd-kit over the flat instance list (no transform strategy — live `arrayMove` in `onDragOver` reflows the real grid; a `DragOverlay` carries the visual).
+**Per-size UI**: the shell sets `data-size="S|M|L"` on the `.capsule` (CSS hook). Components either branch on `useWidget().size` (full control — `NowPlaying`, `CurrentlyPlaying`, and `NutBotFaceWidget` which renders the **terminal** at L) or declare a `detail` component (auto-rendered at L inside `.size-l-more` — homelab, jellyfin, arr-stack, github, …). Either way a widget with L-only content **must include `"L"` in `sizes`**.
 
-**Expansion** (shell-owned, `components/framework/WidgetShell.tsx` + span overrides in `components/Dashboard.tsx`): `hover` → the expanded content reveals **inside the card** (`.inline-expand`, framer-motion animated height) while the widget temporarily claims **+1 row span**, so the expansion pushes the rows below down via dense reflow instead of inflating its own row — same-row neighbors keep their height; `grow` → the widget bumps one size tier on hover (S→M, M→L) and the cascade engine (`lib/gridCascade.ts`) shrinks whichever neighbor(s) it displaces by one tier, falling back to a generic micro view (`components/framework/MicroView.tsx`: icon over a blurred ghost) when a neighbor is squeezed to S-span without declaring "S" support — disabled below 4 grid columns; `overlay` → centered modal via portal (NutBot terminal, hub settings panel); `none` → inert. Span/position changes snap instantly — **never attach layout-animation systems to the grid items**: framer-motion `layout` and dnd-kit's `animateLayoutChanges` both re-measure + setState per item after a reflow, and dense flow moves *every* item, so either one loops into "Maximum update depth exceeded" (this is why `useSortable` passes `animateLayoutChanges: () => false`). The old flex-grow width-shift trick stays gone — expansion is span growth + grid reflow, never sibling width squeezing.
+**Grid engine** (`components/Dashboard.tsx` + `.widget-grid` in `globals.css`): CSS grid, 6 columns at full width (4 ≤1440px, 2 ≤1023px, 1 ≤640px — mirrored in `lib/useGridColumns.ts`), `grid-auto-flow: row dense`, rows `minmax(128px, auto)` so content can never clip. `SPAN_MAP` converts size×orientation presets to spans: S-h 1×1 · S-v 1×2 · M-h 2×1 · M-v 2×2 · L-h 3×2 · L-v 2×3. Drag/drop is dnd-kit over the flat instance list (no transform strategy — live reorder in `onDragOver` reflows the real grid; a `DragOverlay` carries the visual). **Never attach layout-animation systems to the grid items**: framer-motion `layout` and dnd-kit's `animateLayoutChanges` both re-measure + setState per item after a reflow, and dense flow moves *every* item, so either one loops into "Maximum update depth exceeded" (this is why `useSortable` passes `animateLayoutChanges: () => false`).
 
-**Per-widget config**: edit mode (wrench toggle) shows a drag handle + gear per card; the gear opens `WidgetSettingsPopover` — placement controls (size/shape/expand/direction/hide, limited to what the manifest supports) plus a form auto-generated from the manifest's `settings` schema (`toggle | select | text | number`).
+**Per-widget config**: edit mode (wrench toggle) shows a drag handle + gear per card; the gear opens `WidgetSettingsPopover` — placement controls (size/shape/hide, limited to what the manifest supports) plus a form auto-generated from the manifest's `settings` schema (`toggle | select | text | number`).
 
-**Persistence** (`lib/layout.ts`): `localStorage["nutmag-layout"]` v2 — `{ version: 2, widgets: WidgetInstance[] }` where order = grid order and each instance carries `size/orientation/expand/expandDirection/hidden/settings`. Every mutation persists immediately. `sanitize()` migrates v1 column layouts (pair ids `media`/`disk-network` expand to their member widgets), clamps values to manifest capabilities, drops unknown ids/settings, and re-appends missing widgets so nothing can disappear. Other keys: `nutmag-theme`, `nutmag-palette`, `nutmag-prefs` (`lib/prefs.ts`: polling on/off, boot sequence on/off), `nutmag-sessions` (`lib/sessions.ts`).
+**Persistence** (`lib/layout.ts`): `localStorage["nutmag-layout"]` v2 — `{ version: 2, widgets: WidgetInstance[] }` where order = grid order and each instance carries `size/orientation/hidden/settings`. Every mutation persists immediately. `sanitize()` migrates v1 column layouts (pair ids `media`/`disk-network` expand to their member widgets), clamps values to manifest capabilities, drops unknown ids/settings, and re-appends missing widgets so nothing can disappear. Other keys: `nutmag-theme`, `nutmag-palette`, `nutmag-prefs` (`lib/prefs.ts`: polling on/off, boot sequence on/off), `nutmag-sessions` (`lib/sessions.ts`).
 
-**Hub settings widget** (`hub-settings`, "AVN Hub"): theme mode + palette picker on the card; overlay holds the full panel — widget visibility checklist, global prefs, layout reset. It can never be hidden (sanitize forces it visible).
+**Widget manager** (`widgets`, "widget manager" — `components/widgets/WidgetManager.tsx`): the single surface for adding/removing widgets. Lists on-screen widgets (removable → `hidden: true`) and available/hidden ones (add-able → `hidden: false`), each with name + `#id`. Any registered widget appears automatically. It can never hide itself (`ALWAYS_VISIBLE` in `lib/layout.ts`), so there's always a way back. Per size: S = count summary, M/L = the gallery.
+
+**Hub settings widget** (`hub-settings`, "AVN Hub"): theme + palette + global prefs + layout reset, rendered per size (S = theme toggle, M = + palette, L = + prefs/reset). Visibility management lives in the widget manager, not here.
 
 ---
 
@@ -126,17 +132,16 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 │       └── github-activity/  github-repos/
 ├── components/
 │   ├── framework/            # THE widget framework — touch with care
-│   │   ├── WidgetShell.tsx   # card chrome + label + expansion machinery
-│   │   ├── WidgetContext.tsx # useWidget() — size/orientation/expanded/settings
-│   │   ├── WidgetFlyout.tsx  # hover expansion (portal, overlays siblings)
-│   │   ├── WidgetOverlay.tsx # click expansion (centered modal)
+│   │   ├── WidgetShell.tsx   # card chrome + label + detail-at-L (no expansion)
+│   │   ├── WidgetContext.tsx # useWidget() — { id, size, orientation, settings }
 │   │   └── WidgetSettingsPopover.tsx  # gear popover (placement + schema form)
 │   ├── widgets/
-│   │   ├── HubSettings.tsx       # "AVN Hub" — theme/palette/visibility/prefs/reset
-│   │   └── NutBotFaceWidget.tsx  # face-only nutbot card
+│   │   ├── HubSettings.tsx       # "AVN Hub" — theme/palette/prefs/reset (per size)
+│   │   ├── WidgetManager.tsx     # add/remove gallery (on-screen vs available)
+│   │   └── NutBotFaceWidget.tsx  # face at S/M, terminal at L
 │   ├── Dashboard.tsx         # grid + dnd-kit drag/drop + edit mode
 │   ├── LayoutProvider.tsx    # layout store context (instances, editMode)
-│   ├── NutBotTerminal.tsx    # tabs/mock shells/xterm — nutbot's overlay
+│   ├── NutBotTerminal.tsx    # tabs/mock shells/xterm — rendered by nutbot at L
 │   └── *.tsx                 # widget content components (no shell markup)
 ├── config/
 │   ├── widgets.tsx           # WIDGETS manifest registry + SPAN_MAP + DEFAULT_ORDER
@@ -152,7 +157,9 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 │   ├── sessions.ts           # session tracker store
 │   └── spotify.ts  steam.ts  github.ts  homelab.ts   # server-side API clients
 ├── styles/
-│   └── globals.css           # tokens (+ theme packs), grid, shell/flyout/overlay CSS
+│   └── globals.css           # tokens (+ theme packs), grid, card/per-size CSS
+├── docs/
+│   └── CREATING_WIDGETS.md   # widget authoring guide (humans + LLMs)
 ├── CLAUDE.md                 # This file
 └── .env.local                # All API keys — never commit this
 ```
@@ -178,10 +185,18 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > 7. Deploy via Docker + Tailscale (see Phase 8 below)
 
 > **Widget framework refactor** (✅ shipped — see "Widget Framework" section)
-> - Manifest-driven widget registry; shell owns chrome/expansion/settings; shared `usePolling`/`format` plumbing
+> - Manifest-driven widget registry; shell owns chrome/settings; shared `usePolling`/`format` plumbing
 > - Configurable grid (size/orientation presets → spans, dense auto-flow) replacing the fixed 4-column layout; dnd-kit drag everywhere
-> - Per-widget config (size, shape, expand mode/direction, hide, schema-driven settings) editable from the site, persisted to localStorage (v1 layouts migrate automatically)
-> - Hub settings widget (theme mode, palette packs, visibility, global prefs, reset); NutBot split into face widget + terminal overlay
+> - Per-widget config (size, shape, hide, schema-driven settings) editable from the site, persisted to localStorage (v1 layouts migrate automatically)
+
+> **Expansion removed → resize-only model** (✅ shipped)
+> - Ripped out all widget expansion (hover/grow/overlay): deleted `gridCascade.ts`, `WidgetFlyout`/`WidgetOverlay`/`MicroView`, the cascade/override/view-transition machinery, and the `expand`/`expandDirection`/`expandModes`/`expandedComponent` fields. (The hover system caused a reflow-oscillation loop.)
+> - Widgets are now **resize + rearrange only**; "more when bigger" is per-size markup (`useWidget().size`) or a manifest `detail` component rendered at L
+> - New **widget manager** widget (`WidgetManager.tsx`) is the single add/remove surface; NutBot renders its terminal at L; Hub Settings renders its full panel at L
+> - Authoring guide written: [`docs/CREATING_WIDGETS.md`](./docs/CREATING_WIDGETS.md)
+
+> **Next — widget-creator chat (planned)**
+> - An in-UI chat widget backed by an LLM (likely Claude CLI) whose sole job is to scaffold new widgets into this ecosystem on request ("make me an X widget"). It should follow `docs/CREATING_WIDGETS.md` exactly: generate the content component + manifest entry + `DEFAULT_ORDER` line. Keep that doc authoritative and machine-followable so this is a thin wrapper.
 
 > **Now — content finalization & v2 modules**
 > - Homelab v2 host telemetry (drives, network) — types defined in `lib/homelab.ts`; aggregator still to build on the homelab side
@@ -233,7 +248,7 @@ Secrets are passed at runtime via `env_file: .env.local` — they are never bake
 ---
 
 ## Retro Polish & Interaction Ideas (weave in during the aesthetic pass — step 6 — or just after)
-> Written under the old CRT aesthetic — re-check each against the Design System before implementing. The widget framework's flyout/overlay expansion (above) is now the primary interaction pattern.
+> Written under the old CRT aesthetic — re-check each against the Design System before implementing. The widget interaction model is now **resize + rearrange only** (no flyout/overlay expansion); richer detail surfaces via per-size layouts (see Widget Framework).
 - **Boot sequence intro**: brief retro-terminal "boot log" animation (dot-matrix text scrolling system checks) on first load, before the card resolves
 - **Glyph-style status pulse**: thin strip of light (orange/cyan/cream) that pulses based on overall state — steady glow when everything's up, irregular flicker if a homelab service is down (Nothing Phone Glyph-inspired)
 - **Personal uptime stat**: live server-process uptime ("Xh Ym running this session" — resets on restart), shown in the namecard. Future: a small DB-backed history service tracks uptime over time for a calendar/heatmap view in Homelab's more-info panel

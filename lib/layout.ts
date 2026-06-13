@@ -8,8 +8,6 @@ import {
   DEFAULT_ORDER,
   WIDGETS,
   resolveSettings,
-  type ExpandDirection,
-  type ExpandMode,
   type Orientation,
   type SettingsValues,
   type WidgetId,
@@ -21,8 +19,6 @@ export type WidgetInstance = {
   id: WidgetId;
   size: WidgetSize;
   orientation: Orientation;
-  expand: ExpandMode;
-  expandDirection: ExpandDirection;
   hidden: boolean;
   settings: SettingsValues;
 };
@@ -36,9 +32,9 @@ export type LayoutState = {
 const STORAGE_KEY = "nutmag-layout";
 const listeners = new Set<() => void>();
 
-/* widgets the user must never lose access to (the framework's own controls
-   live here once the hub-settings widget exists) */
-const ALWAYS_VISIBLE: string[] = ["hub-settings"];
+/* widgets the user must never lose access to — the widget manager is the only
+   surface for re-adding hidden widgets, so it can never hide itself */
+const ALWAYS_VISIBLE: string[] = ["widgets"];
 
 let layout: LayoutState | null = null;
 let defaultLayout: LayoutState | null = null;
@@ -50,8 +46,6 @@ export function defaultInstance(id: WidgetId): WidgetInstance {
     id,
     size: defaults.size,
     orientation: defaults.orientation,
-    expand: defaults.expand,
-    expandDirection: "down",
     hidden: defaults.hidden ?? false,
     settings: resolveSettings(manifest),
   };
@@ -114,8 +108,6 @@ function sanitize(raw: unknown): LayoutState | null {
             id,
             size: clamp(item.size, manifest.sizes, base.size),
             orientation: clamp(item.orientation, manifest.orientations, base.orientation),
-            expand: clamp(item.expand, manifest.expandModes, base.expand),
-            expandDirection: clamp(item.expandDirection, ["down", "up"] as const, "down"),
             hidden: ALWAYS_VISIBLE.includes(id) ? false : typeof item.hidden === "boolean" ? item.hidden : base.hidden,
             settings: resolveSettings(
               manifest,

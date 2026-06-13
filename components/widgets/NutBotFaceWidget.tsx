@@ -1,15 +1,18 @@
 "use client";
 
-// NutBot's compact home: just the animated face and a one-line status
-// ticker. Clicking the card opens the full terminal overlay
-// (NutBotTerminal, wired as the manifest's expandedComponent).
+// NutBot, per size:
+//   S / M → the animated face plus a one-line status ticker
+//   L     → the full interactive terminal (NutBotTerminal)
+// Resize the widget up to reach the terminal; there's no overlay/expansion.
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { NutBotFace } from "@/components/NutBotFace";
-import { LOG_MESSAGES } from "@/components/NutBotTerminal";
+import { LOG_MESSAGES, NutBotTerminal } from "@/components/NutBotTerminal";
+import { useWidget } from "@/components/framework/WidgetContext";
 
 export function NutBotFaceWidget() {
+  const { size } = useWidget();
   const [line, setLine] = useState(LOG_MESSAGES[LOG_MESSAGES.length - 1]);
   const index = useRef(0);
 
@@ -20,6 +23,10 @@ export function NutBotFaceWidget() {
     }, 2600);
     return () => clearInterval(id);
   }, []);
+
+  if (size === "L") {
+    return <NutBotTerminal />;
+  }
 
   return (
     <div className="nutbot-mini">
@@ -37,7 +44,7 @@ export function NutBotFaceWidget() {
           </motion.span>
         </AnimatePresence>
       </div>
-      <div className="nutbot-mini-hint">click to open terminal</div>
+      <div className="nutbot-mini-hint">resize to L for terminal</div>
     </div>
   );
 }
