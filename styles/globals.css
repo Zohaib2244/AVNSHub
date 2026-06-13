@@ -339,6 +339,16 @@ body {
   flex-direction: column;
 }
 
+/* while a hover/cascade override's reflow is in flight (Dashboard.tsx), the
+   grid can shift a different widget under a stationary pointer; suspending
+   pointer events on those *other* slots stops the reflow itself from firing
+   mouseenter/leave and feeding back into another override (oscillation).
+   The actively-hovered slot (.active-hover) keeps pointer-events so real
+   mouse-leave from the user still closes it normally. */
+.widget-grid.reflowing > .widget-slot:not(.active-hover) {
+  pointer-events: none;
+}
+
 /* ─── view transitions (hover-expand / cascade movement) ─────────
    Span/position overrides apply inside document.startViewTransition()
    (Dashboard.tsx) — the browser FLIP-animates each named slot at the

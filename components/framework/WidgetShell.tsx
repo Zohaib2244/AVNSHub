@@ -5,7 +5,7 @@
 // header, and the expansion machinery — widget content components only
 // render their data and read placement state through useWidget().
 
-import { useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
+import { useRef, useState, type FocusEvent, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   resolveSettings,
@@ -73,6 +73,7 @@ export function WidgetShell({
   const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [overlayOpen, setOverlayOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const capsuleRef = useRef<HTMLDivElement>(null);
 
   function hoverEnter() {
     if (closeTimer.current) clearTimeout(closeTimer.current);
@@ -82,7 +83,19 @@ export function WidgetShell({
     onHoverChange?.(true);
   }
 
-  function hoverLeave() {
+  function hoverLeave(e: MouseEvent<HTMLDivElement> | FocusEvent<HTMLDivElement>) {
+    // the expansion this triggers can resize the row tracks it spans, which
+    // shifts this capsule's own box under a stationary pointer; the browser
+    // then re-fires mouseleave with the pointer's last position even though
+    // it's still over the (moved) capsule. Ignore those — only a leave whose
+    // coordinates are actually outside the current box is real, otherwise
+    // this oscillates: leave -> revert -> snap back under pointer -> enter -> …
+    if ("clientX" in e) {
+      const rect = capsuleRef.current?.getBoundingClientRect();
+      if (rect && e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+        return;
+      }
+    }
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => {
       if (expand !== "grow") setFlyoutOpen(false);
@@ -158,6 +171,7 @@ export function WidgetShell({
 
   return (
     <div
+      ref={capsuleRef}
       id={manifest.id}
       className={`capsule${isOpen ? " open" : ""}`}
       onMouseEnter={hoverActive ? hoverEnter : undefined}

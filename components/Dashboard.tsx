@@ -44,11 +44,24 @@ function spanStyle(instance: WidgetInstance, gridCols: number, cascade?: Cascade
 
 /** runs a state update inside a View Transition when the browser supports it,
     so widget span/position changes glide (compositor-level FLIP). Safe where
-    JS layout-animation systems loop: nothing measures + setStates per item. */
-function applyWithTransition(apply: () => void) {
-  const doc = document as Document & { startViewTransition?: (cb: () => void) => void };
-  if (doc.startViewTransition) doc.startViewTransition(() => flushSync(apply));
-  else apply();
+    JS layout-animation systems loop: nothing measures + setStates per item.
+    The dense reflow this triggers can shift a *different* widget under a
+    stationary pointer; browsers recompute :hover (and fire mouseenter/leave)
+    after such a layout change, which would feed back into another override —
+    expand → reflow → re-hover → expand → … an oscillation loop. Suspending
+    pointer events on the grid for the reflow's duration breaks that cycle:
+    only real pointer movement can change the hovered widget. */
+function applyWithTransition(gridEl: HTMLDivElement | null, apply: () => void) {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => { finished: Promise<void> } };
+  if (!doc.startViewTransition) {
+    gridEl?.classList.add("reflowing");
+    apply();
+    requestAnimationFrame(() => requestAnimationFrame(() => gridEl?.classList.remove("reflowing")));
+    return;
+  }
+  gridEl?.classList.add("reflowing");
+  const transition = doc.startViewTransition(() => flushSync(apply));
+  transition.finished.finally(() => gridEl?.classList.remove("reflowing"));
 }
 
 function GridWidget({
@@ -94,7 +107,7 @@ function GridWidget({
   return (
     <div
       ref={setRefs}
-      className={`widget-slot${editMode ? " editing" : ""}${isDragging ? " dragging" : ""}`}
+      className={`widget-slot${editMode ? " editing" : ""}${isDragging ? " dragging" : ""}${grown ? " active-hover" : ""}`}
       // viewTransitionName lets the View Transitions API track each slot
       // individually, so override changes FLIP-animate per widget
       style={{ ...spanStyle(instance, gridCols, cascade), viewTransitionName: `widget-${instance.id}` }}
@@ -148,6 +161,7 @@ export function Dashboard() {
   const [hoveredId, setHoveredId] = useState<WidgetId | null>(null);
   const [overrides, setOverrides] = useState<Map<WidgetId, CascadeOverride>>(new Map());
   const slotRefs = useRef(new Map<WidgetId, HTMLDivElement>());
+  const gridRef = useRef<HTMLDivElement>(null);
   // last (active, over) pair we reordered for — dedupes onDragOver storms so a
   // dense-reflow-triggered re-measure can't feed back into another reorder
   const lastOverPair = useRef<string | null>(null);
@@ -184,7 +198,7 @@ export function Dashboard() {
     const frame = requestAnimationFrame(() => {
       const hovered = activeHoveredId ? visible.find((w) => w.id === activeHoveredId) : undefined;
       if (!hovered) {
-        if (overridesRef.current.size > 0) applyWithTransition(() => commitOverrides(new Map()));
+        if (overridesRef.current.size > 0) applyWithTransition(gridRef.current, () => commitOverrides(new Map()));
         return;
       }
 
@@ -199,7 +213,7 @@ export function Dashboard() {
         // row, which would stretch every same-row neighbor; pinned to its
         // measured anchor so re-placement can't move it off the pointer
         const [cols, rows] = SPAN_MAP[`${hovered.size}-${hovered.orientation}`];
-        applyWithTransition(() =>
+        applyWithTransition(gridRef.current, () =>
           commitOverrides(
             new Map([
               [
@@ -226,7 +240,7 @@ export function Dashboard() {
         const rect = el ? readGridRect(el) : null;
         if (rect) rects.set(w.id, rect);
       }
-      applyWithTransition(() => commitOverrides(computeCascade(hovered.id, visible, rects, gridCols)));
+      applyWithTransition(gridRef.current, () => commitOverrides(computeCascade(hovered.id, visible, rects, gridCols)));
     });
     return () => cancelAnimationFrame(frame);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- visibleSig mirrors the parts of `visible` the overrides depend on
@@ -261,7 +275,7 @@ export function Dashboard() {
         <div className="frame">
           <div className="frame-inner">
             <SortableContext items={visible.map((w) => w.id)} strategy={() => null}>
-              <div className="widget-grid">
+              <div className="widget-grid" ref={gridRef}>
                 {visible.map((instance) => (
                   <GridWidget
                     key={instance.id}
