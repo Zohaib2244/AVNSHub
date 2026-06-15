@@ -6,7 +6,7 @@
 // mode, every empty cell becomes a click target that opens
 // SlotPlacementPopover for picking an unplaced widget.
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { RegionDims, SlotRegionId } from "@/config/slotLayout";
 import type { SlotWidgetInstance } from "@/lib/slotLayout";
 import type { Direction, Rect } from "@/lib/grid/occupancy";
@@ -57,6 +57,15 @@ export function SlotRegion({
     id: w.id,
     rect: { col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan } satisfies Rect,
   }));
+
+  // clear any pending hover timers when the region unmounts (e.g. switching
+  // layout modes mid-hover) so a stray timeout can't fire after teardown
+  useEffect(() => {
+    return () => {
+      if (hoverIntentRef.current !== null) window.clearTimeout(hoverIntentRef.current);
+      if (hoverExitRef.current !== null) window.clearTimeout(hoverExitRef.current);
+    };
+  }, []);
 
   function clearHoverIntent() {
     if (hoverIntentRef.current === null) return;

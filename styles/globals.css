@@ -312,11 +312,13 @@ body {
   flex-direction: column;
   transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
     width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
-  will-change: left, top, width, height;
 }
 
+/* only hint the compositor while a hover-expand is actually in flight —
+   leaving will-change on every idle cell wastes memory for no benefit */
 .slot-region.hover-expanding .slot-cell {
   pointer-events: auto;
+  will-change: left, top, width, height;
 }
 
 .slot-cell.hover-expanded {
