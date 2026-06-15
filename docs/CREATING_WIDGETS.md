@@ -212,12 +212,31 @@ Most data widgets (homelab, jellyfin, arr-stack, github, …) use pattern B — 
 
 ### C. CSS hook
 
-The card element carries `data-size="S|M|L"`. Target it for size-specific
-styling without touching the component:
+The card element carries `data-size="S|M|L"` and is a named inline-size
+container (`container-name: widget`). Target `data-size` for size-specific
+styling and use container queries when a layout needs to adapt to the card's
+actual rendered width:
 
 ```css
 .capsule[data-size="S"] .my-thing { display: none; }
+
+@container widget (max-width: 190px) {
+  .my-control-row { flex-direction: column; }
+}
 ```
+
+### D. Sizing & overflow
+
+Slot Layout lets users choose region grids, so the same S/M/L markup can render
+in cells that are much narrower or shorter than the old fixed span presets.
+Keep compact layouts resilient:
+
+- Rows of buttons, pills, badges, or segmented controls should wrap instead of
+  assuming one horizontal line.
+- Label + control rows should stack under narrow `@container widget (...)`
+  breakpoints.
+- Test the S layout at the narrowest configured cell before shipping; if it
+  clips, shrink the compact chrome or branch to simpler S markup.
 
 ---
 
@@ -288,7 +307,9 @@ there is always a way to bring widgets back.
 
 ## Don't
 
-- ❌ Re-introduce hover/click expansion, flyouts, or overlay modals.
+- ❌ Re-introduce hover/click expansion, flyouts, or overlay modals without a
+  reflow-safe design; dense grid re-measure loops can hit
+  "Maximum update depth exceeded".
 - ❌ Render `.block`/`.capsule`/label markup inside the component.
 - ❌ Fetch with a bare `setInterval` — use `usePolling`.
 - ❌ Hard-code colors or fonts — use the theme tokens.

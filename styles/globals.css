@@ -718,6 +718,8 @@ body {
    Layout's auto-sized rows are unaffected (the row grows to content
    either way). */
 .capsule {
+  container-type: inline-size;
+  container-name: widget;
   min-width: 0;
   min-height: 0;
   flex: 1;
@@ -1340,6 +1342,7 @@ body {
 /* S-tier: the 1x1/1x2 cell doesn't have room for the full min-height card */
 .steam-card:has(.steam-s-shell) {
   min-height: auto;
+  padding: 10px 12px;
 }
 
 /* ─── steam S tier ────────────────────────────────────────────── */
@@ -1348,15 +1351,15 @@ body {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 8px;
+  gap: 5px;
   height: 100%;
 }
 
 .steam-s-title {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   font-weight: 500;
-  line-height: 1.25;
+  line-height: 1.15;
   color: var(--media-text);
   white-space: nowrap;
   overflow: hidden;
@@ -1594,6 +1597,7 @@ body {
 /* S-tier: the 1x1 cell doesn't have room for the full min-height shell */
 .spotify-capsule:has(.spotify-s-shell) {
   min-height: auto;
+  padding: 10px 12px;
 }
 
 /* ─── spotify S tier ──────────────────────────────────────────── */
@@ -1601,13 +1605,14 @@ body {
 .spotify-s-shell {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: center;
+  gap: 5px;
   height: 100%;
 }
 
-.spotify-art-s {
-  width: 40px;
-  height: 40px;
+.spotify-art-frame.spotify-art-s {
+  width: 32px;
+  height: 32px;
   position: relative;
 }
 
@@ -1625,9 +1630,9 @@ body {
 
 .spotify-s-title {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.15;
   color: var(--media-text);
   white-space: nowrap;
   overflow: hidden;
@@ -2612,6 +2617,7 @@ body {
 
 .seg-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
@@ -2642,6 +2648,61 @@ body {
   background: var(--accent-orange);
   border-color: var(--accent-orange);
   color: var(--badge-text);
+}
+
+@container widget (max-width: 190px) {
+  .wset-row {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 5px;
+  }
+
+  .wset-row > span:first-child {
+    white-space: normal;
+  }
+
+  .wset-select,
+  .wset-input,
+  .wset-row .seg-row {
+    max-width: 100%;
+  }
+}
+
+@container widget (max-width: 140px) {
+  .capsule[data-size="S"] > .block {
+    padding: 10px 8px;
+  }
+
+  .capsule[data-size="S"] .block-label {
+    display: none;
+  }
+
+  .spotify-art-frame.spotify-art-s {
+    width: min(32px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  .seg-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .seg-btn {
+    gap: 0;
+    padding: 3px 6px;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+
+  .seg-btn svg {
+    flex-shrink: 0;
+  }
+
+  .wset-row > span:first-child {
+    display: none;
+  }
 }
 
 .wset-hide-btn {
