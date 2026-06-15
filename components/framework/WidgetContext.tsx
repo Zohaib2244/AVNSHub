@@ -7,6 +7,7 @@
 
 import { createContext, useContext } from "react";
 import type { Orientation, SettingsValues, WidgetSize } from "@/config/widgets";
+import type { RegionId } from "@/config/slotLayout";
 
 export type WidgetCtx = {
   id: string;
@@ -16,6 +17,10 @@ export type WidgetCtx = {
   orientation: Orientation;
   /** manifest schema defaults merged with the user's stored values */
   settings: SettingsValues;
+  /** present only inside Slot Layout — the widget's region + cell footprint.
+      Not read by any widget today; reserved for future slot-aware rendering
+      and hover-to-expand. */
+  slot?: { region: RegionId; colSpan: number; rowSpan: number };
 };
 
 export const WidgetContext = createContext<WidgetCtx | null>(null);

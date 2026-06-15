@@ -1,7 +1,6 @@
 import { Github, Server } from "lucide-react";
 import { NutMagLogo } from "@/components/NutMagLogo";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { EditToggle } from "@/components/EditToggle";
 import { UptimeStat } from "@/components/UptimeStat";
 
 export function IdentityBlock() {
@@ -32,7 +31,6 @@ export function IdentityBlock() {
       <div className="namecard-right">
         <div className="namecard-tagline">nutting magnesium amounts of stuff</div>
         <div className="flex items-center gap-2">
-          <EditToggle />
           <ThemeToggle />
           <span className="live-badge">
             <span className="live-dot" />

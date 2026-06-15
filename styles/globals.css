@@ -292,8 +292,10 @@ body {
     height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
-    /* room so sticker shadows aren't clipped by the scroll container */
-    padding: 2px 8px 8px 2px;
+    /* room so sticker shadows AND edit-mode overhangs (.slot-remove-btn's
+       top: -7px, .resize-handle*'s -4px) aren't clipped by the scroll
+       container's edges */
+    padding: 8px;
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
   }
@@ -339,11 +341,385 @@ body {
   flex-direction: column;
 }
 
+/* ─── slot layout (region-based grid, "Preferred Layout") ──────────
+   Three-column frame: Left | Center | Right. Center stacks a single
+   Terminal slot above the 3x2 Base grid. Left/Right are 2x8 grids.
+   Column/row ratios default to 2fr 3fr 2fr / 7fr 3fr, which keeps a
+   cell roughly the same size across regions — Left/Right are 2 cols /
+   8 rows, Base is 3 cols / 2 rows, so Center starts 1.5x a column wide
+   and Base starts at ~30% of the height (enough for two M-size rows
+   without overflow). These ratios are user-adjustable (lib/slotLayout.ts
+   frameRatios, persisted) via drag handles on the terminal cell's
+   edges — SlotDashboard sets the --col-l/--col-c/--col-r and
+   --row-term/--row-base custom properties below from that state; the
+   var() fallbacks are the defaults above.
+   Placement within each region is separately manual; each .slot-cell's
+   gridColumn/gridRow comes from its persisted rect. */
+
+.slot-frame {
+  display: grid;
+  grid-template-columns: var(--col-l, 2fr) var(--col-c, 3fr) var(--col-r, 2fr);
+  gap: 12px;
+}
+
+.slot-center {
+  display: grid;
+  grid-template-rows: var(--row-term, 7fr) var(--row-base, 3fr);
+  gap: 12px;
+  min-height: 0;
+}
+
+.slot-region {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+@media (min-width: 1024px) {
+  .slot-frame {
+    height: 100%;
+  }
+
+  .slot-region,
+  .slot-center {
+    height: 100%;
+  }
+}
+
+.slot-cell {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* lift above siblings while a resize preview is live, so the grown
+   footprint's edges/handles render over neighboring cells */
+.slot-cell.resizing {
+  z-index: 30;
+}
+
+/* dashed outline on every placed widget while editing — mirrors
+   .widget-slot.editing in Graph Layout */
+.slot-cell.editing .block,
+.slot-cell.editing .namecard,
+.slot-terminal.editing .block,
+.slot-terminal.editing .namecard {
+  outline: 1.5px dashed var(--accent-cyan);
+  outline-offset: 3px;
+}
+
+.slot-terminal {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.slot-terminal > .capsule {
+  flex: 1;
+}
+
+.slot-terminal-empty {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.slot-terminal-empty.editing {
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.slot-terminal-empty.editing:hover,
+.slot-terminal-empty.editing:focus-visible {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  outline: none;
+}
+
+/* empty placement cell — click target for SlotPlacementPopover */
+.slot-cell-empty {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.slot-cell-empty:hover,
+.slot-cell-empty:focus-visible {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  outline: none;
+}
+
+/* move/remove buttons — placed widgets while editing, mirrors .gear-btn.
+   Move starts a cell-by-cell reposition drag; remove keeps the destructive
+   hover from .wset-hide-btn. */
+.slot-move-btn,
+.slot-remove-btn {
+  position: absolute;
+  top: -7px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: var(--bg-card);
+  color: var(--accent-cyan);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.slot-move-btn {
+  left: 8px;
+  cursor: grab;
+}
+
+.slot-move-btn:active {
+  cursor: grabbing;
+}
+
+.slot-remove-btn {
+  right: 8px;
+}
+
+.slot-move-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.slot-remove-btn:hover {
+  color: var(--status-down);
+  border-color: var(--status-down);
+}
+
+/* resize handles — one per edge, shown on placed widgets while editing.
+   Same cyan-border-card-fill-→-orange-on-hover language as
+   .drag-handle/.gear-btn; n/s bars use ns-resize, e/w bars use
+   ew-resize. touch-action: none stops the browser's scroll/zoom
+   gestures from competing with pointer-drag on touch devices. */
+.resize-handle {
+  position: absolute;
+  z-index: 25;
+  border: 1px solid var(--accent-cyan);
+  border-radius: 4px;
+  background: var(--bg-card);
+  touch-action: none;
+}
+
+.resize-handle:hover {
+  border-color: var(--accent-orange);
+  background: var(--accent-orange);
+}
+
+.resize-handle-n,
+.resize-handle-s {
+  left: 50%;
+  width: 28px;
+  height: 6px;
+  transform: translateX(-50%);
+  cursor: ns-resize;
+}
+
+.resize-handle-n {
+  top: -4px;
+}
+
+.resize-handle-s {
+  bottom: -4px;
+}
+
+.resize-handle-e,
+.resize-handle-w {
+  top: 50%;
+  width: 6px;
+  height: 28px;
+  transform: translateY(-50%);
+  cursor: ew-resize;
+}
+
+.resize-handle-e {
+  right: -4px;
+}
+
+.resize-handle-w {
+  left: -4px;
+}
+
+/* placement popover — extends .wset-panel */
+.slot-popover-empty {
+  padding: 10px 4px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.slot-popover-search {
+  position: relative;
+}
+
+.slot-popover-search .drawer-search {
+  margin-bottom: 6px;
+  padding-right: 28px;
+}
+
+.slot-popover-search-icon {
+  position: absolute;
+  right: 10px;
+  top: 9px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.slot-popover-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.slot-popover-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.slot-popover-item:hover {
+  background: var(--bg-nested);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* anchor side overrides .wset-panel's right:4px (compound selector for
+   specificity) so the panel stays on-page regardless of which edge of the
+   frame the triggering cell sits on */
+.slot-popover.slot-popover-left {
+  left: 4px;
+  right: auto;
+}
+
+.slot-popover.slot-popover-right {
+  right: 4px;
+  left: auto;
+}
+
+.slot-popover.slot-popover-center {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 1023px) {
+  .slot-frame {
+    grid-template-columns: 1fr;
+  }
+
+  /* frameRatios only affect the desktop 3-column/2-row split — hide the
+     terminal's resize handles on the single-column mobile layout where
+     they'd have no visible effect */
+  .slot-terminal .resize-handle {
+    display: none;
+  }
+}
+
+/* Slot Layout cells are fixed-height (.slot-region rows are 1fr of a 100%-
+   height region) — the page itself never scrolls. When a widget's content
+   needs more room than its cell allows, the card scrolls internally instead
+   of silently clipping via overflow: hidden. .namecard gets the same
+   treatment as .block (mirrors the .editing dashed-outline selector list
+   below) since the identity widget can land in any slot cell too. Graph
+   Layout's auto-sized rows never produce this overflow, so neither is
+   touched there. The scrollbar itself stays hidden until the card is
+   hovered, so cells that happen to overflow don't show a permanent
+   scrollbar track. */
+.slot-cell .block,
+.slot-cell .namecard,
+.slot-terminal .block,
+.slot-terminal .namecard {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.slot-cell .block:hover,
+.slot-cell .namecard:hover,
+.slot-terminal .block:hover,
+.slot-terminal .namecard:hover {
+  scrollbar-color: var(--border) transparent;
+}
+
+.slot-cell .block::-webkit-scrollbar,
+.slot-cell .namecard::-webkit-scrollbar,
+.slot-terminal .block::-webkit-scrollbar,
+.slot-terminal .namecard::-webkit-scrollbar {
+  width: 6px;
+}
+
+.slot-cell .block::-webkit-scrollbar-thumb,
+.slot-cell .namecard::-webkit-scrollbar-thumb,
+.slot-terminal .block::-webkit-scrollbar-thumb,
+.slot-terminal .namecard::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.slot-cell .block:hover::-webkit-scrollbar-thumb,
+.slot-cell .namecard:hover::-webkit-scrollbar-thumb,
+.slot-terminal .block:hover::-webkit-scrollbar-thumb,
+.slot-terminal .namecard:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
+}
+
 /* ─── blocks ("sticker" cards) ──────────────────────────────────── */
 
-/* shell wrapper around every widget card — fills the grid slot */
+/* shell wrapper around every widget card — fills the grid slot.
+   min-height: 0 lets it shrink below its content's natural height when
+   the parent has a fixed size (Slot Layout's fixed-fraction .slot-cell
+   rows) — otherwise .capsule's default min-height: auto holds it at
+   content size and the card overflows into the cell below. Graph
+   Layout's auto-sized rows are unaffected (the row grows to content
+   either way). */
 .capsule {
   min-width: 0;
+  min-height: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -2349,6 +2725,93 @@ body {
   border-color: var(--accent-orange);
 }
 
+/* ─── AVN Hub Core Settings (fixed top-right panel) ─────────────
+   global controls that live outside any widget: edit mode, the
+   graph/default layout-mode switch, and mode-specific settings
+   (components/HubCorePanel.tsx) */
+
+.hub-core {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  z-index: 100;
+}
+
+.hub-core-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 250px;
+  max-height: calc(100vh - 60px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 12px;
+  box-shadow: 5px 5px 0 var(--shadow);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.hub-core-section + .hub-core-section {
+  border-top: 1px solid var(--border);
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.hub-core-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.hub-core-chevron {
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.hub-core-chevron.open {
+  transform: rotate(180deg);
+}
+
+.hub-core-section-body {
+  margin-top: 8px;
+}
+
+.hub-core-dims {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dims-input {
+  width: 36px;
+  padding: 3px 4px;
+  text-align: center;
+}
+
+.hub-core-dims-sep {
+  color: var(--text-muted-dim);
+  font-size: 0.6rem;
+}
+
+.hub-core-fixed-note {
+  color: var(--text-muted-dim);
+  font-size: 0.62rem;
+}
+
+.hub-core-placeholder {
+  color: var(--text-muted-dim);
+  font-size: 0.66rem;
+  line-height: 1.5;
+}
+
 /* ─── widget manager ─────────────────────────────────────────────
    the add/remove gallery (components/widgets/WidgetManager.tsx) */
 
@@ -2455,4 +2918,3 @@ body {
   color: var(--text-muted-dim);
   opacity: 0.7;
 }
-

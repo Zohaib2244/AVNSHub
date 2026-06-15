@@ -20,6 +20,8 @@ import {
   type ThemeMode,
 } from "@/lib/theme";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
+import { DEFAULT_LAYOUT_MODE, setLayoutMode } from "@/lib/layoutMode";
+import { resetSlotLayout } from "@/lib/slotLayout";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/LayoutProvider";
 
@@ -74,6 +76,13 @@ function PaletteRow() {
 function GeneralPrefs() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
   const { resetLayout } = useLayout();
+
+  function resetAll() {
+    resetLayout();
+    resetSlotLayout();
+    setLayoutMode(DEFAULT_LAYOUT_MODE);
+  }
+
   return (
     <>
       <div className="more-head">general</div>
@@ -93,7 +102,7 @@ function GeneralPrefs() {
           onChange={(e) => setPrefs({ bootSequence: e.target.checked })}
         />
       </label>
-      <button type="button" className="wset-hide-btn hub-reset" onClick={resetLayout}>
+      <button type="button" className="wset-hide-btn hub-reset" onClick={resetAll}>
         <RotateCcw size={12} strokeWidth={1.75} />
         reset layout & widget config
       </button>

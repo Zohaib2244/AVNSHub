@@ -17,6 +17,7 @@ import {
   type WidgetManifest,
   type WidgetSize,
 } from "@/config/widgets";
+import type { RegionId } from "@/config/slotLayout";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 
 /** the per-instance slice the shell cares about; missing fields fall back
@@ -25,6 +26,8 @@ export type ShellConfig = {
   size?: WidgetSize;
   orientation?: Orientation;
   settings?: SettingsValues;
+  /** Slot Layout only — passed through to useWidget().slot, see WidgetContext */
+  slot?: { region: RegionId; colSpan: number; rowSpan: number };
 };
 
 export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; config?: ShellConfig }) {
@@ -37,7 +40,7 @@ export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; co
   const flags = manifest.flags ?? {};
   const Icon = manifest.icon;
 
-  const ctx = { id: manifest.id, size, orientation, settings };
+  const ctx = { id: manifest.id, size, orientation, settings, slot: config?.slot };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
 
