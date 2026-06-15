@@ -43,10 +43,11 @@ import { HubSettings } from "@/components/widgets/HubSettings";
    (components/framework/WidgetShell.tsx) supplies the card chrome, label,
    and grid placement; per-instance overrides (size, orientation, settings)
    come from the layout store. Widgets are resizable (S/M/L × h/v, limited to
-   what the manifest declares) and rearrangeable in edit mode — that's the
-   whole interaction model. There is no hover/click expansion: a widget that
-   wants a richer large layout reads useWidget().size and/or declares a
-   `detail` component (rendered automatically at L size).
+   what the manifest declares) and rearrangeable in edit mode. Slot Layout
+   also has transient visual-only hover preview boxes; they must not mutate
+   stored layout or replace a widget's size contract. A widget that wants a
+   richer large layout reads useWidget().size and/or declares a `detail` component
+   (rendered automatically at L size).
 
    See docs/CREATING_WIDGETS.md for the full authoring guide.
 ──────────────────────────────────────────────────────────────────── */
@@ -61,6 +62,10 @@ export type SettingsField =
   | { key: string; label: string; type: "number"; default: number; min?: number; max?: number };
 
 export type SettingsValues = Record<string, string | number | boolean>;
+
+export const FRAMEWORK_SETTINGS: SettingsField[] = [
+  { key: "hoverExpand", label: "slot hover expand", type: "toggle", default: false },
+];
 
 export type WidgetManifest = {
   /** stable unique identifier — the object key, the layout/persistence key,
@@ -100,7 +105,7 @@ export type WidgetManifest = {
     (wrong types / unknown select options fall back to the field default) */
 export function resolveSettings(manifest: WidgetManifest, stored?: SettingsValues): SettingsValues {
   const values: SettingsValues = {};
-  for (const field of manifest.settings ?? []) {
+  for (const field of [...FRAMEWORK_SETTINGS, ...(manifest.settings ?? [])]) {
     const saved = stored?.[field.key];
     const valid =
       typeof saved === typeof field.default &&

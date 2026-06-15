@@ -5,10 +5,11 @@
 // and provides placement/settings context. Widget content components only
 // render their data and read state through useWidget().
 //
-// There is NO hover/click expansion — widgets are resizable and rearrangeable,
-// nothing more. A widget gets a richer large layout two ways: branch on
-// useWidget().size inside the component, or declare a manifest `detail`
-// component, which the shell renders below the main content at L size.
+// Widgets get richer large layouts two ways: branch on useWidget().size inside
+// the component, or declare a manifest `detail` component, which the shell
+// renders below the main content at L size. Slot Layout's Hover On Expand uses
+// transient preview boxes handled by SlotRegion/SlotWidgetCell; the shell only
+// receives a boolean so existing detail UI can reveal while expanded.
 
 import {
   resolveSettings,
@@ -26,6 +27,8 @@ export type ShellConfig = {
   size?: WidgetSize;
   orientation?: Orientation;
   settings?: SettingsValues;
+  /** Slot Layout only — transient Hover On Expand preview, not persisted */
+  hoverExpanded?: boolean;
   /** Slot Layout only — passed through to useWidget().slot, see WidgetContext */
   slot?: { region: RegionId; colSpan: number; rowSpan: number };
 };
@@ -40,7 +43,8 @@ export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; co
   const flags = manifest.flags ?? {};
   const Icon = manifest.icon;
 
-  const ctx = { id: manifest.id, size, orientation, settings, slot: config?.slot };
+  const hoverExpanded = config?.hoverExpanded ?? false;
+  const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
 
@@ -54,7 +58,7 @@ export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; co
       )}
       <Content />
       {/* detail content shows once the card is large enough to hold it */}
-      {Detail && size === "L" && (
+      {Detail && (size === "L" || hoverExpanded) && (
         <div className="size-l-more">
           <Detail />
         </div>

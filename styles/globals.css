@@ -370,6 +370,7 @@ body {
 }
 
 .slot-region {
+  position: relative;
   display: grid;
   gap: 12px;
   min-height: 0;
@@ -392,6 +393,33 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  transition: left 0.34s cubic-bezier(0.4, 0, 0.2, 1), top 0.34s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.34s cubic-bezier(0.4, 0, 0.2, 1), height 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+  will-change: left, top, width, height;
+}
+
+.slot-region.hover-expanding .slot-cell {
+  pointer-events: auto;
+}
+
+.slot-cell.hover-expanded {
+  z-index: 35;
+}
+
+.slot-cell.hover-contracted {
+  z-index: 18;
+  opacity: 0.82;
+}
+
+.slot-cell.hover-expanded .block,
+.slot-cell.hover-expanded .namecard {
+  border-color: var(--accent-orange);
+  box-shadow: 5px 5px 0 var(--shadow);
+}
+
+.slot-cell.hover-contracted .block,
+.slot-cell.hover-contracted .namecard {
+  border-color: color-mix(in srgb, var(--border) 82%, var(--bg-card));
 }
 
 /* lift above siblings while a resize preview is live, so the grown
@@ -504,6 +532,10 @@ body {
 
 .slot-remove-btn {
   right: 8px;
+}
+
+.slot-settings-btn {
+  right: 36px;
 }
 
 .slot-move-btn:hover {
@@ -706,6 +738,13 @@ body {
 .slot-terminal .block:hover::-webkit-scrollbar-thumb,
 .slot-terminal .namecard:hover::-webkit-scrollbar-thumb {
   background: var(--border);
+}
+
+@media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
+  .slot-cell {
+    transition: none;
+    will-change: auto;
+  }
 }
 
 /* ─── blocks ("sticker" cards) ──────────────────────────────────── */

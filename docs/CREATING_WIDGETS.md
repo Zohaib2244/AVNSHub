@@ -15,10 +15,14 @@ following it literally.** No framework internals need to be touched.
 
 ## The interaction model (what widgets do and don't do)
 
-Widgets are **resizable** and **rearrangeable**. That's it. There is **no hover
-expansion, no click-to-open overlay, no "grow" cascade.** A previous version had
-those; they were removed. Do **not** reintroduce any expand/flyout/overlay
-mechanism.
+Widgets are **resizable** and **rearrangeable**. Slot Layout also has an
+opt-in transient **Hover On Expand** visual preview: when a widget's
+`slot hover expand` setting is enabled, the hovered widget gets a real larger
+preview box, and only directly edge-touching neighbors get smaller preview
+boxes. It does not persist layout, change a widget's configured size, open an
+overlay, or start a neighbor cascade. A previous flyout/overlay/grow system was
+removed after it caused reflow loops; do not reintroduce that style of
+expansion.
 
 A widget that wants to show more when it's bigger does so by **rendering
 different markup per size** (see [Per-size UI](#per-size-ui-the-core-feature)).
@@ -237,6 +241,9 @@ Keep compact layouts resilient:
   breakpoints.
 - Test the S layout at the narrowest configured cell before shipping; if it
   clips, shrink the compact chrome or branch to simpler S markup.
+- If the widget has useful hidden detail on hover, test it with the per-widget
+  `slot hover expand` setting enabled in Slot Layout and keep the expanded
+  state readable without relying on an overlay.
 
 ---
 
@@ -307,8 +314,8 @@ there is always a way to bring widgets back.
 
 ## Don't
 
-- ❌ Re-introduce hover/click expansion, flyouts, or overlay modals without a
-  reflow-safe design; dense grid re-measure loops can hit
+- ❌ Re-introduce hover/click flyouts, overlay modals, persisted hover layout,
+  or neighbor-cascading expansion; dense grid re-measure loops can hit
   "Maximum update depth exceeded".
 - ❌ Render `.block`/`.capsule`/label markup inside the component.
 - ❌ Fetch with a bare `setInterval` — use `usePolling`.

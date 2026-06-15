@@ -8,14 +8,18 @@
 // repositions it, and four edge handles let the user drag-resize the footprint
 // cell-by-cell.
 
-import { useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { Move, X } from "lucide-react";
+import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { Move, Settings2, X } from "lucide-react";
 import { WIDGETS } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
-import { removeWidget, setWidgetRect, getSlotLayout, type SlotWidgetInstance } from "@/lib/slotLayout";
+import { getSlotLayout, removeWidget, setWidgetRect, updateWidgetSettings, type SlotWidgetInstance } from "@/lib/slotLayout";
+import type { WidgetInstance } from "@/lib/layout";
 import { sizeClassForFootprint } from "@/lib/grid/sizeClass";
 import { buildOccupancy, canPlace, growRect, shrinkRect, maxGrowth, type Direction, type Rect } from "@/lib/grid/occupancy";
+import type { HoverExpandEffect } from "@/lib/grid/hoverExpand";
 import { useLayout } from "@/components/LayoutProvider";
+import type { HoverGridMetrics } from "@/components/framework/SlotRegion";
+import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
 import { WidgetShell } from "@/components/framework/WidgetShell";
 
 const DIRECTIONS: Direction[] = ["n", "s", "e", "w"];
@@ -42,23 +46,75 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function SlotWidgetCell({ instance }: { instance: SlotWidgetInstance }) {
+function directionsFromPointer(e: ReactPointerEvent<HTMLElement>): Direction[] {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const horizontal = [
+    { direction: "w" as const, distance: x },
+    { direction: "e" as const, distance: rect.width - x },
+  ];
+  const vertical = [
+    { direction: "n" as const, distance: y },
+    { direction: "s" as const, distance: rect.height - y },
+  ];
+
+  return [...horizontal.sort((a, b) => a.distance - b.distance), ...vertical.sort((a, b) => a.distance - b.distance)].map(
+    (entry) => entry.direction,
+  );
+}
+
+function hoverBoxStyle(rect: Rect, metrics: HoverGridMetrics): CSSProperties {
+  const xPitch = metrics.trackWidth + metrics.gap;
+  const yPitch = metrics.trackHeight + metrics.gap;
+  return {
+    position: "absolute",
+    left: rect.col * xPitch,
+    top: rect.row * yPitch,
+    width: rect.colSpan * metrics.trackWidth + Math.max(0, rect.colSpan - 1) * metrics.gap,
+    height: rect.rowSpan * metrics.trackHeight + Math.max(0, rect.rowSpan - 1) * metrics.gap,
+  };
+}
+
+export function SlotWidgetCell({
+  instance,
+  hoverEffect,
+  hoverMetrics,
+  onHoverIntent,
+  onHoverExit,
+}: {
+  instance: SlotWidgetInstance;
+  hoverEffect?: HoverExpandEffect;
+  hoverMetrics?: HoverGridMetrics;
+  onHoverIntent?: (id: string, preferredDirections: Direction[]) => void;
+  onHoverExit?: () => void;
+}) {
   const { editMode } = useLayout();
   const manifest = WIDGETS[instance.id];
   const cellRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [previewRect, setPreviewRect] = useState<Rect | null>(null);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const activeHoverEffect = hoverEffect && hoverMetrics ? hoverEffect : undefined;
 
   const persistedRect: Rect = { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
-  const rect = previewRect ?? persistedRect;
+  const rect = activeHoverEffect?.visualRect ?? previewRect ?? persistedRect;
 
   const { size, orientation } = sizeClassForFootprint(
     { colSpan: rect.colSpan, rowSpan: rect.rowSpan },
     manifest.sizes,
     manifest.orientations,
   );
+  const settingsInstance: WidgetInstance = {
+    id: instance.id,
+    size,
+    orientation,
+    hidden: false,
+    settings: instance.settings,
+  };
 
   function startDrag(mode: DragState["mode"], e: ReactPointerEvent<HTMLElement>, direction?: Direction) {
+    onHoverExit?.();
     e.preventDefault();
     e.stopPropagation();
     const region = cellRef.current?.closest<HTMLElement>(".slot-region");
@@ -152,14 +208,31 @@ export function SlotWidgetCell({ instance }: { instance: SlotWidgetInstance }) {
     setPreviewRect(null);
   }
 
+  function handleHoverPointerEnter(e: ReactPointerEvent<HTMLDivElement>) {
+    if (editMode || previewRect || e.pointerType === "touch") return;
+    onHoverIntent?.(instance.id, directionsFromPointer(e));
+  }
+
+  function handleHoverPointerLeave() {
+    if (activeHoverEffect?.state === "expanded") onHoverExit?.();
+  }
+
+  const hoverStyle = activeHoverEffect && hoverMetrics ? hoverBoxStyle(activeHoverEffect.visualRect, hoverMetrics) : null;
+
   return (
     <div
       ref={cellRef}
-      className={`slot-cell${editMode ? " editing" : ""}${previewRect ? " resizing" : ""}`}
+      className={`slot-cell${editMode ? " editing" : ""}${previewRect ? " resizing" : ""}${
+        activeHoverEffect ? ` hover-${activeHoverEffect.state}` : ""
+      }`}
+      data-hover-expand={activeHoverEffect?.state}
       style={{
-        gridColumn: `${rect.col + 1} / span ${rect.colSpan}`,
-        gridRow: `${rect.row + 1} / span ${rect.rowSpan}`,
+        gridColumn: hoverStyle ? undefined : `${rect.col + 1} / span ${rect.colSpan}`,
+        gridRow: hoverStyle ? undefined : `${rect.row + 1} / span ${rect.rowSpan}`,
+        ...hoverStyle,
       }}
+      onPointerEnter={handleHoverPointerEnter}
+      onPointerLeave={handleHoverPointerLeave}
     >
       {editMode && (
         <>
@@ -183,6 +256,24 @@ export function SlotWidgetCell({ instance }: { instance: SlotWidgetInstance }) {
           >
             <X size={12} strokeWidth={1.75} />
           </button>
+          <button
+            type="button"
+            className="gear-btn slot-settings-btn"
+            aria-label={`configure ${instance.id} widget`}
+            onClick={() => setSettingsOpen((open) => !open)}
+          >
+            <Settings2 size={12} strokeWidth={1.75} />
+          </button>
+          {settingsOpen && (
+            <WidgetSettingsPopover
+              manifest={manifest}
+              instance={settingsInstance}
+              mode="slot"
+              onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
+              onHide={() => removeWidget(instance.id)}
+              onClose={() => setSettingsOpen(false)}
+            />
+          )}
           {DIRECTIONS.map((dir) => (
             <div
               key={dir}
@@ -201,6 +292,7 @@ export function SlotWidgetCell({ instance }: { instance: SlotWidgetInstance }) {
           size,
           orientation,
           settings: instance.settings,
+          hoverExpanded: activeHoverEffect?.state === "expanded",
           slot: { region: instance.region, colSpan: rect.colSpan, rowSpan: rect.rowSpan },
         }}
       />

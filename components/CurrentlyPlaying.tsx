@@ -38,7 +38,7 @@ function RecentlyPlayed({ data }: { data: CurrentlyPlayingData | undefined }) {
 }
 
 export function CurrentlyPlaying() {
-  const { size } = useWidget();
+  const { size, hoverExpanded } = useWidget();
   const { data } = usePolling<CurrentlyPlayingData>(POLL_URL, POLL_MS);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -138,7 +138,7 @@ export function CurrentlyPlaying() {
         </div>
       </div>
 
-      {size === "L" && (
+      {(size === "L" || hoverExpanded) && (
         <div className="size-l-more">
           <RecentlyPlayed data={data} />
         </div>

@@ -7,7 +7,12 @@
 
 import { useEffect, useRef } from "react";
 import { EyeOff, X } from "lucide-react";
-import type { SettingsField, WidgetManifest } from "@/config/widgets";
+import {
+  FRAMEWORK_SETTINGS,
+  type SettingsField,
+  type SettingsValues,
+  type WidgetManifest,
+} from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
 import { useLayout } from "@/components/LayoutProvider";
 
@@ -81,13 +86,25 @@ export function WidgetSettingsPopover({
   manifest,
   instance,
   onClose,
+  mode = "graph",
+  onUpdateSettings,
+  onHide,
 }: {
   manifest: WidgetManifest;
   instance: WidgetInstance;
   onClose: () => void;
+  mode?: "graph" | "slot";
+  onUpdateSettings?: (settings: SettingsValues) => void;
+  onHide?: () => void;
 }) {
   const { updateInstance } = useLayout();
   const panelRef = useRef<HTMLDivElement>(null);
+  const showPlacement = mode === "graph";
+
+  function updateSettings(settings: SettingsValues) {
+    if (onUpdateSettings) onUpdateSettings(settings);
+    else updateInstance(instance.id, { settings });
+  }
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
@@ -116,55 +133,72 @@ export function WidgetSettingsPopover({
         </button>
       </div>
 
-      <div className="wset-section">placement</div>
+      {showPlacement && (
+        <>
+          <div className="wset-section">placement</div>
 
-      <div className="wset-row">
-        <span>size</span>
-        <div className="seg-row">
-          {manifest.sizes.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`seg-btn${instance.size === s ? " active" : ""}`}
-              onClick={() => updateInstance(instance.id, { size: s })}
-              title={SIZE_LABELS[s]}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {manifest.orientations.length > 1 && (
-        <div className="wset-row">
-          <span>shape</span>
-          <div className="seg-row">
-            {manifest.orientations.map((o) => (
-              <button
-                key={o}
-                type="button"
-                className={`seg-btn${instance.orientation === o ? " active" : ""}`}
-                onClick={() => updateInstance(instance.id, { orientation: o })}
-                title={ORIENTATION_LABELS[o]}
-              >
-                {ORIENTATION_LABELS[o]}
-              </button>
-            ))}
+          <div className="wset-row">
+            <span>size</span>
+            <div className="seg-row">
+              {manifest.sizes.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`seg-btn${instance.size === s ? " active" : ""}`}
+                  onClick={() => updateInstance(instance.id, { size: s })}
+                  title={SIZE_LABELS[s]}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+
+          {manifest.orientations.length > 1 && (
+            <div className="wset-row">
+              <span>shape</span>
+              <div className="seg-row">
+                {manifest.orientations.map((o) => (
+                  <button
+                    key={o}
+                    type="button"
+                    className={`seg-btn${instance.orientation === o ? " active" : ""}`}
+                    onClick={() => updateInstance(instance.id, { orientation: o })}
+                    title={ORIENTATION_LABELS[o]}
+                  >
+                    {ORIENTATION_LABELS[o]}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      <button
-        type="button"
-        className="wset-hide-btn"
-        onClick={() => {
-          updateInstance(instance.id, { hidden: true });
-          onClose();
-        }}
-      >
-        <EyeOff size={12} strokeWidth={1.75} />
-        hide widget
-      </button>
+      <div className="wset-section">interaction</div>
+      {FRAMEWORK_SETTINGS.map((field) => (
+        <SchemaField
+          key={field.key}
+          field={field}
+          value={instance.settings[field.key] ?? field.default}
+          onChange={(value) => updateSettings({ [field.key]: value })}
+        />
+      ))}
+
+      {onHide || showPlacement ? (
+        <button
+          type="button"
+          className="wset-hide-btn"
+          onClick={() => {
+            if (onHide) onHide();
+            else updateInstance(instance.id, { hidden: true });
+            onClose();
+          }}
+        >
+          <EyeOff size={12} strokeWidth={1.75} />
+          {mode === "slot" ? "remove widget" : "hide widget"}
+        </button>
+      ) : null}
 
       {(manifest.settings?.length ?? 0) > 0 && (
         <>
@@ -174,7 +208,7 @@ export function WidgetSettingsPopover({
               key={field.key}
               field={field}
               value={instance.settings[field.key] ?? field.default}
-              onChange={(value) => updateInstance(instance.id, { settings: { [field.key]: value } })}
+              onChange={(value) => updateSettings({ [field.key]: value })}
             />
           ))}
         </>

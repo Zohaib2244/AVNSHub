@@ -69,7 +69,7 @@ function RecentTracks({ data, onPlayTrack }: { data: NowPlayingData | undefined;
 }
 
 export function NowPlaying() {
-  const { size } = useWidget();
+  const { size, hoverExpanded } = useWidget();
   const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS);
   const [controlError, setControlError] = useState<string | null>(null);
 
@@ -199,7 +199,7 @@ export function NowPlaying() {
 
       {controlError && <div className="control-error">{controlError}</div>}
 
-      {size === "L" && (
+      {(size === "L" || hoverExpanded) && (
         <div className="size-l-more">
           <RecentTracks data={data} onPlayTrack={playTrack} />
         </div>

@@ -298,6 +298,19 @@ export function removeWidget(id: WidgetId) {
   commit({ ...current, widgets: current.widgets.filter((w) => w.id !== id) });
 }
 
+/** update the settings stored on a placed slot widget */
+export function updateWidgetSettings(id: WidgetId, settings: SettingsValues) {
+  const current = getSlotLayout();
+  const instance = current.widgets.find((w) => w.id === id);
+  if (!instance) return;
+
+  const nextSettings = resolveSettings(WIDGETS[id], { ...instance.settings, ...settings });
+  commit({
+    ...current,
+    widgets: current.widgets.map((w) => (w.id === id ? { ...w, settings: nextSettings } : w)),
+  });
+}
+
 /** set/clear the terminal slot's occupant; if `id` was placed in a region
     it's removed from there first */
 export function setTerminalWidget(id: WidgetId | null) {
