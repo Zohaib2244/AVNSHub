@@ -1,9 +1,10 @@
 "use client";
+import "./CurrentlyPlaying.css";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Copy, Library } from "lucide-react";
-import { GameLibrary } from "@/components/media/GameLibrary";
+import { GameLibrary } from "@/components/widgets/default/media/GameLibrary";
 import { usePolling } from "@/lib/usePolling";
 import { timeAgo } from "@/lib/format";
 import { useWidget } from "@/components/framework/WidgetContext";

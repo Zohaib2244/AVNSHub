@@ -93,12 +93,14 @@ export function SlotWidgetCell({
   onHoverIntent?: (id: string, preferredDirections: Direction[]) => void;
   onHoverExit?: () => void;
 }) {
-  const { editMode } = useLayout();
+  const { editMode, activePopover, setActivePopover } = useLayout();
   const manifest = WIDGETS[instance.id];
   const cellRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [previewRect, setPreviewRect] = useState<Rect | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  // shared so opening one widget's settings closes any other open popover
+  const popoverKey = `settings:${instance.id}`;
+  const settingsOpen = activePopover === popoverKey;
   const activeHoverEffect = hoverEffect && hoverMetrics ? hoverEffect : undefined;
 
   const persistedRect: Rect = { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
@@ -322,7 +324,7 @@ export function SlotWidgetCell({
             type="button"
             className="gear-btn slot-settings-btn"
             aria-label={`configure ${instance.id} widget`}
-            onClick={() => setSettingsOpen((open) => !open)}
+            onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
           >
             <Settings2 size={12} strokeWidth={1.75} />
           </button>
@@ -333,7 +335,7 @@ export function SlotWidgetCell({
               mode="slot"
               onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
               onHide={() => removeWidget(instance.id)}
-              onClose={() => setSettingsOpen(false)}
+              onClose={() => setActivePopover(null)}
             />
           )}
           {DIRECTIONS.map((dir) => (

@@ -1,4 +1,5 @@
 "use client";
+import "./NowPlaying.css";
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";

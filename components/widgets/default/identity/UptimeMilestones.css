@@ -1,0 +1,101 @@
+/* ─── uptime milestones ──────────────────────────────────────── */
+
+.milestone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--bg-nested);
+}
+
+.milestone:last-child {
+  border-bottom: none;
+}
+
+.m-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+}
+
+.m-icon.reached {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.m-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.m-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.m-flag {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent-orange);
+}
+
+.m-pct {
+  font-size: 0.6rem;
+  color: var(--text-muted);
+}
+
+.m-sub {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+.progress-wrap {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.m-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.m-footer-label {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.m-footer-session {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.m-footer-value {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: var(--accent-orange);
+}

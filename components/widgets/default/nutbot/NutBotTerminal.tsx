@@ -1,4 +1,5 @@
 "use client";
+import "./NutBotTerminal.css";
 
 // NutBot's full terminal — log ticker, mock shell tabs, and the optional
 // xterm real shell. Lives in the face widget's click-to-expand overlay, so
@@ -7,8 +8,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X } from "lucide-react";
-import { NutBotFace } from "@/components/nutbot/NutBotFace";
-import { RealShell } from "@/components/nutbot/RealShell";
+import { NutBotFace } from "@/components/widgets/default/nutbot/NutBotFace";
+import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 
 const SHELL_WS_URL = process.env.NEXT_PUBLIC_NUTBOT_SHELL_URL;
 

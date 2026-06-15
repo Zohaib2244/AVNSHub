@@ -5,7 +5,7 @@
 // widgets that fit the target region (any widget fits the single-slot
 // terminal); picking one commits via placeWidget/setTerminalWidget.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Search, X } from "lucide-react";
 import { WIDGETS, type WidgetId } from "@/config/widgets";
 import { minFootprint, type RegionId } from "@/config/slotLayout";
@@ -16,6 +16,10 @@ import { getSlotLayout, getUnplacedWidgets, placeWidget, setTerminalWidget } fro
 export function SlotPlacementPopover({ region, onClose }: { region: RegionId; onClose: () => void }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
+  // keyboard-highlighted row; the top match starts selected so a plain Enter
+  // after typing picks it
+  const [activeIndex, setActiveIndex] = useState(0);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
@@ -52,11 +56,36 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
         });
 
   const filtered = fuzzyFilter(candidates, query, (id) => WIDGETS[id].title);
+  const clampedIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : 0;
+
+  // reset the highlight to the top match whenever the result set changes
+  useEffect(() => {
+    setActiveIndex(0);
+  }, [query]);
+
+  // keep the highlighted row scrolled into view as arrows move it
+  useEffect(() => {
+    itemRefs.current[clampedIndex]?.scrollIntoView({ block: "nearest" });
+  }, [clampedIndex]);
 
   function handlePick(id: WidgetId) {
     if (region === "terminal") setTerminalWidget(id);
     else placeWidget(id, region);
     onClose();
+  }
+
+  function handleSearchKeyDown(e: ReactKeyboardEvent<HTMLInputElement>) {
+    if (filtered.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex(Math.min(clampedIndex + 1, filtered.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex(Math.max(clampedIndex - 1, 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      handlePick(filtered[clampedIndex]);
+    }
   }
 
   const anchorClass = region === "left" ? "slot-popover-left" : region === "right" ? "slot-popover-right" : "slot-popover-center";
@@ -81,6 +110,7 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
               placeholder="search widgets..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleSearchKeyDown}
               spellCheck={false}
               autoComplete="off"
               autoFocus
@@ -91,11 +121,20 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
             <div className="slot-popover-empty">no matches for &ldquo;{query.trim()}&rdquo;</div>
           ) : (
             <div className="slot-popover-list">
-              {filtered.map((id) => {
+              {filtered.map((id, i) => {
                 const manifest = WIDGETS[id];
                 const Icon = manifest.icon;
                 return (
-                  <button key={id} type="button" className="slot-popover-item" onClick={() => handlePick(id)}>
+                  <button
+                    key={id}
+                    ref={(el) => {
+                      itemRefs.current[i] = el;
+                    }}
+                    type="button"
+                    className={`slot-popover-item${i === clampedIndex ? " active" : ""}`}
+                    onClick={() => handlePick(id)}
+                    onMouseMove={() => setActiveIndex(i)}
+                  >
                     <Icon size={14} strokeWidth={1.75} />
                     {manifest.title}
                   </button>

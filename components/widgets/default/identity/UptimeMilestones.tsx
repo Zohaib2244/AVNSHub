@@ -1,4 +1,5 @@
 "use client";
+import "./UptimeMilestones.css";
 
 import {
   Calendar,

@@ -1,4 +1,5 @@
 "use client";
+import "./SessionTracker.css";
 
 import { useState, useSyncExternalStore } from "react";
 import { BarChart3, Check, Plus } from "lucide-react";

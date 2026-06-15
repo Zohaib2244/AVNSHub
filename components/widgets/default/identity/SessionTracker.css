@@ -1,0 +1,200 @@
+/* ─── session tracker ────────────────────────────────────────── */
+
+.tracker-select {
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+/* the tracker's chart + stats live in its flyout; the card itself
+   only shows the select + recent log */
+.tracker-log-pane {
+  min-width: 0;
+}
+
+.tracker-sub-label {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted-dim);
+  margin-bottom: 6px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 80px;
+}
+
+.cb {
+  position: relative;
+  flex: 1;
+  min-height: 4px;
+  border-radius: 3px 3px 0 0;
+  transition: height 0.3s ease;
+}
+
+.cb:hover .cb-tip {
+  display: block;
+}
+
+.cb-tip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--text-primary);
+  color: var(--bg-card);
+  font-size: 0.55rem;
+  padding: 2px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.chart-labels {
+  display: flex;
+  gap: 4px;
+  margin-top: 3px;
+}
+
+.chart-labels span {
+  flex: 1;
+  text-align: center;
+  font-size: 0.55rem;
+  color: var(--text-muted);
+}
+
+.chart-labels span.today {
+  color: var(--accent-orange);
+  font-weight: 500;
+}
+
+.tracker-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.tracker-stat {
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  text-align: center;
+}
+
+.tracker-stat-n {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 1.1rem;
+  line-height: 1.2;
+  color: var(--accent-orange);
+}
+
+.tracker-stat-l {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.slog-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--bg-nested);
+  font-size: 0.7rem;
+  color: var(--text-primary);
+}
+
+.slog-row:last-child {
+  border-bottom: none;
+}
+
+.slog-dur {
+  color: var(--accent-cyan);
+}
+
+.slog-empty {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  padding: 8px 0;
+}
+
+.add-session {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.add-session input {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.7rem;
+}
+
+.add-session input::placeholder {
+  color: var(--text-muted);
+}
+
+.add-session button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--accent-orange);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-orange);
+  font-family: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.add-session button:hover {
+  background: var(--accent-orange);
+  color: var(--badge-text);
+}
+
+.report-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px;
+  border: 1px solid var(--accent-cyan);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-cyan);
+  font-family: inherit;
+  font-size: 0.7rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.report-btn:hover {
+  background: var(--accent-cyan);
+  color: var(--badge-text);
+}

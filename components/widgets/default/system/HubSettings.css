@@ -1,0 +1,57 @@
+/* ─── hub settings widget ────────────────────────────────────── */
+
+.palette-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.palette-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.palette-btn:hover:not(.active) {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.palette-btn.active {
+  color: var(--text-primary);
+  border-color: var(--accent-orange);
+}
+
+.palette-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 26px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.palette-swatch span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+.hub-reset:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}

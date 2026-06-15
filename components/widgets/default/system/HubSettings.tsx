@@ -1,4 +1,5 @@
 "use client";
+import "./HubSettings.css";
 
 // The hub's own control surface — itself a widget. Per size:
 //   S → theme mode toggle only

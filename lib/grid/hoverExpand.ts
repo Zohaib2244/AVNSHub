@@ -15,6 +15,15 @@ export type HoverExpandEffect = {
   visualRect: Rect;
 };
 
+/** which axes a widget is allowed to borrow space along when it hover-expands */
+export type HoverExpandAxis = "width" | "height" | "both";
+
+function axisAllows(axis: HoverExpandAxis, direction: Direction): boolean {
+  if (axis === "width") return direction === "e" || direction === "w";
+  if (axis === "height") return direction === "n" || direction === "s";
+  return true;
+}
+
 export type HoverExpandPreview = {
   activeId: string;
   direction: Direction;
@@ -117,11 +126,16 @@ export function createHoverExpandPreview(
   items: HoverExpandItem[],
   dims: GridDims,
   preferredDirections: Direction[],
+  axis: HoverExpandAxis = "both",
 ): HoverExpandPreview | null {
   const activeItem = items.find((item) => item.id === activeId);
   if (!activeItem) return null;
 
-  const directions = uniqueDirections([...preferredDirections, "e", "s", "w", "n"]);
+  // honour the widget's axis lock: drop any direction off the allowed axis,
+  // so a width-only widget never borrows vertically and vice versa
+  const directions = uniqueDirections([...preferredDirections, "e", "s", "w", "n"]).filter((d) =>
+    axisAllows(axis, d),
+  );
   const candidates = items.filter((item) => item.id !== activeId);
 
   for (const direction of directions) {

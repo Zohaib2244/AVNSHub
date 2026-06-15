@@ -1,0 +1,129 @@
+/* ─── github activity: head + tabs ──────────────────────────── */
+
+.github-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.github-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1.5px solid var(--border);
+  box-shadow: 2px 2px 0 var(--shadow);
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.github-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.github-label {
+  margin-bottom: 0;
+}
+
+.github-username {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.github-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.github-link-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.github-tabs {
+  display: flex;
+  gap: 6px;
+  padding-top: 10px;
+  margin-bottom: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.github-tab {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.github-tab.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.github-repo-list {
+  max-height: 150px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.github-repo-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 0.7rem;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--bg-nested);
+}
+
+.github-repo-row span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.github-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.github-copy-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}

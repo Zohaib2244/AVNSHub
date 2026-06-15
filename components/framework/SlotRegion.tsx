@@ -11,7 +11,7 @@ import type { RegionDims, SlotRegionId } from "@/config/slotLayout";
 import type { SlotWidgetInstance } from "@/lib/slotLayout";
 import type { Direction, Rect } from "@/lib/grid/occupancy";
 import { buildOccupancy } from "@/lib/grid/occupancy";
-import { createHoverExpandPreview, type HoverExpandPreview } from "@/lib/grid/hoverExpand";
+import { createHoverExpandPreview, type HoverExpandAxis, type HoverExpandPreview } from "@/lib/grid/hoverExpand";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotWidgetCell } from "@/components/framework/SlotWidgetCell";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
@@ -82,6 +82,8 @@ export function SlotRegion({
     const instance = instances.find((w) => w.id === id);
     if (instance?.settings.hoverExpand !== true) return;
     if (!supportsHoverExpand()) return;
+    // per-widget axis lock: only borrow space along width, height, or both
+    const axis = (instance.settings.hoverExpandAxis as HoverExpandAxis) ?? "both";
     hoverIntentRef.current = window.setTimeout(() => {
       hoverIntentRef.current = null;
       const regionEl = regionRef.current;
@@ -89,7 +91,7 @@ export function SlotRegion({
       const rect = regionEl.getBoundingClientRect();
       const styles = getComputedStyle(regionEl);
       const gap = parseFloat(styles.columnGap) || 12;
-      const preview = createHoverExpandPreview(id, hoverItems, dims, preferredDirections);
+      const preview = createHoverExpandPreview(id, hoverItems, dims, preferredDirections, axis);
       if (!preview) return;
       setHoverMetrics({
         gap,
@@ -182,7 +184,12 @@ export function SlotRegion({
 }
 
 function SlotEmptyCell({ region, cell }: { region: SlotRegionId; cell: { col: number; row: number } }) {
-  const [open, setOpen] = useState(false);
+  // open-state shared via LayoutProvider so a second add-menu (here or
+  // elsewhere) auto-closes the first
+  const { activePopover, setActivePopover } = useLayout();
+  const popoverKey = `place:${region}:${cell.col}-${cell.row}`;
+  const open = activePopover === popoverKey;
+  const toggle = () => setActivePopover(open ? null : popoverKey);
 
   return (
     <div
@@ -191,15 +198,15 @@ function SlotEmptyCell({ region, cell }: { region: SlotRegionId; cell: { col: nu
       role="button"
       tabIndex={0}
       aria-label={`place a widget in ${region}`}
-      onClick={() => setOpen((o) => !o)}
+      onClick={toggle}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          setOpen((o) => !o);
+          toggle();
         }
       }}
     >
-      +{open && <SlotPlacementPopover region={region} onClose={() => setOpen(false)} />}
+      +{open && <SlotPlacementPopover region={region} onClose={() => setActivePopover(null)} />}
     </div>
   );
 }

@@ -1,4 +1,5 @@
 "use client";
+import "./WidgetManager.css";
 
 // The widget manager — itself a widget, and the single surface for adding and
 // removing widgets from the dashboard. Widgets already on screen can be

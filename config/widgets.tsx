@@ -19,24 +19,24 @@ import {
   Trophy,
   Tv,
 } from "lucide-react";
-import { ClockWidget } from "@/components/identity/ClockWidget";
-import { QuickLinks } from "@/components/identity/QuickLinks";
-import { UptimeMilestones } from "@/components/identity/UptimeMilestones";
-import { HomelabStatus, HomelabStatusMore } from "@/components/homelab/HomelabStatus";
-import { ServerStats, ServerStatsMore } from "@/components/homelab/ServerStats";
-import { DiskStorage, DiskStorageMore } from "@/components/homelab/DiskStorage";
-import { NetworkStats, NetworkStatsMore } from "@/components/homelab/NetworkStats";
-import { Jellyfin, JellyfinMore } from "@/components/homelab/Jellyfin";
-import { ArrStack, ArrStackMore } from "@/components/homelab/ArrStack";
-import { StorageApps } from "@/components/homelab/StorageApps";
-import { NutBotFaceWidget } from "@/components/widgets/NutBotFaceWidget";
-import { WidgetManager } from "@/components/widgets/WidgetManager";
-import { IdentityBlock } from "@/components/identity/IdentityBlock";
-import { NowPlaying } from "@/components/media/NowPlaying";
-import { CurrentlyPlaying } from "@/components/media/CurrentlyPlaying";
-import { GitHubActivity, GitHubActivityMore } from "@/components/github/GitHubActivity";
-import { SessionTracker, SessionTrackerMore } from "@/components/identity/SessionTracker";
-import { HubSettings } from "@/components/widgets/HubSettings";
+import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
+import { QuickLinks } from "@/components/widgets/default/identity/QuickLinks";
+import { UptimeMilestones } from "@/components/widgets/default/identity/UptimeMilestones";
+import { HomelabStatus, HomelabStatusMore } from "@/components/widgets/default/homelab/HomelabStatus";
+import { ServerStats, ServerStatsMore } from "@/components/widgets/default/homelab/ServerStats";
+import { DiskStorage, DiskStorageMore } from "@/components/widgets/default/homelab/DiskStorage";
+import { NetworkStats, NetworkStatsMore } from "@/components/widgets/default/homelab/NetworkStats";
+import { Jellyfin, JellyfinMore } from "@/components/widgets/default/homelab/Jellyfin";
+import { ArrStack, ArrStackMore } from "@/components/widgets/default/homelab/ArrStack";
+import { StorageApps } from "@/components/widgets/default/homelab/StorageApps";
+import { NutBotFaceWidget } from "@/components/widgets/default/nutbot/NutBotFaceWidget";
+import { WidgetManager } from "@/components/widgets/default/system/WidgetManager";
+import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
+import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
+import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
+import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
+import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
+import { HubSettings } from "@/components/widgets/default/system/HubSettings";
 
 /* ─── widget framework contracts ─────────────────────────────────────
    A widget = a content component + a manifest entry here. The shell
@@ -65,6 +65,17 @@ export type SettingsValues = Record<string, string | number | boolean>;
 
 export const FRAMEWORK_SETTINGS: SettingsField[] = [
   { key: "hoverExpand", label: "slot hover expand", type: "toggle", default: false },
+  {
+    key: "hoverExpandAxis",
+    label: "expand axis",
+    type: "select",
+    default: "both",
+    options: [
+      { value: "both", label: "both" },
+      { value: "width", label: "width" },
+      { value: "height", label: "height" },
+    ],
+  },
 ];
 
 export type WidgetManifest = {

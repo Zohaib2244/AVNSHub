@@ -1,4 +1,5 @@
 "use client";
+import "./NutBotFace.css";
 
 import { useEffect, useState } from "react";
 

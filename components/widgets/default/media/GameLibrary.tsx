@@ -1,4 +1,5 @@
 "use client";
+import "./GameLibrary.css";
 
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";

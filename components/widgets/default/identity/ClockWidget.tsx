@@ -1,4 +1,5 @@
 "use client";
+import "./ClockWidget.css";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Moon, Pause, Play, Sun, SunMoon } from "lucide-react";

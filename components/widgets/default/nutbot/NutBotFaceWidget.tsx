@@ -1,4 +1,5 @@
 "use client";
+import "./NutBotFaceWidget.css";
 
 // NutBot, per size:
 //   S / M → the animated face plus a one-line status ticker
@@ -7,8 +8,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { NutBotFace } from "@/components/nutbot/NutBotFace";
-import { LOG_MESSAGES, NutBotTerminal } from "@/components/nutbot/NutBotTerminal";
+import { NutBotFace } from "@/components/widgets/default/nutbot/NutBotFace";
+import { LOG_MESSAGES, NutBotTerminal } from "@/components/widgets/default/nutbot/NutBotTerminal";
 import { useWidget } from "@/components/framework/WidgetContext";
 
 export function NutBotFaceWidget() {

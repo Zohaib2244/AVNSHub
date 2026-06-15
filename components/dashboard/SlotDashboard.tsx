@@ -51,8 +51,11 @@ function clampPairDelta(deltaFr: number, gain: number, lose: number) {
 
 export function SlotDashboard() {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
-  const { editMode } = useLayout();
-  const [terminalPickerOpen, setTerminalPickerOpen] = useState(false);
+  const { editMode, activePopover, setActivePopover } = useLayout();
+  // shared so it can't stay open alongside another add menu / settings popover
+  const terminalPickerKey = "place:terminal";
+  const terminalPickerOpen = activePopover === terminalPickerKey;
+  const toggleTerminalPicker = () => setActivePopover(terminalPickerOpen ? null : terminalPickerKey);
 
   const frameRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
@@ -189,13 +192,13 @@ export function SlotDashboard() {
                     className={`slot-terminal-empty${editMode ? " editing" : ""}`}
                     role={editMode ? "button" : undefined}
                     tabIndex={editMode ? 0 : undefined}
-                    onClick={editMode ? () => setTerminalPickerOpen((o) => !o) : undefined}
+                    onClick={editMode ? toggleTerminalPicker : undefined}
                     onKeyDown={
                       editMode
                         ? (e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              setTerminalPickerOpen((o) => !o);
+                              toggleTerminalPicker();
                             }
                           }
                         : undefined
@@ -203,7 +206,7 @@ export function SlotDashboard() {
                   >
                     {editMode ? "+ add terminal widget" : "no terminal widget"}
                     {terminalPickerOpen && (
-                      <SlotPlacementPopover region="terminal" onClose={() => setTerminalPickerOpen(false)} />
+                      <SlotPlacementPopover region="terminal" onClose={() => setActivePopover(null)} />
                     )}
                   </div>
                 )}

@@ -54,9 +54,11 @@ function GridWidget({
     disabled: !editMode,
     animateLayoutChanges: () => false,
   });
-  const [settingsOpen, setSettingsOpen] = useState(false);
-
-  if (!editMode && settingsOpen) setSettingsOpen(false);
+  // open-state is shared via LayoutProvider so opening one widget's settings
+  // auto-closes any other that was open
+  const { activePopover, setActivePopover } = useLayout();
+  const popoverKey = `settings:${instance.id}`;
+  const settingsOpen = activePopover === popoverKey;
 
   const manifest: WidgetManifest = WIDGETS[instance.id];
 
@@ -87,12 +89,12 @@ function GridWidget({
             type="button"
             className="gear-btn"
             aria-label={`configure ${instance.id} widget`}
-            onClick={() => setSettingsOpen((open) => !open)}
+            onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
           >
             <Settings2 size={12} strokeWidth={1.75} />
           </button>
           {settingsOpen && (
-            <WidgetSettingsPopover manifest={manifest} instance={instance} onClose={() => setSettingsOpen(false)} />
+            <WidgetSettingsPopover manifest={manifest} instance={instance} onClose={() => setActivePopover(null)} />
           )}
         </>
       )}

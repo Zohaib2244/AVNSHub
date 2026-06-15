@@ -1,7 +1,8 @@
+import "./IdentityBlock.css";
 import { Github, Server } from "lucide-react";
-import { NutMagLogo } from "@/components/identity/NutMagLogo";
-import { ThemeToggle } from "@/components/identity/ThemeToggle";
-import { UptimeStat } from "@/components/identity/UptimeStat";
+import { NutMagLogo } from "@/components/widgets/default/identity/NutMagLogo";
+import { ThemeToggle } from "@/components/widgets/default/identity/ThemeToggle";
+import { UptimeStat } from "@/components/widgets/default/identity/UptimeStat";
 
 export function IdentityBlock() {
   return (

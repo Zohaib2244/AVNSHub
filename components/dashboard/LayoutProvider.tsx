@@ -22,6 +22,11 @@ type LayoutContextValue = {
   lockLayout: () => void;
   /** restore the default arrangement and clear the saved one */
   resetLayout: () => void;
+  /** the single open popover (settings gear / placement picker) across the
+      whole dashboard, keyed by a caller-defined id — opening one closes any
+      other, so two settings/add menus can never be open at once */
+  activePopover: string | null;
+  setActivePopover: (id: string | null) => void;
 };
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
@@ -29,9 +34,14 @@ const LayoutContext = createContext<LayoutContextValue | null>(null);
 export function LayoutProvider({ children }: { children: ReactNode }) {
   const layout = useSyncExternalStore(subscribeLayout, getLayout, getServerLayout);
   const [editMode, setEditMode] = useState(false);
+  const [activePopover, setActivePopover] = useState<string | null>(null);
 
   const startEdit = useCallback(() => setEditMode(true), []);
-  const lockLayout = useCallback(() => setEditMode(false), []);
+  // leaving edit mode hides every gear/add affordance — drop any open popover
+  const lockLayout = useCallback(() => {
+    setEditMode(false);
+    setActivePopover(null);
+  }, []);
 
   return (
     <LayoutContext.Provider
@@ -43,6 +53,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         startEdit,
         lockLayout,
         resetLayout: resetLayoutStore,
+        activePopover,
+        setActivePopover,
       }}
     >
       {children}

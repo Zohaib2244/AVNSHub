@@ -1,4 +1,5 @@
 "use client";
+import "./GitHubActivity.css";
 
 import { useEffect, useState } from "react";
 import { Check, Copy, Github, GitCommitHorizontal } from "lucide-react";

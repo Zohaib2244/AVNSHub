@@ -1,4 +1,5 @@
 "use client";
+import "./ServerStats.css";
 
 import { Cpu, MemoryStick, HardDrive, Network } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";

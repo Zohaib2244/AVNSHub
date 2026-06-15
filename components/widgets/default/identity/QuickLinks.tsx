@@ -1,3 +1,4 @@
+import "./QuickLinks.css";
 import { quickLinks } from "@/config/links";
 
 export function QuickLinks() {
