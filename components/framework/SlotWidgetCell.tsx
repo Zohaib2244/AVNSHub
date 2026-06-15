@@ -277,9 +277,11 @@ export function SlotWidgetCell({
     onHoverIntent?.(instance.id, directionsFromPointer(e));
   }
 
-  function handleHoverPointerLeave() {
-    if (activeHoverEffect?.state === "expanded") onHoverExit?.();
-  }
+  // Exits are owned by SlotRegion's pointermove tracking (sticky "still inside"
+  // + debounced exit + region pointerleave). The cell does NOT clear on its own
+  // pointerleave: doing so fired an abrupt clear-to-resting the instant the
+  // pointer crossed into a neighbor, which is what made handoffs flash back to
+  // default size before re-expanding.
 
   const hoverStyle = flip && effectiveHoverMetrics ? hoverBoxStyle(flip.rect, effectiveHoverMetrics) : null;
 
@@ -296,7 +298,6 @@ export function SlotWidgetCell({
         ...hoverStyle,
       }}
       onPointerEnter={handleHoverPointerEnter}
-      onPointerLeave={handleHoverPointerLeave}
     >
       {editMode && (
         <>

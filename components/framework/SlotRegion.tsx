@@ -49,6 +49,7 @@ export function SlotRegion({
   const regionRef = useRef<HTMLDivElement>(null);
   const hoverIntentRef = useRef<number | null>(null);
   const hoverExitRef = useRef<number | null>(null);
+  const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverExpandPreview | null>(null);
   const [hoverMetrics, setHoverMetrics] = useState<HoverGridMetrics | null>(null);
 
@@ -77,29 +78,94 @@ export function SlotRegion({
     return true;
   }
 
+  function currentHoverMetrics() {
+    const regionEl = regionRef.current;
+    if (!regionEl) return null;
+
+    const rect = regionEl.getBoundingClientRect();
+    const styles = getComputedStyle(regionEl);
+    const gap = parseFloat(styles.columnGap) || 12;
+    return {
+      gap,
+      trackWidth: (rect.width - gap * (dims.cols - 1)) / dims.cols,
+      trackHeight: (rect.height - gap * (dims.rows - 1)) / dims.rows,
+    } satisfies HoverGridMetrics;
+  }
+
+  function applyHoverExpand(id: string, preferredDirections: Direction[]) {
+    const instance = instances.find((w) => w.id === id);
+    if (instance?.settings.hoverExpand !== true) return false;
+    if (!supportsHoverExpand()) return false;
+    // per-widget axis lock: only borrow space along width, height, or both
+    const axis = (instance.settings.hoverExpandAxis as HoverExpandAxis) ?? "both";
+    const metrics = currentHoverMetrics();
+    if (!metrics) return false;
+    const preview = createHoverExpandPreview(id, hoverItems, dims, preferredDirections, axis);
+    if (!preview) return false;
+
+    setHoverMetrics(metrics);
+    setHoverPreview(preview);
+    return true;
+  }
+
   function requestHoverExpand(id: string, preferredDirections: Direction[]) {
     clearHoverIntent();
     const instance = instances.find((w) => w.id === id);
     if (instance?.settings.hoverExpand !== true) return;
     if (!supportsHoverExpand()) return;
-    // per-widget axis lock: only borrow space along width, height, or both
-    const axis = (instance.settings.hoverExpandAxis as HoverExpandAxis) ?? "both";
+    // A preview is already live → switch targets in place: no intent delay and
+    // no clear-to-null intermediate, so a contracted neighbor animates straight
+    // from its shrunken box to its expanded box in one continuous transition
+    // (instead of contracted → default → pause → expanded).
+    if (hoverPreview) {
+      clearHoverExit();
+      if (id !== hoverPreview.activeId) applyHoverExpand(id, preferredDirections);
+      return;
+    }
     hoverIntentRef.current = window.setTimeout(() => {
       hoverIntentRef.current = null;
-      const regionEl = regionRef.current;
-      if (!regionEl) return;
-      const rect = regionEl.getBoundingClientRect();
-      const styles = getComputedStyle(regionEl);
-      const gap = parseFloat(styles.columnGap) || 12;
-      const preview = createHoverExpandPreview(id, hoverItems, dims, preferredDirections, axis);
-      if (!preview) return;
-      setHoverMetrics({
-        gap,
-        trackWidth: (rect.width - gap * (dims.cols - 1)) / dims.cols,
-        trackHeight: (rect.height - gap * (dims.rows - 1)) / dims.rows,
-      });
-      setHoverPreview(preview);
+      applyHoverExpand(id, preferredDirections);
     }, HOVER_INTENT_MS);
+  }
+
+  function targetFromPointer(clientX: number, clientY: number, visualRects?: Record<string, Rect>) {
+    const regionEl = regionRef.current;
+    if (!regionEl) return null;
+
+    const regionRect = regionEl.getBoundingClientRect();
+    const metrics = currentHoverMetrics();
+    if (!metrics) return null;
+    const pointerX = clientX - regionRect.left;
+    const pointerY = clientY - regionRect.top;
+
+    for (const item of hoverItems) {
+      const box = hoverVisualBox(visualRects?.[item.id] ?? item.rect, metrics);
+      const inside =
+        pointerX >= box.left &&
+        pointerX <= box.left + box.width &&
+        pointerY >= box.top &&
+        pointerY <= box.top + box.height;
+      if (!inside) continue;
+
+      const localX = pointerX - box.left;
+      const localY = pointerY - box.top;
+      const horizontal = [
+        { direction: "w" as const, distance: localX },
+        { direction: "e" as const, distance: box.width - localX },
+      ];
+      const vertical = [
+        { direction: "n" as const, distance: localY },
+        { direction: "s" as const, distance: box.height - localY },
+      ];
+      const preferredDirections = [
+        ...horizontal.sort((a, b) => a.distance - b.distance),
+        ...vertical.sort((a, b) => a.distance - b.distance),
+      ].map((entry) => entry.direction);
+
+      return { id: item.id, preferredDirections };
+    }
+
+    return null;
   }
 
   function clearHoverExpand() {
@@ -113,6 +179,10 @@ export function SlotRegion({
   const activeHoverMetrics = editMode ? null : hoverMetrics;
 
   function handleRegionPointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType !== "touch") {
+      lastPointerRef.current = { clientX: e.clientX, clientY: e.clientY };
+    }
+
     if (!activeHoverPreview || !activeHoverMetrics || e.pointerType === "touch") return;
 
     const activeEffect = activeHoverPreview.effects[activeHoverPreview.activeId];
@@ -122,23 +192,49 @@ export function SlotRegion({
     const regionRect = regionEl.getBoundingClientRect();
     const pointerX = e.clientX - regionRect.left;
     const pointerY = e.clientY - regionRect.top;
+
+    // Sticky check FIRST: while the pointer is still within the expanded box
+    // (+buffer), keep this widget expanded. The active widget always wins over
+    // a neighbor here, so the growing edge sliding under a near-stationary
+    // pointer can never flip the hover to the neighbor and oscillate.
     const box = hoverVisualBox(activeEffect.visualRect, activeHoverMetrics);
     const buffer = 6;
-    const inside =
+    const insideActive =
       pointerX >= box.left - buffer &&
       pointerX <= box.left + box.width + buffer &&
       pointerY >= box.top - buffer &&
       pointerY <= box.top + box.height + buffer;
-
-    if (inside) {
+    if (insideActive) {
       clearHoverExit();
       return;
     }
 
+    // Outside the active box, but clearly over a different widget → hand off
+    // immediately and smoothly (in-place re-target, no clear-to-null).
+    const activeVisualRects = Object.fromEntries(
+      Object.entries(activeHoverPreview.effects).map(([id, effect]) => [id, effect.visualRect]),
+    );
+    const visualTarget = targetFromPointer(e.clientX, e.clientY, activeVisualRects);
+    if (visualTarget && visualTarget.id !== activeHoverPreview.activeId) {
+      clearHoverIntent();
+      clearHoverExit();
+      applyHoverExpand(visualTarget.id, visualTarget.preferredDirections);
+      return;
+    }
+
+    // Genuinely over a gap / empty cell → schedule a debounced exit. If by the
+    // time it fires the pointer has landed on another widget, hand off directly
+    // rather than clearing first (keeps the transition continuous).
     if (hoverExitRef.current !== null) return;
     hoverExitRef.current = window.setTimeout(() => {
       hoverExitRef.current = null;
-      clearHoverExpand();
+      const pointer = lastPointerRef.current;
+      const nextTarget = pointer ? targetFromPointer(pointer.clientX, pointer.clientY) : null;
+      if (nextTarget && nextTarget.id !== activeHoverPreview.activeId) {
+        applyHoverExpand(nextTarget.id, nextTarget.preferredDirections);
+      } else {
+        clearHoverExpand();
+      }
     }, EXIT_INTENT_MS);
   }
 
@@ -164,7 +260,7 @@ export function SlotRegion({
         gridTemplateRows: `repeat(${dims.rows}, minmax(0, 1fr))`,
       }}
       onPointerMove={handleRegionPointerMove}
-      onPointerLeave={clearHoverExpand}
+      onPointerLeave={() => clearHoverExpand()}
     >
       {instances.map((instance) => (
         <SlotWidgetCell

@@ -121,6 +121,92 @@ function contractedEffect(neighbor: Rect, direction: Direction, borrow: number):
   };
 }
 
+const HORIZONTAL: Direction[] = ["e", "w"];
+const VERTICAL: Direction[] = ["n", "s"];
+
+/** the cell sitting diagonally outside the active rect, in the corner formed
+    by horizontal direction `h` and vertical direction `v` */
+function cornerCell(active: Rect, h: Direction, v: Direction): { col: number; row: number } {
+  return {
+    col: h === "e" ? active.col + active.colSpan : active.col - 1,
+    row: v === "s" ? active.row + active.rowSpan : active.row - 1,
+  };
+}
+
+function occupies(rect: Rect, col: number, row: number): boolean {
+  return col >= rect.col && col < rect.col + rect.colSpan && row >= rect.row && row < rect.row + rect.rowSpan;
+}
+
+/** first preferred direction along `axisDirs` that can grow and has at least
+    one edge neighbor to borrow from */
+function pickAxisDirection(
+  active: Rect,
+  candidates: HoverExpandItem[],
+  dims: GridDims,
+  preferred: Direction[],
+  axisDirs: Direction[],
+): { direction: Direction; neighbors: HoverExpandItem[] } | null {
+  const ordered = uniqueDirections([...preferred, ...axisDirs]).filter((d) => axisDirs.includes(d));
+  for (const direction of ordered) {
+    if (!canExpand(active, dims, direction)) continue;
+    const neighbors = edgeNeighbors(active, candidates, direction);
+    if (neighbors.length === 0) continue;
+    return { direction, neighbors };
+  }
+  return null;
+}
+
+/** "both" expansion: grow along one horizontal AND one vertical direction at
+    once, contracting the edge neighbors on each axis plus the single diagonal
+    corner widget the growth would otherwise overlap. Returns null (so the
+    caller can fall back to single-axis) when only one axis is viable. */
+function createBothAxisPreview(
+  activeId: string,
+  active: Rect,
+  candidates: HoverExpandItem[],
+  dims: GridDims,
+  preferred: Direction[],
+): HoverExpandPreview | null {
+  const h = pickAxisDirection(active, candidates, dims, preferred, HORIZONTAL);
+  const v = pickAxisDirection(active, candidates, dims, preferred, VERTICAL);
+  if (!h || !v) return null;
+
+  const hIds = new Set(h.neighbors.map((n) => n.id));
+  const vIds = new Set(v.neighbors.map((n) => n.id));
+  const cell = cornerCell(active, h.direction, v.direction);
+  // the diagonal corner widget — only a distinct one (a large neighbor already
+  // contracted on an edge clears the corner itself when it shifts away)
+  const corner = candidates.find((c) => !hIds.has(c.id) && !vIds.has(c.id) && occupies(c.rect, cell.col, cell.row)) ?? null;
+
+  const bx = Math.min(
+    BORROW_SPAN,
+    ...h.neighbors.map(({ rect }) => rect.colSpan - MIN_CONTRACTED_SPAN),
+    corner ? corner.rect.colSpan - MIN_CONTRACTED_SPAN : Infinity,
+  );
+  const by = Math.min(
+    BORROW_SPAN,
+    ...v.neighbors.map(({ rect }) => rect.rowSpan - MIN_CONTRACTED_SPAN),
+    corner ? corner.rect.rowSpan - MIN_CONTRACTED_SPAN : Infinity,
+  );
+  if (bx < MIN_BORROW_SPAN || by < MIN_BORROW_SPAN) return null;
+
+  const expanded = expandedRect(expandedRect(active, h.direction, bx), v.direction, by);
+  const effects: Record<string, HoverExpandEffect> = {
+    [activeId]: { state: "expanded", direction: h.direction, visualRect: expanded },
+  };
+  for (const neighbor of h.neighbors) effects[neighbor.id] = contractedEffect(neighbor.rect, h.direction, bx);
+  for (const neighbor of v.neighbors) effects[neighbor.id] = contractedEffect(neighbor.rect, v.direction, by);
+  if (corner) {
+    effects[corner.id] = {
+      state: "contracted",
+      direction: h.direction,
+      visualRect: contractedRect(contractedRect(corner.rect, h.direction, bx), v.direction, by),
+    };
+  }
+
+  return { activeId, direction: h.direction, effects };
+}
+
 export function createHoverExpandPreview(
   activeId: string,
   items: HoverExpandItem[],
@@ -130,13 +216,20 @@ export function createHoverExpandPreview(
 ): HoverExpandPreview | null {
   const activeItem = items.find((item) => item.id === activeId);
   if (!activeItem) return null;
+  const candidates = items.filter((item) => item.id !== activeId);
+
+  // "both" grows along two perpendicular axes simultaneously; fall through to
+  // the single-axis path when the geometry only supports one direction
+  if (axis === "both") {
+    const both = createBothAxisPreview(activeId, activeItem.rect, candidates, dims, preferredDirections);
+    if (both) return both;
+  }
 
   // honour the widget's axis lock: drop any direction off the allowed axis,
   // so a width-only widget never borrows vertically and vice versa
   const directions = uniqueDirections([...preferredDirections, "e", "s", "w", "n"]).filter((d) =>
     axisAllows(axis, d),
   );
-  const candidates = items.filter((item) => item.id !== activeId);
 
   for (const direction of directions) {
     const active = activeItem.rect;
