@@ -393,8 +393,8 @@ body {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  transition: left 0.34s cubic-bezier(0.4, 0, 0.2, 1), top 0.34s cubic-bezier(0.4, 0, 0.2, 1),
-    width 0.34s cubic-bezier(0.4, 0, 0.2, 1), height 0.34s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
+  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
   will-change: left, top, width, height;
 }
 
@@ -745,6 +745,10 @@ body {
     transition: none;
     will-change: auto;
   }
+
+  .size-l-more-hoe {
+    transition: none;
+  }
 }
 
 /* ─── blocks ("sticker" cards) ──────────────────────────────────── */
@@ -902,6 +906,27 @@ body {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
+}
+
+/* Hover On Expand's collapsed detail panel — always mounted, grows open via
+   max-height/opacity/margin-top (mirrors .dg-more in DESIGN_VARIATIONS "G") */
+.size-l-more-hoe {
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0;
+  padding-top: 0;
+  border-top-color: transparent;
+  overflow: hidden;
+  transition: max-height 0.45s ease, opacity 0.3s ease, margin-top 0.45s ease,
+    padding-top 0.45s ease, border-top-color 0.45s ease;
+}
+
+.size-l-more-hoe.open {
+  max-height: 220px;
+  opacity: 1;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top-color: var(--border);
 }
 
 /* close button — shared by the edit-mode settings popover */

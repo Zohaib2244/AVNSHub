@@ -12,11 +12,12 @@ import type { SlotWidgetInstance } from "@/lib/slotLayout";
 import type { Direction, Rect } from "@/lib/grid/occupancy";
 import { buildOccupancy } from "@/lib/grid/occupancy";
 import { createHoverExpandPreview, type HoverExpandPreview } from "@/lib/grid/hoverExpand";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotWidgetCell } from "@/components/framework/SlotWidgetCell";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
 
 const HOVER_INTENT_MS = 140;
+const EXIT_INTENT_MS = 120;
 
 export type HoverGridMetrics = {
   gap: number;
@@ -47,6 +48,7 @@ export function SlotRegion({
   const { editMode } = useLayout();
   const regionRef = useRef<HTMLDivElement>(null);
   const hoverIntentRef = useRef<number | null>(null);
+  const hoverExitRef = useRef<number | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverExpandPreview | null>(null);
   const [hoverMetrics, setHoverMetrics] = useState<HoverGridMetrics | null>(null);
 
@@ -59,6 +61,12 @@ export function SlotRegion({
     if (hoverIntentRef.current === null) return;
     window.clearTimeout(hoverIntentRef.current);
     hoverIntentRef.current = null;
+  }
+
+  function clearHoverExit() {
+    if (hoverExitRef.current === null) return;
+    window.clearTimeout(hoverExitRef.current);
+    hoverExitRef.current = null;
   }
 
   function supportsHoverExpand() {
@@ -94,6 +102,7 @@ export function SlotRegion({
 
   function clearHoverExpand() {
     clearHoverIntent();
+    clearHoverExit();
     setHoverPreview(null);
     setHoverMetrics(null);
   }
@@ -112,14 +121,23 @@ export function SlotRegion({
     const pointerX = e.clientX - regionRect.left;
     const pointerY = e.clientY - regionRect.top;
     const box = hoverVisualBox(activeEffect.visualRect, activeHoverMetrics);
-    const buffer = 2;
+    const buffer = 6;
     const inside =
       pointerX >= box.left - buffer &&
       pointerX <= box.left + box.width + buffer &&
       pointerY >= box.top - buffer &&
       pointerY <= box.top + box.height + buffer;
 
-    if (!inside) clearHoverExpand();
+    if (inside) {
+      clearHoverExit();
+      return;
+    }
+
+    if (hoverExitRef.current !== null) return;
+    hoverExitRef.current = window.setTimeout(() => {
+      hoverExitRef.current = null;
+      clearHoverExpand();
+    }, EXIT_INTENT_MS);
   }
 
   const emptyCells: { col: number; row: number }[] = [];

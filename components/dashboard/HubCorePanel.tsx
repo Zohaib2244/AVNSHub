@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { ChevronDown, Lock, RotateCcw, Settings, Wrench, X } from "lucide-react";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import {
   getLayoutMode,
   getServerLayoutMode,

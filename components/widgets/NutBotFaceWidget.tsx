@@ -7,8 +7,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { NutBotFace } from "@/components/NutBotFace";
-import { LOG_MESSAGES, NutBotTerminal } from "@/components/NutBotTerminal";
+import { NutBotFace } from "@/components/nutbot/NutBotFace";
+import { LOG_MESSAGES, NutBotTerminal } from "@/components/nutbot/NutBotTerminal";
 import { useWidget } from "@/components/framework/WidgetContext";
 
 export function NutBotFaceWidget() {

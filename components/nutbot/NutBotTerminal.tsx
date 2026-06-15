@@ -7,8 +7,8 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X } from "lucide-react";
-import { NutBotFace } from "@/components/NutBotFace";
-import { RealShell } from "@/components/RealShell";
+import { NutBotFace } from "@/components/nutbot/NutBotFace";
+import { RealShell } from "@/components/nutbot/RealShell";
 
 const SHELL_WS_URL = process.env.NEXT_PUBLIC_NUTBOT_SHELL_URL;
 

@@ -11,7 +11,7 @@
 import { Lock, Minus, Plus } from "lucide-react";
 import { DEFAULT_ORDER, WIDGETS, type WidgetId, type WidgetManifest } from "@/config/widgets";
 import { useWidget } from "@/components/framework/WidgetContext";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 /** the widget manager can never remove itself — it's the only way to re-add
     hidden widgets (mirrors ALWAYS_VISIBLE in lib/layout.ts) */

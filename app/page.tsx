@@ -1,12 +1,12 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import { GlyphStrip } from "@/components/GlyphStrip";
-import { BootSequence } from "@/components/BootSequence";
-import { LayoutProvider } from "@/components/LayoutProvider";
-import { Dashboard } from "@/components/Dashboard";
-import { SlotDashboard } from "@/components/SlotDashboard";
-import { HubCorePanel } from "@/components/HubCorePanel";
+import { GlyphStrip } from "@/components/dashboard/GlyphStrip";
+import { BootSequence } from "@/components/dashboard/BootSequence";
+import { LayoutProvider } from "@/components/dashboard/LayoutProvider";
+import { Dashboard } from "@/components/dashboard/Dashboard";
+import { SlotDashboard } from "@/components/dashboard/SlotDashboard";
+import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { getLayoutMode, getServerLayoutMode, subscribeLayoutMode } from "@/lib/layoutMode";
 
 export default function Home() {

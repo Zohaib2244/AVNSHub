@@ -18,7 +18,7 @@ import { WIDGETS } from "@/config/widgets";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
 import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios, setTerminalWidget } from "@/lib/slotLayout";
 import { terminalSizeClass } from "@/lib/grid/sizeClass";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
 import { WidgetShell } from "@/components/framework/WidgetShell";

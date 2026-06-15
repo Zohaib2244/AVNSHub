@@ -1,0 +1,129 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - button "open avn hub core settings" [ref=e9] [cursor=pointer]:
+      - img [ref=e10]
+    - generic [ref=e16]:
+      - generic [ref=e17]:
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - img [ref=e22]
+            - text: clock & date
+          - generic [ref=e25]: "--:--:--"
+          - generic [ref=e26]: —
+          - generic [ref=e28]:
+            - generic [ref=e29]: sunrise 05:12
+            - generic [ref=e30]: —
+            - generic [ref=e31]: sunset 19:48
+          - generic [ref=e32]:
+            - button "Play lofi radio" [ref=e33] [cursor=pointer]:
+              - img [ref=e34]
+            - generic [ref=e42]: lofi hip-hop radio
+          - generic [ref=e43]:
+            - button "light" [ref=e44] [cursor=pointer]:
+              - img [ref=e45]
+              - text: light
+            - button "auto" [ref=e51] [cursor=pointer]:
+              - img [ref=e52]
+              - text: auto
+            - button "dark" [ref=e56] [cursor=pointer]:
+              - img [ref=e57]
+              - text: dark
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - img [ref=e63]
+            - text: now playing
+          - generic [ref=e68]:
+            - img [ref=e70]
+            - generic [ref=e74]:
+              - generic [ref=e75]: —
+              - generic [ref=e76]: spotify idle
+            - generic [ref=e77]:
+              - button "previous track" [disabled] [ref=e78]:
+                - img [ref=e79]
+              - button "play" [disabled] [ref=e81]:
+                - img [ref=e82]
+              - button "next track" [disabled] [ref=e84]:
+                - img [ref=e85]
+          - generic [ref=e89]: no recent tracks
+      - generic [ref=e90]:
+        - generic [ref=e93]:
+          - generic [ref=e94]:
+            - img [ref=e95]
+            - text: nutbot v1.4
+          - generic [ref=e98]:
+            - generic [ref=e99]:
+              - button "log" [ref=e100] [cursor=pointer]
+              - button "shell 1" [ref=e101] [cursor=pointer]:
+                - text: shell 1
+                - img [ref=e102]
+              - button "new shell tab" [ref=e105] [cursor=pointer]:
+                - img [ref=e106]
+            - generic [ref=e107]:
+              - generic [ref=e108]: ╭─────╮
+              - generic [ref=e109]:
+                - text: │
+                - generic [ref=e110]: ● ●
+                - text: │
+              - generic [ref=e111]:
+                - text: │
+                - generic [ref=e112]: ▂▂▂
+                - text: │
+              - generic [ref=e113]: ╰─────╯
+              - generic [ref=e114]: ▐▬▬ ▪ ▌
+        - generic [ref=e116]:
+          - generic [ref=e118]:
+            - generic [ref=e119]:
+              - img [ref=e120]
+              - text: identity
+            - generic [ref=e124]:
+              - generic [ref=e125]:
+                - generic [ref=e126]:
+                  - img "NutMag" [ref=e127]
+                  - text: NutMag2469
+                - generic [ref=e155]:
+                  - link "github" [ref=e156] [cursor=pointer]:
+                    - /url: https://github.com/Zohaib2244
+                    - img [ref=e157]
+                    - text: github
+                  - generic [ref=e160]: ·
+                  - link "homelab" [ref=e161] [cursor=pointer]:
+                    - /url: "#homelab"
+                    - img [ref=e162]
+                    - text: homelab
+                  - generic [ref=e165]: ·
+                  - generic [ref=e166]: — uptime
+              - generic [ref=e167]:
+                - generic [ref=e168]: nutting magnesium amounts of stuff
+                - generic [ref=e169]:
+                  - 'button "Theme: dark — switch to light" [ref=e170] [cursor=pointer]':
+                    - img [ref=e171]
+                  - generic [ref=e173]: live
+          - generic [ref=e177]:
+            - generic [ref=e179]:
+              - generic [ref=e180]:
+                - img [ref=e181]
+                - text: github activity
+              - generic [ref=e183]: —
+            - generic [ref=e184]: —
+      - generic [ref=e185]:
+        - generic [ref=e188]:
+          - generic [ref=e189]:
+            - generic [ref=e190]:
+              - generic [ref=e191]: Last played
+              - generic [ref=e192]:
+                - generic [ref=e193]: —
+                - generic [ref=e194]: —
+            - generic [ref=e195]:
+              - generic [ref=e197]: Online Status
+              - generic [ref=e198]:
+                - generic [ref=e199]: pfp
+                - generic [ref=e200]: User name
+          - generic [ref=e202]: nothing played recently
+        - generic [ref=e205]:
+          - generic [ref=e206]:
+            - img [ref=e207]
+            - text: a very nutty home server
+          - generic [ref=e210]: —
+          - generic [ref=e212]: no service data
+  - button "Open Next.js Dev Tools" [ref=e218] [cursor=pointer]:
+    - img [ref=e219]

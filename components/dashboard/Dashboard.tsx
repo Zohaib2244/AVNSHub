@@ -17,7 +17,7 @@ import { GripHorizontal, Settings2 } from "lucide-react";
 import { SPAN_MAP, WIDGETS, type WidgetId, type WidgetManifest } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
 import { useGridColumns } from "@/lib/useGridColumns";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { WidgetShell } from "@/components/framework/WidgetShell";
 import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
 

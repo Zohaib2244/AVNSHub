@@ -58,8 +58,16 @@ export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; co
       )}
       <Content />
       {/* detail content shows once the card is large enough to hold it */}
-      {Detail && (size === "L" || hoverExpanded) && (
+      {Detail && size === "L" && (
         <div className="size-l-more">
+          <Detail />
+        </div>
+      )}
+      {/* Hover On Expand: always-mounted collapsed detail panel that grows
+          open via CSS (max-height/opacity/margin-top), mirroring
+          DESIGN_VARIATIONS "G"'s .dg-more pattern — no mount/unmount pop */}
+      {Detail && size !== "L" && settings.hoverExpand === true && (
+        <div className={`size-l-more size-l-more-hoe${hoverExpanded ? " open" : ""}`}>
           <Detail />
         </div>
       )}

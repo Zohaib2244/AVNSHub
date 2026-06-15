@@ -8,7 +8,7 @@
 // repositions it, and four edge handles let the user drag-resize the footprint
 // cell-by-cell.
 
-import { useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { Move, Settings2, X } from "lucide-react";
 import { WIDGETS } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
@@ -17,12 +17,16 @@ import type { WidgetInstance } from "@/lib/layout";
 import { sizeClassForFootprint } from "@/lib/grid/sizeClass";
 import { buildOccupancy, canPlace, growRect, shrinkRect, maxGrowth, type Direction, type Rect } from "@/lib/grid/occupancy";
 import type { HoverExpandEffect } from "@/lib/grid/hoverExpand";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import type { HoverGridMetrics } from "@/components/framework/SlotRegion";
 import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
 import { WidgetShell } from "@/components/framework/WidgetShell";
 
 const DIRECTIONS: Direction[] = ["n", "s", "e", "w"];
+
+/** Hover On Expand FLIP transition duration — matches .slot-cell's
+    left/top/width/height transition in globals.css */
+const FLIP_DURATION_MS = 400;
 
 type DragState = {
   mode: "move" | "resize";
@@ -99,6 +103,64 @@ export function SlotWidgetCell({
 
   const persistedRect: Rect = { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
   const rect = activeHoverEffect?.visualRect ?? previewRect ?? persistedRect;
+
+  const [flip, setFlip] = useState<{ rect: Rect; effect: HoverExpandEffect; metrics: HoverGridMetrics } | null>(null);
+  const wasExpandedRef = useRef(false);
+  const flipRafRef = useRef<number | null>(null);
+  const flipTimeoutRef = useRef<number | null>(null);
+
+  // FLIP-style entry/exit for the hover-expand preview box: position
+  // changes always animate from a real "previous frame" value (instead of
+  // teleporting when `position` flips between relative/absolute), mirroring
+  // DESIGN_VARIATIONS "G"'s always-has-a-resting-value transition pattern.
+  useLayoutEffect(() => {
+    const clearPending = () => {
+      if (flipRafRef.current !== null) {
+        cancelAnimationFrame(flipRafRef.current);
+        flipRafRef.current = null;
+      }
+      if (flipTimeoutRef.current !== null) {
+        window.clearTimeout(flipTimeoutRef.current);
+        flipTimeoutRef.current = null;
+      }
+    };
+    clearPending();
+
+    const resting: Rect = { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
+
+    if (activeHoverEffect && hoverMetrics) {
+      if (!wasExpandedRef.current) {
+        // entry: snap to the resting box (pixel-identical to the grid
+        // placement, invisible) then animate to the expand/contract target
+        // next frame so the transition has a "from" value to interpolate
+        setFlip({ rect: resting, effect: activeHoverEffect, metrics: hoverMetrics });
+        flipRafRef.current = requestAnimationFrame(() => {
+          flipRafRef.current = null;
+          setFlip({ rect: activeHoverEffect.visualRect, effect: activeHoverEffect, metrics: hoverMetrics });
+        });
+      } else {
+        // re-target while already absolute (the hovered edge changed) — the
+        // existing transition redirects smoothly mid-flight
+        setFlip({ rect: activeHoverEffect.visualRect, effect: activeHoverEffect, metrics: hoverMetrics });
+      }
+      wasExpandedRef.current = true;
+    } else if (wasExpandedRef.current) {
+      wasExpandedRef.current = false;
+      // exit: animate back to the resting box using the retained effect/metrics
+      // (so classes/data-attrs persist through the exit animation), then drop
+      // absolute positioning once the transition finishes
+      setFlip((prev) => (prev ? { rect: resting, effect: prev.effect, metrics: prev.metrics } : null));
+      flipTimeoutRef.current = window.setTimeout(() => {
+        flipTimeoutRef.current = null;
+        setFlip(null);
+      }, FLIP_DURATION_MS);
+    }
+
+    return clearPending;
+  }, [activeHoverEffect, hoverMetrics, instance.col, instance.row, instance.colSpan, instance.rowSpan]);
+
+  const effectiveHoverEffect = activeHoverEffect ?? flip?.effect;
+  const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
 
   const { size, orientation } = sizeClassForFootprint(
     { colSpan: rect.colSpan, rowSpan: rect.rowSpan },
@@ -217,15 +279,15 @@ export function SlotWidgetCell({
     if (activeHoverEffect?.state === "expanded") onHoverExit?.();
   }
 
-  const hoverStyle = activeHoverEffect && hoverMetrics ? hoverBoxStyle(activeHoverEffect.visualRect, hoverMetrics) : null;
+  const hoverStyle = flip && effectiveHoverMetrics ? hoverBoxStyle(flip.rect, effectiveHoverMetrics) : null;
 
   return (
     <div
       ref={cellRef}
       className={`slot-cell${editMode ? " editing" : ""}${previewRect ? " resizing" : ""}${
-        activeHoverEffect ? ` hover-${activeHoverEffect.state}` : ""
+        effectiveHoverEffect ? ` hover-${effectiveHoverEffect.state}` : ""
       }`}
-      data-hover-expand={activeHoverEffect?.state}
+      data-hover-expand={effectiveHoverEffect?.state}
       style={{
         gridColumn: hoverStyle ? undefined : `${rect.col + 1} / span ${rect.colSpan}`,
         gridRow: hoverStyle ? undefined : `${rect.row + 1} / span ${rect.rowSpan}`,

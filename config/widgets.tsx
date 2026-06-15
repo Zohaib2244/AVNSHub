@@ -19,23 +19,23 @@ import {
   Trophy,
   Tv,
 } from "lucide-react";
-import { ClockWidget } from "@/components/ClockWidget";
-import { QuickLinks } from "@/components/QuickLinks";
-import { UptimeMilestones } from "@/components/UptimeMilestones";
-import { HomelabStatus, HomelabStatusMore } from "@/components/HomelabStatus";
-import { ServerStats, ServerStatsMore } from "@/components/ServerStats";
-import { DiskStorage, DiskStorageMore } from "@/components/DiskStorage";
-import { NetworkStats, NetworkStatsMore } from "@/components/NetworkStats";
-import { Jellyfin, JellyfinMore } from "@/components/Jellyfin";
-import { ArrStack, ArrStackMore } from "@/components/ArrStack";
-import { StorageApps } from "@/components/StorageApps";
+import { ClockWidget } from "@/components/identity/ClockWidget";
+import { QuickLinks } from "@/components/identity/QuickLinks";
+import { UptimeMilestones } from "@/components/identity/UptimeMilestones";
+import { HomelabStatus, HomelabStatusMore } from "@/components/homelab/HomelabStatus";
+import { ServerStats, ServerStatsMore } from "@/components/homelab/ServerStats";
+import { DiskStorage, DiskStorageMore } from "@/components/homelab/DiskStorage";
+import { NetworkStats, NetworkStatsMore } from "@/components/homelab/NetworkStats";
+import { Jellyfin, JellyfinMore } from "@/components/homelab/Jellyfin";
+import { ArrStack, ArrStackMore } from "@/components/homelab/ArrStack";
+import { StorageApps } from "@/components/homelab/StorageApps";
 import { NutBotFaceWidget } from "@/components/widgets/NutBotFaceWidget";
 import { WidgetManager } from "@/components/widgets/WidgetManager";
-import { IdentityBlock } from "@/components/IdentityBlock";
-import { NowPlaying } from "@/components/NowPlaying";
-import { CurrentlyPlaying } from "@/components/CurrentlyPlaying";
-import { GitHubActivity, GitHubActivityMore } from "@/components/GitHubActivity";
-import { SessionTracker, SessionTrackerMore } from "@/components/SessionTracker";
+import { IdentityBlock } from "@/components/identity/IdentityBlock";
+import { NowPlaying } from "@/components/media/NowPlaying";
+import { CurrentlyPlaying } from "@/components/media/CurrentlyPlaying";
+import { GitHubActivity, GitHubActivityMore } from "@/components/github/GitHubActivity";
+import { SessionTracker, SessionTrackerMore } from "@/components/identity/SessionTracker";
 import { HubSettings } from "@/components/widgets/HubSettings";
 
 /* ─── widget framework contracts ─────────────────────────────────────

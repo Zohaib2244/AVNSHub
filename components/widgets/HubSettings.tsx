@@ -23,7 +23,7 @@ import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs"
 import { DEFAULT_LAYOUT_MODE, setLayoutMode } from "@/lib/layoutMode";
 import { resetSlotLayout } from "@/lib/slotLayout";
 import { useWidget } from "@/components/framework/WidgetContext";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 const THEME_OPTIONS: { mode: ThemeMode; Icon: typeof Sun }[] = [
   { mode: "light", Icon: Sun },

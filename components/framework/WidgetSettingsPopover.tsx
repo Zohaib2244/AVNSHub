@@ -14,7 +14,7 @@ import {
   type WidgetManifest,
 } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
-import { useLayout } from "@/components/LayoutProvider";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 const SIZE_LABELS = { S: "small", M: "medium", L: "large" } as const;
 const ORIENTATION_LABELS = { h: "horizontal", v: "vertical" } as const;
