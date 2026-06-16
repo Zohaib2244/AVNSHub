@@ -256,7 +256,7 @@ export const WIDGETS = {
   },
   nutbot: {
     id: "nutbot",
-    title: "nutbot v1.4",
+    title: "nutbot v1.5",
     icon: SquareTerminal,
     component: NutBotFaceWidget,
     sizes: ["S", "M", "L"],

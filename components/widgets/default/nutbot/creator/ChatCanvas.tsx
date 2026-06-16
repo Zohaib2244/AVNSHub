@@ -22,7 +22,8 @@ type Message =
   | { role: "assistant"; text: string; streaming?: boolean }
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
-  | { role: "ok"; text: string };
+  | { role: "ok"; text: string }
+  | { role: "error"; text: string };
 
 type Props = {
   settings: GenerateSettings;
@@ -76,6 +77,13 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
 
+  // surface an error both in the status bar (short) and as a full, readable
+  // chat message (wraps, scrolls — the status bar truncates long text)
+  function fail(message: string) {
+    setPhase({ id: "error", message });
+    setMessages((prev) => [...prev, { role: "error", text: message }]);
+  }
+
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [messages, phase]);
@@ -107,7 +115,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
       });
 
       if (!res.ok || !res.body) {
-        setPhase({ id: "error", message: `server ${res.status}` });
+        fail(`server error ${res.status} — the generate request failed before streaming started`);
         return;
       }
 
@@ -177,7 +185,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
           } else if (event === "tsc_errors") {
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
           } else if (event === "error") {
-            setPhase({ id: "error", message: payload.message as string });
+            fail(payload.message as string);
           }
         }
       }
