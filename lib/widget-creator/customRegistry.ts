@@ -159,22 +159,30 @@ export function findComponentModule(id: string): ComponentModule | null {
   return { file, exportName: matchesBase ? file : firstExport };
 }
 
+/** a JS-safe local variable name for an id — ids may contain hyphens
+    ("spotify-visualizer"), which are illegal in identifiers */
+function localVar(id: string): string {
+  return `_${id.replace(/[^a-zA-Z0-9_$]/g, "_")}`;
+}
+
 function lazyDeclLine(id: string, mod: ComponentModule): string {
   const path = `@/components/widgets/custom/${id}/${mod.file}`;
+  const v = localVar(id);
   return mod.exportName
-    ? `const _${id} = lazy(() => import("${path}").then((m) => ({ default: m.${mod.exportName} })));\n`
-    : `const _${id} = lazy(() => import("${path}"));\n`;
+    ? `const ${v} = lazy(() => import("${path}").then((m) => ({ default: m.${mod.exportName} })));\n`
+    : `const ${v} = lazy(() => import("${path}"));\n`;
 }
 
 function mapEntryLine(id: string): string {
-  return `  ${id}: _${id},\n`;
+  // always quote the key — ids can contain hyphens, illegal as bare keys
+  return `  "${id}": ${localVar(id)},\n`;
 }
 
 /** append the lazy declaration + map entry between the markers (idempotent).
     `mod` defaults to the detected module, falling back to the conventional name. */
 export function addToComponentMap(id: string, mod?: ComponentModule): void {
   let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  if (content.includes(`const _${id} =`)) return; // already registered
+  if (content.includes(`const ${localVar(id)} =`)) return; // already registered
   const resolved = mod ?? findComponentModule(id) ?? { file: componentName(id), exportName: componentName(id) };
   content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
@@ -185,8 +193,9 @@ export function addToComponentMap(id: string, mod?: ComponentModule): void {
     regardless of which file/export the declaration happened to point at */
 export function removeFromComponentMap(id: string): void {
   const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  const declPrefix = `const _${id} = `;
-  const entryLine = `  ${id}: _${id},`;
+  const v = localVar(id);
+  const declPrefix = `const ${v} = `;
+  const entryLine = `  "${id}": ${v},`;
   const kept = content.split("\n").filter((line) => !line.startsWith(declPrefix) && line !== entryLine);
   writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
 }
