@@ -1,0 +1,251 @@
+/* ─── spotify capsule ─────────────────────────────────────────── */
+
+.spotify-capsule {
+  --media-text: var(--text-primary);
+  --media-subtle: color-mix(in srgb, var(--text-primary) 62%, var(--bg-card));
+  --media-faint: color-mix(in srgb, var(--text-primary) 36%, var(--bg-card));
+  --media-border: color-mix(in srgb, var(--border) 78%, var(--accent-orange));
+  min-height: 146px;
+  padding: 14px 16px 16px;
+  border-radius: 12px;
+  cursor: default;
+}
+
+/* S-tier: the 1x1 cell doesn't have room for the full min-height shell */
+.spotify-capsule:has(.spotify-s-shell) {
+  min-height: auto;
+  padding: 10px 12px;
+}
+
+/* ─── spotify S tier ──────────────────────────────────────────── */
+
+.spotify-s-shell {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  height: 100%;
+}
+
+.spotify-art-frame.spotify-art-s {
+  width: 32px;
+  height: 32px;
+  position: relative;
+}
+
+.spotify-live-dot {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--accent-orange);
+  border: 1.5px solid var(--bg-card);
+  animation: live-pulse 2s ease-in-out infinite;
+}
+
+.spotify-s-title {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.72rem;
+  font-weight: 500;
+  line-height: 1.15;
+  color: var(--media-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  line-height: 1.2;
+  text-transform: uppercase;
+  color: var(--media-faint);
+  margin-bottom: 10px;
+}
+
+.spotify-shell {
+  min-width: 0;
+}
+
+.spotify-now-row {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+}
+
+.spotify-art-frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 8px;
+  border: 1.5px solid var(--media-border);
+  background: var(--bg-nested);
+  color: var(--media-subtle);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.spotify-art-frame img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.spotify-copy {
+  min-width: 0;
+}
+
+.spotify-title {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.94rem;
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--media-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-artist {
+  margin-top: 3px;
+  font-size: 0.68rem;
+  line-height: 1.25;
+  color: var(--media-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spotify-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.player-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  border: 1.5px solid var(--media-border);
+  background: var(--bg-nested);
+  color: var(--media-text);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.player-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--bg-nested) 82%, var(--accent-orange));
+}
+
+.player-btn:disabled,
+.player-btn:disabled:hover {
+  color: var(--text-muted-dim);
+  border-color: var(--border);
+  cursor: default;
+  opacity: 0.55;
+}
+
+.spotify-progress {
+  height: 6px;
+  margin: 16px 20px 0 70px;
+  border: 1px solid var(--media-border);
+  border-radius: 99px;
+  background: var(--bg-nested);
+  overflow: hidden;
+}
+
+.spotify-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-cyan);
+  transition: width 0.4s ease;
+}
+
+.spotify-progress.is-live span {
+  background: linear-gradient(90deg, var(--accent-cyan), var(--accent-orange), var(--accent-cyan));
+  background-size: 180% 100%;
+  animation: spotify-progress-glide 2.4s linear infinite;
+}
+
+@keyframes spotify-progress-glide {
+  from {
+    background-position: 0% 50%;
+  }
+
+  to {
+    background-position: 180% 50%;
+  }
+}
+
+.control-error {
+  font-size: 0.62rem;
+  color: var(--status-down);
+  margin-top: 5px;
+}
+
+.more-row.clickable {
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.more-row.clickable:hover {
+  color: var(--accent-orange);
+}
+
+@media (max-width: 720px) {
+  .spotify-capsule {
+    padding: 16px;
+  }
+
+  .spotify-now-row {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .spotify-art-frame {
+    width: 56px;
+    height: 56px;
+  }
+
+  .spotify-controls {
+    grid-column: 1 / -1;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .player-btn {
+    width: 100%;
+    height: 38px;
+  }
+
+  .spotify-progress {
+    margin: 18px 4px 0;
+  }
+}
+
+/* S-tier album art shrink — moved from the framework container query in
+   globals.css to keep it ordered after the .spotify-art-s base above */
+@container widget (max-width: 140px) {
+  .spotify-art-frame.spotify-art-s {
+    width: min(32px, 100%);
+    height: auto;
+    aspect-ratio: 1;
+  }
+}

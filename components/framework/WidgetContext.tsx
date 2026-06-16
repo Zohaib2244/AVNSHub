@@ -7,6 +7,7 @@
 
 import { createContext, useContext } from "react";
 import type { Orientation, SettingsValues, WidgetSize } from "@/config/widgets";
+import type { RegionId } from "@/config/slotLayout";
 
 export type WidgetCtx = {
   id: string;
@@ -16,6 +17,15 @@ export type WidgetCtx = {
   orientation: Orientation;
   /** manifest schema defaults merged with the user's stored values */
   settings: SettingsValues;
+  /** true only while Slot Layout's transient Hover On Expand preview is active
+      for this widget; content may reveal existing detail UI, but must not
+      persist layout or start its own hover cascade. */
+  hoverExpanded?: boolean;
+  /** present only inside Slot Layout — the widget's region + cell footprint.
+      Not read by any widget today; reserved for slot-aware rendering. Hover
+      On Expand uses the surrounding SlotRegion rects rather than widget
+      content state. */
+  slot?: { region: RegionId; colSpan: number; rowSpan: number };
 };
 
 export const WidgetContext = createContext<WidgetCtx | null>(null);

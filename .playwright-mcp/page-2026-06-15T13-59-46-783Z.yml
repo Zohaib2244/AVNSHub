@@ -1,0 +1,319 @@
+- generic [ref=e1]:
+  - main [ref=e2]:
+    - button "open avn hub core settings" [ref=e1421] [cursor=pointer]:
+      - img [ref=e1422]
+    - generic [ref=e969]:
+      - generic [ref=e970]:
+        - generic [ref=e971]:
+          - button "move clock widget" [ref=e1287]:
+            - img [ref=e1288]
+          - button "remove clock widget" [ref=e1293] [cursor=pointer]:
+            - img [ref=e1294]
+          - button "configure clock widget" [ref=e1297] [cursor=pointer]:
+            - img [ref=e1298]
+          - generic [ref=e973]:
+            - generic [ref=e974]:
+              - img [ref=e975]
+              - text: clock & date
+            - generic [ref=e978]: 18:59:46
+            - generic [ref=e979]: Monday, June 15 2026
+            - generic [ref=e982]:
+              - generic [ref=e983]: sunrise 05:12
+              - generic [ref=e984]: dusk
+              - generic [ref=e985]: sunset 19:48
+            - generic [ref=e986]:
+              - button "Play lofi radio" [ref=e987] [cursor=pointer]:
+                - img [ref=e988]
+              - generic [ref=e996]: lofi hip-hop radio
+            - generic [ref=e997]:
+              - button "light" [ref=e998] [cursor=pointer]:
+                - img [ref=e999]
+                - text: light
+              - button "auto" [ref=e1005] [cursor=pointer]:
+                - img [ref=e1006]
+                - text: auto
+              - button "dark" [ref=e1010] [cursor=pointer]:
+                - img [ref=e1011]
+                - text: dark
+            - generic [ref=e1013]:
+              - generic [ref=e1015]: Jun 2026
+              - generic [ref=e1016]:
+                - generic [ref=e1017]: S
+                - generic [ref=e1018]: M
+                - generic [ref=e1019]: T
+                - generic [ref=e1020]: W
+                - generic [ref=e1021]: T
+                - generic [ref=e1022]: F
+                - generic [ref=e1023]: S
+                - generic [ref=e1025]: "1"
+                - generic [ref=e1026]: "2"
+                - generic [ref=e1027]: "3"
+                - generic [ref=e1028]: "4"
+                - generic [ref=e1029]: "5"
+                - generic [ref=e1030]: "6"
+                - generic [ref=e1031]: "7"
+                - generic [ref=e1032]: "8"
+                - generic [ref=e1033]: "9"
+                - generic [ref=e1034]: "10"
+                - generic [ref=e1035]: "11"
+                - generic [ref=e1036]: "12"
+                - generic [ref=e1037]: "13"
+                - generic [ref=e1038]: "14"
+                - generic [ref=e1039]: "15"
+                - generic [ref=e1040]: "16"
+                - generic [ref=e1041]: "17"
+                - generic [ref=e1042]: "18"
+                - generic [ref=e1043]: "19"
+                - generic [ref=e1044]: "20"
+                - generic [ref=e1045]: "21"
+                - generic [ref=e1046]: "22"
+                - generic [ref=e1047]: "23"
+                - generic [ref=e1048]: "24"
+                - generic [ref=e1049]: "25"
+                - generic [ref=e1050]: "26"
+                - generic [ref=e1051]: "27"
+                - generic [ref=e1052]: "28"
+                - generic [ref=e1053]: "29"
+                - generic [ref=e1054]: "30"
+        - generic [ref=e1055]:
+          - button "move now-playing widget" [ref=e1305]:
+            - img [ref=e1306]
+          - button "remove now-playing widget" [ref=e1311] [cursor=pointer]:
+            - img [ref=e1312]
+          - button "configure now-playing widget" [ref=e1315] [cursor=pointer]:
+            - img [ref=e1316]
+          - generic [ref=e1057]:
+            - generic [ref=e1058]:
+              - img [ref=e1059]
+              - text: now playing
+            - generic [ref=e1064]:
+              - generic [ref=e1066]:
+                - generic [ref=e1067]: The Hype
+                - generic [ref=e1068]: Twenty One Pilots · 1h ago
+              - generic [ref=e1069]:
+                - button "previous track" [ref=e1070] [cursor=pointer]:
+                  - img [ref=e1071]
+                - button "play" [ref=e1073] [cursor=pointer]:
+                  - img [ref=e1074]
+                - button "next track" [ref=e1076] [cursor=pointer]:
+                  - img [ref=e1077]
+            - generic [ref=e1080]:
+              - generic [ref=e1081]: Recently Played / Queue
+              - button "broken lovelytheband" [ref=e1082] [cursor=pointer]:
+                - generic [ref=e1083]: broken
+                - generic [ref=e1084]: lovelytheband
+              - button "We're Going Home Vance Joy" [ref=e1085] [cursor=pointer]:
+                - generic [ref=e1086]: We're Going Home
+                - generic [ref=e1087]: Vance Joy
+              - button "We're Going Home Vance Joy" [ref=e1088] [cursor=pointer]:
+                - generic [ref=e1089]: We're Going Home
+                - generic [ref=e1090]: Vance Joy
+              - button "We're Going Home Vance Joy" [ref=e1091] [cursor=pointer]:
+                - generic [ref=e1092]: We're Going Home
+                - generic [ref=e1093]: Vance Joy
+        - button "place a widget in left" [ref=e1323] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1324] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1325] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1326] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1327] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1328] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1329] [cursor=pointer]: +
+        - button "place a widget in left" [ref=e1330] [cursor=pointer]: +
+      - generic [ref=e1094]:
+        - generic [ref=e1095]:
+          - button "remove nutbot from terminal" [ref=e1331] [cursor=pointer]:
+            - img [ref=e1332]
+          - generic [ref=e1097]:
+            - generic [ref=e1098]:
+              - img [ref=e1099]
+              - text: nutbot v1.4
+            - generic [ref=e1102]:
+              - generic [ref=e1103]:
+                - button "log" [ref=e1104] [cursor=pointer]
+                - button "shell 1" [ref=e1105] [cursor=pointer]:
+                  - text: shell 1
+                  - img [ref=e1106]
+                - button "new shell tab" [ref=e1109] [cursor=pointer]:
+                  - img [ref=e1110]
+              - generic [ref=e1111]:
+                - generic [ref=e1112]: ╭─────╮
+                - generic [ref=e1113]:
+                  - text: │
+                  - generic [ref=e1114]: ─ ─
+                  - text: │
+                - generic [ref=e1115]:
+                  - text: │
+                  - generic [ref=e1116]: ▂▂▂
+                  - text: │
+                - generic [ref=e1117]: ╰─────╯
+                - generic [ref=e1118]: ▐▬▬ ▪ ▌
+            - generic [ref=e1119]:
+              - generic [ref=e1438]: "[ok] storage apps ... nominal"
+              - generic [ref=e1439]: "[ok] homelab uplink ... stable"
+              - generic [ref=e1440]: "[ok] github.sync ... up to date"
+              - generic [ref=e1441]: "[ok] jellyfin ... 2 active sessions"
+              - generic [ref=e1442]: "[ok] storage apps ... nominal"
+              - generic [ref=e1443]: "[ok] homelab uplink ... stable"
+              - generic [ref=e1444]: "[ok] github.sync ... up to date"
+        - generic [ref=e1127]:
+          - generic [ref=e1128]:
+            - button "move identity widget" [ref=e1341]:
+              - img [ref=e1342]
+            - button "remove identity widget" [ref=e1347] [cursor=pointer]:
+              - img [ref=e1348]
+            - button "configure identity widget" [ref=e1351] [cursor=pointer]:
+              - img [ref=e1352]
+            - generic [ref=e1129]:
+              - generic [ref=e1130]:
+                - img [ref=e1131]
+                - text: identity
+              - generic [ref=e1135]:
+                - generic [ref=e1136]:
+                  - generic [ref=e1137]:
+                    - img "NutMag" [ref=e1138]
+                    - text: NutMag2469
+                  - generic [ref=e1166]:
+                    - link "github" [ref=e1167] [cursor=pointer]:
+                      - /url: https://github.com/Zohaib2244
+                      - img [ref=e1168]
+                      - text: github
+                    - generic [ref=e1171]: ·
+                    - link "homelab" [ref=e1172] [cursor=pointer]:
+                      - /url: "#homelab"
+                      - img [ref=e1173]
+                      - text: homelab
+                    - generic [ref=e1176]: ·
+                    - generic [ref=e1177]: 3h 26m uptime
+                - generic [ref=e1178]:
+                  - generic [ref=e1179]: nutting magnesium amounts of stuff
+                  - generic [ref=e1180]:
+                    - 'button "Theme: dark — switch to light" [ref=e1181] [cursor=pointer]':
+                      - img [ref=e1182]
+                    - generic [ref=e1184]: live
+          - generic [ref=e1186]:
+            - button "move github widget" [ref=e1359]:
+              - img [ref=e1360]
+            - button "remove github widget" [ref=e1365] [cursor=pointer]:
+              - img [ref=e1366]
+            - button "configure github widget" [active] [ref=e1369] [cursor=pointer]:
+              - img [ref=e1370]
+            - generic [ref=e1445]:
+              - generic [ref=e1446]:
+                - generic [ref=e1447]: github activity
+                - button "close widget settings" [ref=e1448] [cursor=pointer]:
+                  - img [ref=e1449]
+              - generic [ref=e1452]: interaction
+              - generic [ref=e1453]:
+                - generic [ref=e1454]: slot hover expand
+                - checkbox "slot hover expand" [ref=e1455] [cursor=pointer]
+              - button "remove widget" [ref=e1456] [cursor=pointer]:
+                - img [ref=e1457]
+                - text: remove widget
+              - generic [ref=e1462]: widget
+              - generic [ref=e1463]:
+                - generic [ref=e1464]: commits shown
+                - spinbutton "commits shown" [ref=e1465]: "5"
+            - generic [ref=e1188]:
+              - generic [ref=e1190]:
+                - generic [ref=e1191]:
+                  - img [ref=e1192]
+                  - text: github activity
+                - generic [ref=e1194]: —
+              - generic [ref=e1195]: —
+      - generic [ref=e1196]:
+        - generic [ref=e1197]:
+          - button "move currently-playing widget" [ref=e1377]:
+            - img [ref=e1378]
+          - button "remove currently-playing widget" [ref=e1383] [cursor=pointer]:
+            - img [ref=e1384]
+          - button "configure currently-playing widget" [ref=e1387] [cursor=pointer]:
+            - img [ref=e1388]
+          - generic [ref=e1199]:
+            - generic [ref=e1200]:
+              - generic [ref=e1201]:
+                - generic [ref=e1202]: Last played
+                - generic [ref=e1203]:
+                  - generic [ref=e1204]: TEKKEN 8
+                  - generic [ref=e1205]: 11.1h recent
+                - button "View Library" [ref=e1206] [cursor=pointer]:
+                  - img [ref=e1207]
+                  - text: View Library
+              - generic [ref=e1209]:
+                - generic [ref=e1210]:
+                  - generic [ref=e1211]: Online Status
+                  - generic [ref=e1212]: offline
+                - generic [ref=e1214]:
+                  - img "steam avatar" [ref=e1215]
+                  - generic [ref=e1216]: halalInsaan
+                - button "copy steam friend code" [ref=e1217] [cursor=pointer]:
+                  - img [ref=e1218]
+                  - text: copy friend code
+            - generic [ref=e1221]:
+              - generic [ref=e1222]: last 2 weeks
+              - generic [ref=e1223]:
+                - generic [ref=e1224]: Forza Horizon 6
+                - generic [ref=e1225]: 24.7h · 88.1h total
+              - generic [ref=e1226]:
+                - generic [ref=e1227]: TEKKEN 8
+                - generic [ref=e1228]: 11.1h · 183h total
+              - generic [ref=e1229]:
+                - generic [ref=e1230]: Wallpaper Engine
+                - generic [ref=e1231]: 0.1h · 79.8h total
+        - generic [ref=e1232]:
+          - button "move homelab widget" [ref=e1395]:
+            - img [ref=e1396]
+          - button "remove homelab widget" [ref=e1401] [cursor=pointer]:
+            - img [ref=e1402]
+          - button "configure homelab widget" [ref=e1405] [cursor=pointer]:
+            - img [ref=e1406]
+          - generic [ref=e1234]:
+            - generic [ref=e1235]:
+              - img [ref=e1236]
+              - text: a very nutty home server
+            - generic [ref=e1239]: 99.0%
+            - generic [ref=e1240]:
+              - generic [ref=e1241]: immich
+              - generic [ref=e1243]: jellyfin
+              - generic [ref=e1245]: jellyseerr
+              - generic [ref=e1247]: radarr
+              - generic [ref=e1249]: sonarr
+              - generic [ref=e1251]: jackett
+              - generic [ref=e1253]: qbittorrent
+              - generic [ref=e1255]: nextcloud
+            - generic [ref=e1257]:
+              - generic [ref=e1258]: services
+              - generic [ref=e1259]:
+                - generic [ref=e1260]: immich
+                - generic [ref=e1261]: 99.9%
+              - generic [ref=e1262]:
+                - generic [ref=e1263]: jellyfin
+                - generic [ref=e1264]: 99.8%
+              - generic [ref=e1265]:
+                - generic [ref=e1266]: jellyseerr
+                - generic [ref=e1267]: 99.7%
+              - generic [ref=e1268]:
+                - generic [ref=e1269]: radarr
+                - generic [ref=e1270]: 99.6%
+              - generic [ref=e1271]:
+                - generic [ref=e1272]: sonarr
+                - generic [ref=e1273]: 99.9%
+              - generic [ref=e1274]:
+                - generic [ref=e1275]: jackett
+                - generic [ref=e1276]: 94.2%
+              - generic [ref=e1277]:
+                - generic [ref=e1278]: qbittorrent
+                - generic [ref=e1279]: 99.4%
+              - generic [ref=e1280]:
+                - generic [ref=e1281]: nextcloud
+                - generic [ref=e1282]: 99.9%
+        - button "place a widget in right" [ref=e1413] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1414] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1415] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1416] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1417] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1418] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1419] [cursor=pointer]: +
+        - button "place a widget in right" [ref=e1420] [cursor=pointer]: +
+  - button "Open Next.js Dev Tools" [ref=e218] [cursor=pointer]:
+    - img [ref=e219]
+  - alert [ref=e910]

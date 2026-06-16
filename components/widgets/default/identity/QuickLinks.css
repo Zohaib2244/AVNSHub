@@ -1,0 +1,39 @@
+/* ─── quicklinks ─────────────────────────────────────────────── */
+
+.quicklink-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 18px;
+  margin-top: 2px;
+}
+
+.quicklink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.75rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.quicklink:hover {
+  color: var(--accent-orange);
+}
+
+/* compact variant — sidebar placement */
+.quicklinks-compact {
+  padding: 10px 14px;
+}
+
+.quicklinks-compact .block-label {
+  margin-bottom: 6px;
+}
+
+.quicklinks-compact .quicklink-row {
+  gap: 6px 12px;
+}
+
+.quicklinks-compact .quicklink {
+  font-size: 0.7rem;
+}

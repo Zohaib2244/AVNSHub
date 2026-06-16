@@ -1,0 +1,31 @@
+/* ─── nutbot terminal ─────────────────────────────────────────── */
+
+/* compact face-only nutbot card (S/M) — the terminal renders at L size */
+.nutbot-mini {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 2px 0;
+  text-align: center;
+  height: 100%;
+}
+
+.nutbot-mini-ticker {
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  min-height: 1.2em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.nutbot-mini-hint {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted-dim);
+}

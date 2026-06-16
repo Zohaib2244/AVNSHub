@@ -19,34 +19,35 @@ import {
   Trophy,
   Tv,
 } from "lucide-react";
-import { ClockWidget } from "@/components/ClockWidget";
-import { QuickLinks } from "@/components/QuickLinks";
-import { UptimeMilestones } from "@/components/UptimeMilestones";
-import { HomelabStatus, HomelabStatusMore } from "@/components/HomelabStatus";
-import { ServerStats, ServerStatsMore } from "@/components/ServerStats";
-import { DiskStorage, DiskStorageMore } from "@/components/DiskStorage";
-import { NetworkStats, NetworkStatsMore } from "@/components/NetworkStats";
-import { Jellyfin, JellyfinMore } from "@/components/Jellyfin";
-import { ArrStack, ArrStackMore } from "@/components/ArrStack";
-import { StorageApps } from "@/components/StorageApps";
-import { NutBotFaceWidget } from "@/components/widgets/NutBotFaceWidget";
-import { WidgetManager } from "@/components/widgets/WidgetManager";
-import { IdentityBlock } from "@/components/IdentityBlock";
-import { NowPlaying } from "@/components/NowPlaying";
-import { CurrentlyPlaying } from "@/components/CurrentlyPlaying";
-import { GitHubActivity, GitHubActivityMore } from "@/components/GitHubActivity";
-import { SessionTracker, SessionTrackerMore } from "@/components/SessionTracker";
-import { HubSettings } from "@/components/widgets/HubSettings";
+import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
+import { QuickLinks } from "@/components/widgets/default/identity/QuickLinks";
+import { UptimeMilestones } from "@/components/widgets/default/identity/UptimeMilestones";
+import { HomelabStatus, HomelabStatusMore } from "@/components/widgets/default/homelab/HomelabStatus";
+import { ServerStats, ServerStatsMore } from "@/components/widgets/default/homelab/ServerStats";
+import { DiskStorage, DiskStorageMore } from "@/components/widgets/default/homelab/DiskStorage";
+import { NetworkStats, NetworkStatsMore } from "@/components/widgets/default/homelab/NetworkStats";
+import { Jellyfin, JellyfinMore } from "@/components/widgets/default/homelab/Jellyfin";
+import { ArrStack, ArrStackMore } from "@/components/widgets/default/homelab/ArrStack";
+import { StorageApps } from "@/components/widgets/default/homelab/StorageApps";
+import { NutBotFaceWidget } from "@/components/widgets/default/nutbot/NutBotFaceWidget";
+import { WidgetManager } from "@/components/widgets/default/system/WidgetManager";
+import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
+import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
+import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
+import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
+import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
+import { HubSettings } from "@/components/widgets/default/system/HubSettings";
 
 /* ─── widget framework contracts ─────────────────────────────────────
    A widget = a content component + a manifest entry here. The shell
    (components/framework/WidgetShell.tsx) supplies the card chrome, label,
    and grid placement; per-instance overrides (size, orientation, settings)
    come from the layout store. Widgets are resizable (S/M/L × h/v, limited to
-   what the manifest declares) and rearrangeable in edit mode — that's the
-   whole interaction model. There is no hover/click expansion: a widget that
-   wants a richer large layout reads useWidget().size and/or declares a
-   `detail` component (rendered automatically at L size).
+   what the manifest declares) and rearrangeable in edit mode. Slot Layout
+   also has transient visual-only hover preview boxes; they must not mutate
+   stored layout or replace a widget's size contract. A widget that wants a
+   richer large layout reads useWidget().size and/or declares a `detail` component
+   (rendered automatically at L size).
 
    See docs/CREATING_WIDGETS.md for the full authoring guide.
 ──────────────────────────────────────────────────────────────────── */
@@ -61,6 +62,21 @@ export type SettingsField =
   | { key: string; label: string; type: "number"; default: number; min?: number; max?: number };
 
 export type SettingsValues = Record<string, string | number | boolean>;
+
+export const FRAMEWORK_SETTINGS: SettingsField[] = [
+  { key: "hoverExpand", label: "slot hover expand", type: "toggle", default: false },
+  {
+    key: "hoverExpandAxis",
+    label: "expand axis",
+    type: "select",
+    default: "both",
+    options: [
+      { value: "both", label: "both" },
+      { value: "width", label: "width" },
+      { value: "height", label: "height" },
+    ],
+  },
+];
 
 export type WidgetManifest = {
   /** stable unique identifier — the object key, the layout/persistence key,
@@ -100,7 +116,7 @@ export type WidgetManifest = {
     (wrong types / unknown select options fall back to the field default) */
 export function resolveSettings(manifest: WidgetManifest, stored?: SettingsValues): SettingsValues {
   const values: SettingsValues = {};
-  for (const field of manifest.settings ?? []) {
+  for (const field of [...FRAMEWORK_SETTINGS, ...(manifest.settings ?? [])]) {
     const saved = stored?.[field.key];
     const valid =
       typeof saved === typeof field.default &&
