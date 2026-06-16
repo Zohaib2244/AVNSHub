@@ -56,49 +56,57 @@ function rectOf(instance: SlotWidgetInstance): Rect {
   return { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
 }
 
-/* a small sample placement so regions aren't empty on first load — purely
-   a starting point, the user rearranges everything in edit mode */
+/* canonical default layout — exported from the browser after manual
+   arrangement, then baked in here so a fresh session (or "reset layout")
+   starts from this exact state */
 function buildDefaultState(): SlotLayoutState {
   if (!defaultState) {
+    // helper: skip any widget whose manifest isn't registered yet
+    // (e.g. custom widgets absent on a fresh install)
+    function entry(
+      id: string,
+      region: SlotRegionId,
+      col: number,
+      row: number,
+      colSpan: number,
+      rowSpan: number,
+      overrides: SettingsValues = {},
+    ): SlotWidgetInstance | null {
+      const manifest = getManifest(id);
+      if (!manifest) return null;
+      return { id, region, col, row, colSpan, rowSpan, settings: resolveSettings(manifest, overrides) };
+    }
+
     defaultState = {
       version: 3,
-      regionDims: { ...REGION_GRID },
+      regionDims: {
+        left:  { cols: 2, rows: 8 },
+        right: { cols: 2, rows: 8 },
+        base:  { cols: 3, rows: 2 },
+      },
       frameRatios: {
-        columns: [...DEFAULT_FRAME_RATIOS.columns] as FrameRatios["columns"],
-        centerRows: [...DEFAULT_FRAME_RATIOS.centerRows] as FrameRatios["centerRows"],
+        columns:    [2, 3, 2] as FrameRatios["columns"],
+        centerRows: [5, 5]    as FrameRatios["centerRows"],
       },
       widgets: [
-        { id: "clock", region: "left", col: 0, row: 0, colSpan: 2, rowSpan: 2, settings: resolveSettings(WIDGETS.clock) },
-        {
-          id: "now-playing",
-          region: "left",
-          col: 0,
-          row: 2,
-          colSpan: 2,
-          rowSpan: 2,
-          settings: resolveSettings(WIDGETS["now-playing"]),
-        },
-        {
-          id: "currently-playing",
-          region: "right",
-          col: 0,
-          row: 0,
-          colSpan: 2,
-          rowSpan: 2,
-          settings: resolveSettings(WIDGETS["currently-playing"]),
-        },
-        { id: "homelab", region: "right", col: 0, row: 2, colSpan: 2, rowSpan: 2, settings: resolveSettings(WIDGETS.homelab) },
-        {
-          id: "identity",
-          region: "base",
-          col: 0,
-          row: 0,
-          colSpan: 3,
-          rowSpan: 1,
-          settings: resolveSettings(WIDGETS.identity),
-        },
-        { id: "github", region: "base", col: 0, row: 1, colSpan: 3, rowSpan: 1, settings: resolveSettings(WIDGETS.github) },
-      ],
+        // ── left column ──────────────────────────────────────────
+        entry("clock",          "left",  0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "height", showCalendar: true, showLofi: true }),
+        entry("now-playing",    "left",  0, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
+        entry("weather",        "left",  1, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "width", city: "", units: "f" }),
+        entry("disk-storage",   "left",  0, 3, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
+        entry("server-stats",   "left",  1, 3, 1, 3, { hoverExpand: true,  hoverExpandAxis: "both" }),
+        entry("storage-apps",   "left",  0, 4, 1, 1, { hoverExpand: true,  hoverExpandAxis: "width" }),
+        entry("network-stats",  "left",  0, 5, 1, 1, { hoverExpand: false, hoverExpandAxis: "both" }),
+        entry("arr-stack",      "left",  0, 6, 2, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
+        // ── right column ─────────────────────────────────────────
+        entry("currently-playing", "right", 0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both" }),
+        entry("homelab",        "right", 0, 2, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both", pollSeconds: "60" }),
+        entry("hub-settings",   "right", 0, 4, 2, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
+        entry("widgets",        "right", 0, 5, 1, 3, { hoverExpand: false, hoverExpandAxis: "height" }),
+        // ── base row ─────────────────────────────────────────────
+        entry("identity",       "base",  0, 0, 3, 1, { hoverExpand: false, hoverExpandAxis: "height" }),
+        entry("github",         "base",  0, 1, 3, 1, { hoverExpand: true,  hoverExpandAxis: "height", flyoutCommits: 5 }),
+      ].filter((w): w is SlotWidgetInstance => w !== null),
       terminalWidgetId: TERMINAL_REGION.defaultWidget,
     };
   }
