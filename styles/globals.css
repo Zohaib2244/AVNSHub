@@ -1427,6 +1427,20 @@ body {
   font-family: var(--font-jetbrains-mono), monospace;
 }
 
+.hub-core-io-ok {
+  margin-top: 4px;
+  font-size: 0.6rem;
+  color: var(--accent-cyan);
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+/* widget import bar sits between the tab head and the scrollable lists */
+.hub-widget-importbar {
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
 .hub-widget-panel {
   display: flex;
   flex-direction: column;

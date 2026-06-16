@@ -190,9 +190,54 @@ function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
         <span className="wset-title">widget manager</span>
         <span className="hub-core-tab-meta">{layoutMode === "slots" ? "default layout" : "graph layout"}</span>
       </div>
+      <WidgetImportBar />
       <div className="hub-widget-scroll" role="region" aria-label="widget manager list">
         {layoutMode === "slots" ? <SlotWidgetControls /> : <GraphWidgetControls />}
       </div>
+    </div>
+  );
+}
+
+/** import a .zip exported from another card and register the widget it carries.
+    On success the file writes trigger HMR and the widget appears in the lists. */
+function WidgetImportBar() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [status, setStatus] = useState<{ kind: "idle" | "busy" | "ok" | "error"; msg?: string }>({ kind: "idle" });
+
+  async function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+    setStatus({ kind: "busy", msg: "importing…" });
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/widget-creator/import", { method: "POST", body });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
+      if (res.ok) setStatus({ kind: "ok", msg: `imported ${data.id ?? ""} ✓` });
+      else setStatus({ kind: "error", msg: data.error ?? "import failed" });
+    } catch {
+      setStatus({ kind: "error", msg: "import failed" });
+    }
+  }
+
+  return (
+    <div className="hub-core-io-row hub-widget-importbar">
+      <button
+        type="button"
+        className="hub-core-io-btn"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={status.kind === "busy"}
+        title="import a widget exported as .zip"
+      >
+        <Upload size={14} strokeWidth={1.75} />
+        import widget
+      </button>
+      {status.kind !== "idle" && status.kind !== "busy" && (
+        <span className={status.kind === "ok" ? "hub-core-io-ok" : "hub-core-io-error"}>{status.msg}</span>
+      )}
+      {status.kind === "busy" && <span className="block-sub">{status.msg}</span>}
+      <input ref={fileInputRef} type="file" accept=".zip" style={{ display: "none" }} onChange={handleImport} />
     </div>
   );
 }
@@ -533,6 +578,19 @@ function HubWidgetActions({
 }) {
   return (
     <div className="hub-widget-actions">
+      {isCustom && (
+        <button
+          type="button"
+          className="hub-widget-btn"
+          onClick={() => {
+            window.location.href = `/api/widget-creator/export?id=${encodeURIComponent(id)}`;
+          }}
+          aria-label={`export ${manifest?.title ?? id} widget`}
+          title="export widget (.zip)"
+        >
+          <Download size={11} strokeWidth={1.75} />
+        </button>
+      )}
       {isCustom && (
         <button
           type="button"

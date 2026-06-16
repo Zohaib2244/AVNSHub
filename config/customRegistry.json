@@ -1,0 +1,28 @@
+{
+  "weather": {
+    "title": "weather",
+    "iconName": "Thermometer",
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
+    "settings": [
+      {
+        "key": "city",
+        "label": "city",
+        "type": "text",
+        "default": "",
+        "placeholder": "auto-detect (leave blank)"
+      },
+      {
+        "key": "units",
+        "label": "units",
+        "type": "select",
+        "default": "f",
+        "options": [
+          { "value": "f", "label": "°F" },
+          { "value": "c", "label": "°C" }
+        ]
+      }
+    ]
+  }
+}

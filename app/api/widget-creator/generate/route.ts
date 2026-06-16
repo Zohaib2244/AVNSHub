@@ -1,8 +1,16 @@
 import { spawn } from "child_process";
-import { readFileSync, readdirSync } from "fs";
+import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { HARNESS_ADAPTERS, HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { lineSignalsLimit } from "@/lib/widget-creator/limitDetection";
+import {
+  readRegistry,
+  upsertRegistryEntry,
+  addToComponentMap,
+  buildRegistryEntry,
+  mergeWidgetManifest,
+  componentName,
+} from "@/lib/widget-creator/customRegistry";
 
 const REPO_ROOT = process.cwd();
 
@@ -26,9 +34,11 @@ function readExistingWidget(slug: string): string {
 
 function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
   const creatingWidgetsDoc = readDoc("docs/CREATING_WIDGETS.md");
-  const customWidgetsContent = readDoc("config/customWidgets.tsx");
+  const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
+  const slug = settings.editSlug ?? settings.slug ?? "";
+  const comp = slug ? componentName(slug) : "<Pascal>Widget";
   const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
 
   const settingsSummary = [
@@ -54,9 +64,9 @@ function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
     ? `## Your task — EDITING an existing widget
 
 You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT create a new widget.
-- Overwrite \`components/widgets/custom/${settings.editSlug}/<ComponentName>.tsx\` with the updated component
-- Update the manifest entry in \`config/customWidgets.tsx\` ONLY if settings (sizes, icon, etc.) need to change; the slug and order must stay the same
-- DO NOT add a second entry to CUSTOM_DEFAULT_ORDER
+- Overwrite \`components/widgets/custom/${settings.editSlug}/${comp}.tsx\` with the updated component (keep the named export \`export function ${comp}() { ... }\`)
+- If sizes / icon / settings-schema change, also overwrite \`components/widgets/custom/${settings.editSlug}/manifest.json\` to match
+- DO NOT touch any file under \`config/\` — the registration is managed automatically. The slug must stay the same.
 
 ## Current implementation (modify this)
 
@@ -65,11 +75,11 @@ ${existingCode || "(could not read existing file — write a corrected version)"
 \`\`\``
     : `## Your task — creating a new widget
 
-Write a new widget following the rules in the authoring guide below. The widget should live entirely within:
-- \`components/widgets/custom/<slug>/<ComponentName>.tsx\` (the component)
-- \`config/customWidgets.tsx\` (the manifest registration — append to, don't replace)
+Write a new widget following the rules in the authoring guide below. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
+- \`${comp}.tsx\` — the component, with a named export \`export function ${comp}() { ... }\`
+- \`manifest.json\` — the widget's manifest data (see "Required output" below)
 
-Do NOT touch \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other core framework file.`;
+Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file — the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.`;
 
   return `You are generating a widget for the NutMag Card project — a living developer identity card built with Next.js, Tailwind, and Framer Motion.
 
@@ -78,12 +88,6 @@ ${taskSection}
 ## Authoring guide (follow exactly)
 
 ${creatingWidgetsDoc}
-
-## customWidgets.tsx (current state — append your widget here)
-
-\`\`\`tsx
-${customWidgetsContent}
-\`\`\`
 
 ## Widget spec from the user
 
@@ -95,21 +99,24 @@ ${userPrompt}
 
 ## Required output
 
-1. Write \`components/widgets/custom/<slug>/<ComponentName>.tsx\` with the full widget component.
-2. Update \`config/customWidgets.tsx\` by inserting:
-   - The lucide icon import and component import between the "generated imports" comment markers
-   - The manifest object between the "generated widgets" comment markers
-   - The slug string between the "generated order" comment markers
+1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export — the file basename and export name must both be \`${comp}\`).
 
-When writing imports in customWidgets.tsx, use this exact format:
+2. Write \`components/widgets/custom/${slug || "<slug>"}/manifest.json\` describing the widget. This is pure data — DO NOT write any config/*.ts(x) file; the build picks this manifest up automatically. Shape:
+\`\`\`json
+{
+  "title": "${settings.name ?? (slug || "widget name")}",
+  "iconName": "${settings.icon ?? "Box"}",
+  "sizes": ${JSON.stringify(settings.sizes?.length ? settings.sizes : ["S", "M", "L"])},
+  "orientations": ${JSON.stringify(settings.orientations?.length ? settings.orientations : ["h"])},
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "example", "label": "example", "type": "text", "default": "" }
+  ]
+}
 \`\`\`
-// --- generated imports start ---
-import { IconName } from "lucide-react";
-import { ComponentName } from "@/components/widgets/custom/<slug>/ComponentName";
-// --- generated imports end ---
-\`\`\`
+\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) — use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
 
-3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/<slug>/route.ts\`.
+3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/${slug || "<slug>"}/route.ts\`.
 
 Design rules to follow:
 - Use CSS variables for all colors: \`--text-primary\`, \`--text-muted\`, \`--accent-orange\`, \`--accent-cyan\`, \`--border\`, \`--bg-card\`, \`--bg-nested\`, \`--shadow\`
@@ -260,7 +267,14 @@ export async function POST(req: Request) {
             sendEvent(write, "error", { message: "All harnesses hit their rate limit. Try again later." });
           }
         } else {
-          // done cleanly — run tsc check
+          // done cleanly — wire the new/edited widget into the registry
+          // deterministically (JSON entry + one lazy line), THEN type-check the
+          // wired-up state. The harness only wrote the component + manifest.json.
+          const wired = writeWidgetConfig(settings);
+          if (!wired.ok) {
+            sendEvent(write, "error", { message: `widget generated but registration failed: ${wired.error}` });
+            break;
+          }
           sendEvent(write, "status", { type: "tsc_check" });
           const tscResult = await runTscCheck();
           if (tscResult.errors.length > 0) {
@@ -289,6 +303,43 @@ export async function POST(req: Request) {
   });
 }
 
+/** After the harness writes the component + manifest.json, register the widget
+    into the split config deterministically: build the entry from the creator
+    settings, overlay the validated per-widget manifest.json, write it to
+    customRegistry.json, and append the one lazy line to customComponentMap.tsx. */
+function writeWidgetConfig(settings: GenerateSettings): { ok: boolean; error?: string } {
+  const id = settings.editSlug ?? settings.slug;
+  if (!id) return { ok: false, error: "no slug provided" };
+  if (!/^[a-z0-9-]+$/.test(id)) return { ok: false, error: `invalid slug "${id}"` };
+
+  const dir = join(REPO_ROOT, "components/widgets/custom", id);
+  const comp = componentName(id);
+  if (!existsSync(join(dir, `${comp}.tsx`))) {
+    return { ok: false, error: `expected component ${comp}.tsx was not created` };
+  }
+
+  const existing = readRegistry()[id];
+  let entry = buildRegistryEntry(
+    { id, name: settings.name, icon: settings.icon, sizes: settings.sizes, orientations: settings.orientations },
+    existing,
+  );
+
+  // overlay the LLM-authored per-widget manifest.json when it parses cleanly;
+  // a malformed manifest is ignored so it can never corrupt the registry
+  const manifestPath = join(dir, "manifest.json");
+  if (existsSync(manifestPath)) {
+    try {
+      entry = mergeWidgetManifest(entry, JSON.parse(readFileSync(manifestPath, "utf-8")));
+    } catch {
+      /* keep the settings-derived entry */
+    }
+  }
+
+  upsertRegistryEntry(id, entry);
+  addToComponentMap(id);
+  return { ok: true };
+}
+
 async function runTscCheck(): Promise<{ errors: string[] }> {
   return new Promise((resolve) => {
     const child = spawn("npx", ["tsc", "--noEmit", "--pretty", "false"], {
@@ -305,7 +356,7 @@ async function runTscCheck(): Promise<{ errors: string[] }> {
         resolve({ errors: [] });
       } else {
         // only surface errors in the custom widget directory
-        const lines = output.split("\n").filter((l) => l.includes("components/widgets/custom") || l.includes("config/customWidgets"));
+        const lines = output.split("\n").filter((l) => l.includes("components/widgets/custom") || l.includes("config/custom"));
         resolve({ errors: lines.length > 0 ? lines : output.split("\n").filter(Boolean).slice(0, 10) });
       }
     });
