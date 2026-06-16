@@ -460,6 +460,59 @@
   border-color: var(--text-primary);
 }
 
+.wc-add-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 9px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: transparent;
+  color: var(--accent-cyan);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.wc-add-btn:hover {
+  background: var(--accent-cyan);
+  color: var(--bg-card);
+}
+
+.wc-added-hint {
+  flex-shrink: 0;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+  padding: 0 4px;
+  align-self: center;
+}
+
+.wc-select {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 6px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.62rem;
+  color: var(--text-primary);
+  outline: none;
+  cursor: pointer;
+}
+
+.wc-select:focus {
+  border-color: var(--accent-orange);
+}
+
 .wc-chat-input {
   flex: 1;
   min-width: 0;

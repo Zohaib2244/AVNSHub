@@ -1,5 +1,5 @@
 import { spawn } from "child_process";
-import { readFileSync } from "fs";
+import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import { HARNESS_ADAPTERS, HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { lineSignalsLimit } from "@/lib/widget-creator/limitDetection";
@@ -14,13 +14,26 @@ function readDoc(relPath: string): string {
   }
 }
 
+function readExistingWidget(slug: string): string {
+  try {
+    const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+    const files = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
+    return files.map((f) => `// ${f}\n${readFileSync(join(dir, f), "utf-8")}`).join("\n\n");
+  } catch {
+    return "";
+  }
+}
+
 function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
   const creatingWidgetsDoc = readDoc("docs/CREATING_WIDGETS.md");
   const customWidgetsContent = readDoc("config/customWidgets.tsx");
 
+  const isEdit = Boolean(settings.editSlug);
+  const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
+
   const settingsSummary = [
     settings.name && `Widget name: "${settings.name}"`,
-    settings.slug && `Slug (id): "${settings.slug}"`,
+    (settings.slug || settings.editSlug) && `Slug (id): "${settings.slug || settings.editSlug}"`,
     settings.icon && `Lucide icon: ${settings.icon}`,
     settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
     settings.orientations?.length && `Orientations: ${settings.orientations.join(", ")}`,
@@ -37,15 +50,30 @@ function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
     .filter(Boolean)
     .join("\n");
 
-  return `You are generating a widget for the NutMag Card project — a living developer identity card built with Next.js, Tailwind, and Framer Motion.
+  const taskSection = isEdit
+    ? `## Your task — EDITING an existing widget
 
-## Your task
+You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT create a new widget.
+- Overwrite \`components/widgets/custom/${settings.editSlug}/<ComponentName>.tsx\` with the updated component
+- Update the manifest entry in \`config/customWidgets.tsx\` ONLY if settings (sizes, icon, etc.) need to change; the slug and order must stay the same
+- DO NOT add a second entry to CUSTOM_DEFAULT_ORDER
+
+## Current implementation (modify this)
+
+\`\`\`tsx
+${existingCode || "(could not read existing file — write a corrected version)"}
+\`\`\``
+    : `## Your task — creating a new widget
 
 Write a new widget following the rules in the authoring guide below. The widget should live entirely within:
 - \`components/widgets/custom/<slug>/<ComponentName>.tsx\` (the component)
 - \`config/customWidgets.tsx\` (the manifest registration — append to, don't replace)
 
-Do NOT touch \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other core framework file.
+Do NOT touch \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other core framework file.`;
+
+  return `You are generating a widget for the NutMag Card project — a living developer identity card built with Next.js, Tailwind, and Framer Motion.
+
+${taskSection}
 
 ## Authoring guide (follow exactly)
 
@@ -97,6 +125,8 @@ Start writing the files now.`;
 export type GenerateSettings = {
   name?: string;
   slug?: string;
+  /** if set, edit this existing custom widget instead of creating a new one */
+  editSlug?: string;
   icon?: string;
   sizes?: string[];
   orientations?: string[];
@@ -236,7 +266,8 @@ export async function POST(req: Request) {
           if (tscResult.errors.length > 0) {
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
           } else {
-            sendEvent(write, "status", { type: "done" });
+            const doneSlug = settings.editSlug ?? settings.slug ?? null;
+            sendEvent(write, "status", { type: "done", slug: doneSlug });
           }
           break;
         }

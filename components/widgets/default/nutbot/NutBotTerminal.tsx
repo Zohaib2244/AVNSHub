@@ -82,10 +82,19 @@ export function NutBotTerminal() {
     ...(SHELL_WS_URL ? [{ id: "real-shell", title: "real shell" }] : []),
     { id: "creator", title: "creator" },
   ]);
-  const [activeTab, setActiveTab] = useState("log");
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("nutmag-nutbot-tab") ?? "log";
+    }
+    return "log";
+  });
   const [shells, setShells] = useState<Record<string, ShellState>>({ "shell-1": { history: [], input: "" } });
   const shellCount = useRef(1);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try { sessionStorage.setItem("nutmag-nutbot-tab", activeTab); } catch {}
+  }, [activeTab]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;

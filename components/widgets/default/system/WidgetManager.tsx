@@ -16,7 +16,7 @@ import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { getLayoutMode, getServerLayoutMode, subscribeLayoutMode } from "@/lib/layoutMode";
-import { getSlotLayout, getUnplacedWidgets, placeWidgetAuto, removeWidget as removeSlotWidget } from "@/lib/slotLayout";
+import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, placeWidgetAuto, removeWidget as removeSlotWidget } from "@/lib/slotLayout";
 
 /** the widget manager can never remove itself — it's the only way to re-add
     hidden widgets (mirrors ALWAYS_VISIBLE in lib/layout.ts) */
@@ -26,6 +26,8 @@ export function WidgetManager() {
   const { size } = useWidget();
   const { layout, updateInstance, addWidget } = useLayout();
   const layoutMode = useSyncExternalStore(subscribeLayoutMode, getLayoutMode, getServerLayoutMode);
+  // always subscribe so server and client agree during hydration
+  const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
   const isSlot = layoutMode === "slots";
 
   // keep a stable registry order regardless of current grid order;
@@ -34,10 +36,13 @@ export function WidgetManager() {
   const allIds = [...DEFAULT_ORDER, ...Object.keys(CUSTOM_WIDGETS).filter((id) => !DEFAULT_ORDER.includes(id))];
 
   if (isSlot) {
-    // Slot layout: "on screen" = placed in a region or terminal; "available" = unplaced
-    const slotLayout = getSlotLayout();
-    const placedIds = new Set([...slotLayout.widgets.map((w) => w.id), ...(slotLayout.terminalWidgetId ? [slotLayout.terminalWidgetId] : [])]);
-    const unplacedIds = getUnplacedWidgets();
+    // derive placed/unplaced from the subscribed snapshot — never call getSlotLayout() in render
+    const placedIds = new Set([
+      ...slotLayout.widgets.map((w) => w.id),
+      ...(slotLayout.terminalWidgetId ? [slotLayout.terminalWidgetId] : []),
+    ]);
+    const allKnownIds = [...Object.keys(WIDGETS), ...Object.keys(CUSTOM_WIDGETS).filter((id) => !(id in WIDGETS))];
+    const unplacedIds = allKnownIds.filter((id) => !placedIds.has(id));
     const onScreenSlot = allIds.filter((id) => placedIds.has(id));
     const availableSlot = unplacedIds.filter((id) => allIds.includes(id) || id in CUSTOM_WIDGETS);
 

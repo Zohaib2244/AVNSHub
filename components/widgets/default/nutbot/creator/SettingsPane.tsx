@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
+import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 
 type Props = {
   settings: GenerateSettings;
@@ -38,6 +39,8 @@ const IMAGE_KEY_MAP = { S: "sImageRef", M: "mImageRef", L: "lImageRef" } as cons
 
 export function SettingsPane({ settings, onChange }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
+  const isEditMode = Boolean(settings.editSlug);
+  const customIds = Object.keys(CUSTOM_WIDGETS);
 
   function toggleSize(s: string) {
     const current = settings.sizes ?? ["S", "M", "L"];
@@ -58,6 +61,41 @@ export function SettingsPane({ settings, onChange }: Props) {
 
   return (
     <div className="wc-settings">
+      <Section title="mode">
+        <div className="wc-row wc-row-spread">
+          <div className="wc-toggle-group">
+            <button
+              type="button"
+              className={`wc-toggle-btn${!isEditMode ? " active" : ""}`}
+              onClick={() => onChange({ editSlug: undefined })}
+            >create</button>
+            <button
+              type="button"
+              className={`wc-toggle-btn${isEditMode ? " active" : ""}${customIds.length === 0 ? " disabled" : ""}`}
+              onClick={() => {
+                const first = customIds[0];
+                if (first) onChange({ editSlug: first });
+              }}
+              disabled={customIds.length === 0}
+              title={customIds.length === 0 ? "no custom widgets yet" : "edit an existing widget"}
+            >edit</button>
+          </div>
+          {isEditMode && customIds.length > 0 && (
+            <select
+              className="wc-select"
+              value={settings.editSlug ?? ""}
+              onChange={(e) => onChange({ editSlug: e.target.value })}
+            >
+              {customIds.map((id) => (
+                <option key={id} value={id}>
+                  {CUSTOM_WIDGETS[id]?.title ?? id} (#{id})
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+      </Section>
+
       <Section title="identity">
         <div className="wc-row-pair">
           <div className="wc-field">

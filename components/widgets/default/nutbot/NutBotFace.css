@@ -28,3 +28,19 @@
 .nutbot-face-slot {
   color: var(--text-muted);
 }
+
+/* celebrate mode — widget just created */
+.nutbot-face-celebrate .nutbot-face-eye,
+.nutbot-face-celebrate .nutbot-face-mouth {
+  color: var(--accent-orange);
+}
+
+.nutbot-face-celebrate {
+  animation: nutbot-wiggle 0.45s ease-in-out infinite alternate;
+  filter: drop-shadow(0 0 5px var(--accent-orange));
+}
+
+@keyframes nutbot-wiggle {
+  from { transform: translateY(0) rotate(-3deg); }
+  to   { transform: translateY(-2px) rotate(3deg); }
+}

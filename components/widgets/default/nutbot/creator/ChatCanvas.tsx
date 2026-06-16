@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { Send, Square, PlusCircle } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
+import { emitWidgetCreated } from "@/lib/nutbotSignal";
+import { getLayoutMode } from "@/lib/layoutMode";
+import { placeWidgetAuto } from "@/lib/slotLayout";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 type Phase =
   | { id: "idle" }
@@ -51,9 +55,23 @@ function StatusBar({ phase }: { phase: Phase }) {
 }
 
 export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
+  const { addWidget } = useLayout();
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
-  const [phase, setPhase] = useState<Phase>({ id: "idle" });
+  // restore done state from sessionStorage so HMR doesn't lose it
+  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("nutmag-creator-done") ?? null;
+    }
+    return null;
+  });
+  const [phase, setPhase] = useState<Phase>(() => {
+    if (typeof window !== "undefined" && sessionStorage.getItem("nutmag-creator-done")) {
+      return { id: "done" };
+    }
+    return { id: "idle" };
+  });
+  const [added, setAdded] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -120,16 +138,22 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
             } else if (type === "tsc_check") {
               setPhase({ id: "tsc" });
             } else if (type === "done") {
+              const slug = (payload.slug as string | null) ?? null;
               setPhase({ id: "done" });
               setMessages((prev) => {
-                // mark last assistant message as not streaming
                 const updated = [...prev];
                 const idx = assistantIdxRef.current;
                 if (idx >= 0 && updated[idx]?.role === "assistant") {
                   updated[idx] = { ...(updated[idx] as { role: "assistant"; text: string }), streaming: false };
                 }
-                return [...updated, { role: "ok", text: "[ok] widget written — open widget manager to add it to the grid" }];
+                return [...updated, { role: "ok", text: "[ok] widget written — click '+ add to layout' below" }];
               });
+              if (slug) {
+                setDoneWidgetId(slug);
+                setAdded(false);
+                emitWidgetCreated(slug);
+                try { sessionStorage.setItem("nutmag-creator-done", slug); } catch {}
+              }
             }
           } else if (event === "chunk") {
             const text = payload.text as string;
@@ -189,6 +213,20 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
     if (phase.id !== "idle" && phase.id !== "done" && phase.id !== "error") return;
     setMessages([]);
     setPhase({ id: "idle" });
+    setDoneWidgetId(null);
+    setAdded(false);
+    try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
+  }
+
+  function handleAddToLayout() {
+    if (!doneWidgetId) return;
+    const mode = getLayoutMode();
+    if (mode === "slots") {
+      placeWidgetAuto(doneWidgetId);
+    } else {
+      addWidget(doneWidgetId);
+    }
+    setAdded(true);
   }
 
   const isGenerating = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
@@ -256,9 +294,20 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
 
       <div className="wc-chat-footer">
         {isDoneOrError && (
-          <button type="button" className="wc-clear-btn" onClick={clearChat}>
-            new
-          </button>
+          <>
+            <button type="button" className="wc-clear-btn" onClick={clearChat}>
+              new
+            </button>
+            {doneWidgetId && !added && (
+              <button type="button" className="wc-add-btn" onClick={handleAddToLayout}>
+                <PlusCircle size={11} strokeWidth={2} />
+                add to layout
+              </button>
+            )}
+            {added && (
+              <span className="wc-added-hint">added ✓</span>
+            )}
+          </>
         )}
         <textarea
           className="wc-chat-input"
