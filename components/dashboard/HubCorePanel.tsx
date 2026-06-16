@@ -40,6 +40,7 @@ const LAYOUT_MODE_OPTIONS: { mode: LayoutMode; label: string }[] = [
 
 const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
 type HubCoreTab = "settings" | "widgets";
+type HubSettingsSection = "avn" | "mode";
 
 function registryIds() {
   const ids: string[] = [];
@@ -55,8 +56,7 @@ function regionShortLabel(region: SlotRegionId) {
 
 export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
   const [activeTab, setActiveTab] = useState<HubCoreTab | null>(null);
-  const [avnOpen, setAvnOpen] = useState(true);
-  const [modeOpen, setModeOpen] = useState(true);
+  const [activeSettingsSection, setActiveSettingsSection] = useState<HubSettingsSection | null>("avn");
   const panelRef = useRef<HTMLDivElement>(null);
 
   const { editMode, startEdit, lockLayout, resetLayout } = useLayout();
@@ -124,7 +124,11 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
           >
             {activeTab === "settings" ? (
               <>
-                <CoreSection title="avn hub" open={avnOpen} onToggle={() => setAvnOpen((o) => !o)}>
+                <CoreSection
+                  title="avn hub"
+                  open={activeSettingsSection === "avn"}
+                  onToggle={() => setActiveSettingsSection((section) => (section === "avn" ? null : "avn"))}
+                >
                   <div className="wset-row">
                     <span>edit mode</span>
                     <div className="seg-row">
@@ -163,8 +167,8 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
 
                 <CoreSection
                   title={layoutMode === "slots" ? "default mode" : "graph mode"}
-                  open={modeOpen}
-                  onToggle={() => setModeOpen((o) => !o)}
+                  open={activeSettingsSection === "mode"}
+                  onToggle={() => setActiveSettingsSection((section) => (section === "mode" ? null : "mode"))}
                 >
                   {layoutMode === "slots" ? <DefaultModeSettings /> : <GraphModeSettings />}
                 </CoreSection>
@@ -186,7 +190,9 @@ function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
         <span className="wset-title">widget manager</span>
         <span className="hub-core-tab-meta">{layoutMode === "slots" ? "default layout" : "graph layout"}</span>
       </div>
-      {layoutMode === "slots" ? <SlotWidgetControls /> : <GraphWidgetControls />}
+      <div className="hub-widget-scroll" role="region" aria-label="widget manager list">
+        {layoutMode === "slots" ? <SlotWidgetControls /> : <GraphWidgetControls />}
+      </div>
     </div>
   );
 }

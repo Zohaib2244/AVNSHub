@@ -1226,12 +1226,15 @@ body {
 
 .hub-core-panel-widgets {
   width: 280px;
+  overflow: hidden;
 }
 
 .hub-core-tab-content {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
+  max-height: inherit;
 }
 
 .hub-core-tab-head {
@@ -1249,6 +1252,25 @@ body {
   font-size: 0.54rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.hub-widget-scroll {
+  max-height: clamp(240px, 52vh, 420px);
+  overflow-y: scroll;
+  overflow-x: hidden;
+  padding-right: 4px;
+  margin-right: -4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.hub-widget-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.hub-widget-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
 }
 
 .hub-core-section + .hub-core-section {
@@ -1410,6 +1432,7 @@ body {
   flex-direction: column;
   gap: 6px;
   margin-bottom: 8px;
+  min-height: 0;
 }
 
 .hub-widget-list-section {
