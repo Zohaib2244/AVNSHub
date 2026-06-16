@@ -25,9 +25,9 @@ export const REGION_GRID: Record<SlotRegionId, RegionDims> = {
 
 /** display labels for the AVN Hub Core Settings region-dims editor */
 export const REGION_LABELS: Record<SlotRegionId, string> = {
-  left: "column l",
-  right: "column r",
-  base: "base",
+  left: "left grid",
+  right: "right grid",
+  base: "base grid",
 };
 
 /** bounds for user-editable region grid dims (AVN Hub Core Settings →

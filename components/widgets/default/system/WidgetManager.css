@@ -112,3 +112,26 @@
   color: var(--text-muted-dim);
   opacity: 0.7;
 }
+
+.wm-btn-delete {
+  color: var(--text-muted);
+}
+
+.wm-btn-delete:hover:not(:disabled) {
+  color: #c0392b;
+  border-color: #c0392b;
+}
+
+.wm-custom-badge {
+  display: inline-block;
+  margin-left: 5px;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--accent-cyan);
+  color: var(--accent-cyan);
+  vertical-align: middle;
+}

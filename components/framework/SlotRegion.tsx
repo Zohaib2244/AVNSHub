@@ -302,7 +302,7 @@ function SlotEmptyCell({ region, cell }: { region: SlotRegionId; cell: { col: nu
 
   return (
     <div
-      className="slot-cell-empty"
+      className={`slot-cell-empty${open ? " selected" : ""}`}
       style={{ gridColumn: `${cell.col + 1} / span 1`, gridRow: `${cell.row + 1} / span 1` }}
       role="button"
       tabIndex={0}
@@ -315,7 +315,7 @@ function SlotEmptyCell({ region, cell }: { region: SlotRegionId; cell: { col: nu
         }
       }}
     >
-      +{open && <SlotPlacementPopover region={region} onClose={() => setActivePopover(null)} />}
+      +{open && <SlotPlacementPopover region={region} onClose={() => setActivePopover(null)} preferredCell={cell} />}
     </div>
   );
 }

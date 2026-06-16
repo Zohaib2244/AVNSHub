@@ -96,139 +96,147 @@ export function SettingsPane({ settings, onChange }: Props) {
         </div>
       </Section>
 
-      <Section title="identity">
-        <div className="wc-row-pair">
-          <div className="wc-field">
-            <span className="wc-field-label">name</span>
-            <input
-              className="wc-input"
-              placeholder="weather"
-              value={settings.name ?? ""}
-              onChange={(e) => {
-                const name = e.target.value;
-                const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-                onChange({ name, slug });
-              }}
-            />
+      {!isEditMode && (
+        <Section title="identity">
+          <div className="wc-row-pair">
+            <div className="wc-field">
+              <span className="wc-field-label">name</span>
+              <input
+                className="wc-input"
+                placeholder="weather"
+                value={settings.name ?? ""}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+                  onChange({ name, slug });
+                }}
+              />
+            </div>
+            <div className="wc-field">
+              <span className="wc-field-label">icon</span>
+              <input
+                className="wc-input"
+                placeholder="Cloud"
+                list="wc-icon-list"
+                value={settings.icon ?? ""}
+                onChange={(e) => onChange({ icon: e.target.value })}
+              />
+              <datalist id="wc-icon-list">
+                {LUCIDE_SUGGESTIONS.map((i) => <option key={i} value={i} />)}
+              </datalist>
+            </div>
           </div>
           <div className="wc-field">
-            <span className="wc-field-label">icon</span>
+            <span className="wc-field-label">slug</span>
             <input
               className="wc-input"
-              placeholder="Cloud"
-              list="wc-icon-list"
-              value={settings.icon ?? ""}
-              onChange={(e) => onChange({ icon: e.target.value })}
+              placeholder="auto-derived"
+              value={settings.slug ?? ""}
+              onChange={(e) => onChange({ slug: e.target.value })}
             />
-            <datalist id="wc-icon-list">
-              {LUCIDE_SUGGESTIONS.map((i) => <option key={i} value={i} />)}
-            </datalist>
           </div>
-        </div>
-        <div className="wc-field">
-          <span className="wc-field-label">slug</span>
-          <input
-            className="wc-input"
-            placeholder="auto-derived"
-            value={settings.slug ?? ""}
-            onChange={(e) => onChange({ slug: e.target.value })}
-          />
-        </div>
-      </Section>
+        </Section>
+      )}
 
-      <Section title="sizes & layout">
-        <div className="wc-row wc-row-spread">
-          <div className="wc-inline-label">sizes</div>
-          <div className="wc-toggle-group">
-            {SIZE_OPTIONS.map((s) => (
+      {!isEditMode && (
+        <Section title="sizes & layout">
+          <div className="wc-row wc-row-spread">
+            <div className="wc-inline-label">sizes</div>
+            <div className="wc-toggle-group">
+              {SIZE_OPTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`wc-toggle-btn${(settings.sizes ?? ["S","M","L"]).includes(s) ? " active" : ""}`}
+                  onClick={() => toggleSize(s)}
+                >{s}</button>
+              ))}
+            </div>
+            <div className="wc-inline-label">ori</div>
+            <div className="wc-toggle-group">
+              {ORI_OPTIONS.map((o) => (
+                <button
+                  key={o}
+                  type="button"
+                  className={`wc-toggle-btn${(settings.orientations ?? ["h"]).includes(o) ? " active" : ""}`}
+                  onClick={() => toggleOri(o)}
+                >{o}</button>
+              ))}
+            </div>
+          </div>
+          <div className="wc-row wc-row-spread">
+            <div className="wc-inline-label">hover expand</div>
+            <button
+              type="button"
+              className={`wc-toggle-btn${settings.hoe ? " active" : ""}`}
+              onClick={() => onChange({ hoe: !settings.hoe })}
+            >{settings.hoe ? "on" : "off"}</button>
+            {settings.hoe && (
+              <div className="wc-toggle-group">
+                {HOE_MODES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    className={`wc-toggle-btn${(settings.hoeMode ?? "both") === m ? " active" : ""}`}
+                    onClick={() => onChange({ hoeMode: m })}
+                  >{m}</button>
+                ))}
+              </div>
+            )}
+          </div>
+        </Section>
+      )}
+
+      {!isEditMode && (
+        <Section title="per-size content">
+          <div className="wc-size-tabs">
+            {(["S", "M", "L"] as const).map((s) => (
               <button
                 key={s}
                 type="button"
-                className={`wc-toggle-btn${(settings.sizes ?? ["S","M","L"]).includes(s) ? " active" : ""}`}
-                onClick={() => toggleSize(s)}
+                className={`wc-size-tab${perSizeTab === s ? " active" : ""}`}
+                onClick={() => setPerSizeTab(s)}
               >{s}</button>
             ))}
           </div>
-          <div className="wc-inline-label">ori</div>
-          <div className="wc-toggle-group">
-            {ORI_OPTIONS.map((o) => (
-              <button
-                key={o}
-                type="button"
-                className={`wc-toggle-btn${(settings.orientations ?? ["h"]).includes(o) ? " active" : ""}`}
-                onClick={() => toggleOri(o)}
-              >{o}</button>
-            ))}
-          </div>
-        </div>
-        <div className="wc-row wc-row-spread">
-          <div className="wc-inline-label">hover expand</div>
-          <button
-            type="button"
-            className={`wc-toggle-btn${settings.hoe ? " active" : ""}`}
-            onClick={() => onChange({ hoe: !settings.hoe })}
-          >{settings.hoe ? "on" : "off"}</button>
-          {settings.hoe && (
-            <div className="wc-toggle-group">
-              {HOE_MODES.map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`wc-toggle-btn${(settings.hoeMode ?? "both") === m ? " active" : ""}`}
-                  onClick={() => onChange({ hoeMode: m })}
-                >{m}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      </Section>
-
-      <Section title="per-size content">
-        <div className="wc-size-tabs">
-          {(["S", "M", "L"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`wc-size-tab${perSizeTab === s ? " active" : ""}`}
-              onClick={() => setPerSizeTab(s)}
-            >{s}</button>
-          ))}
-        </div>
-        <textarea
-          className="wc-textarea"
-          placeholder={`What should the ${perSizeTab} size show?`}
-          value={descValue}
-          onChange={(e) => onChange({ [descKey]: e.target.value } as Partial<GenerateSettings>)}
-          rows={3}
-        />
-        <ImageUploadSlot
-          label={perSizeTab}
-          value={imageValue}
-          onChange={(v) => onChange({ [imageKey]: v } as Partial<GenerateSettings>)}
-        />
-      </Section>
-
-      <Section title="data source" defaultOpen={false}>
-        <div className="wc-field">
-          <span className="wc-field-label">endpoint url</span>
-          <input
-            className="wc-input"
-            placeholder="/api/my-widget"
-            value={settings.dataUrl ?? ""}
-            onChange={(e) => onChange({ dataUrl: e.target.value })}
-          />
-        </div>
-        <div className="wc-field">
-          <span className="wc-field-label">response shape</span>
           <textarea
             className="wc-textarea"
-            placeholder="{ temp: number, city: string }"
-            value={settings.dataShape ?? ""}
-            onChange={(e) => onChange({ dataShape: e.target.value })}
-            rows={2}
+            placeholder={`What should the ${perSizeTab} size show?`}
+            value={descValue}
+            onChange={(e) => onChange({ [descKey]: e.target.value } as Partial<GenerateSettings>)}
+            rows={3}
           />
-        </div>
-      </Section>
+          <ImageUploadSlot
+            label={perSizeTab}
+            value={imageValue}
+            onChange={(v) => onChange({ [imageKey]: v } as Partial<GenerateSettings>)}
+          />
+        </Section>
+      )}
+
+      {!isEditMode && (
+        <Section title="data source" defaultOpen={false}>
+          <div className="wc-field">
+            <span className="wc-field-label">endpoint url</span>
+            <input
+              className="wc-input"
+              placeholder="/api/my-widget"
+              value={settings.dataUrl ?? ""}
+              onChange={(e) => onChange({ dataUrl: e.target.value })}
+            />
+          </div>
+          <div className="wc-field">
+            <span className="wc-field-label">response shape</span>
+            <textarea
+              className="wc-textarea"
+              placeholder="{ temp: number, city: string }"
+              value={settings.dataShape ?? ""}
+              onChange={(e) => onChange({ dataShape: e.target.value })}
+              rows={2}
+            />
+          </div>
+        </Section>
+      )}
     </div>
   );
 }

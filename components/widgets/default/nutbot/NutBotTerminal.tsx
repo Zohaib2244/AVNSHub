@@ -24,7 +24,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v1.4 idle, awaiting input...",
+  "[info] nutbot v1.5 idle, awaiting input...",
 ];
 
 const HELP_TEXT = "available: help, whoami, neofetch, ls, date, echo <text>, clear";

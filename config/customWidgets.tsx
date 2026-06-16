@@ -5,13 +5,8 @@
 import type { WidgetManifest } from "./widgets";
 
 // --- generated imports start ---
-import { Thermometer, Dumbbell } from "lucide-react";
+import { Thermometer } from "lucide-react";
 import { WeatherWidget } from "@/components/widgets/custom/weather/WeatherWidget";
-import { GymWidget } from "@/components/widgets/custom/gym/GymWidget";
-import { Timer } from "lucide-react";
-import { CubeWidget } from "@/components/widgets/custom/cube/CubeWidget";
-import { MessageSquare } from "lucide-react";
-import { WhatsAppWidget } from "@/components/widgets/custom/whatsapp/WhatsAppWidget";
 // --- generated imports end ---
 
 export const CUSTOM_WIDGETS: Record<string, WidgetManifest> = {
@@ -44,50 +39,11 @@ export const CUSTOM_WIDGETS: Record<string, WidgetManifest> = {
       },
     ],
   },
-  gym: {
-    id: "gym",
-    title: "gym",
-    icon: Dumbbell,
-    component: GymWidget,
-    sizes: ["S", "M", "L"],
-    orientations: ["h"],
-    defaults: { size: "M", orientation: "h" },
-  },
-  cube: {
-    id: "cube",
-    title: "cube timer",
-    icon: Timer,
-    component: CubeWidget,
-    sizes: ["S", "M", "L"],
-    orientations: ["h"],
-    defaults: { size: "M", orientation: "h" },
-  },
-  whatsapp: {
-    id: "whatsapp",
-    title: "whatsapp",
-    icon: MessageSquare,
-    component: WhatsAppWidget,
-    sizes: ["S", "M", "L"],
-    orientations: ["h"],
-    defaults: { size: "M", orientation: "h" },
-    settings: [
-      {
-        key: "groupId",
-        label: "group JID",
-        type: "text",
-        default: "",
-        placeholder: "override WHATSAPP_GROUP_ID (optional)",
-      },
-    ],
-  },
   // --- generated widgets end ---
 };
 
 export const CUSTOM_DEFAULT_ORDER: string[] = [
   // --- generated order start ---
   "weather",
-  "gym",
-  "cube",
-  "whatsapp",
   // --- generated order end ---
 ];

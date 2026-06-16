@@ -135,7 +135,18 @@ export function findFit(
   dims: GridDims,
   occupancy: boolean[][],
   footprint: { colSpan: number; rowSpan: number },
+  preferredCell?: { col: number; row: number },
 ): { col: number; row: number } | null {
+  if (preferredCell) {
+    const { col, row } = preferredCell;
+    if (
+      col + footprint.colSpan <= dims.cols &&
+      row + footprint.rowSpan <= dims.rows &&
+      canPlace({ col, row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan }, dims, occupancy)
+    ) {
+      return { col, row };
+    }
+  }
   for (let r = 0; r + footprint.rowSpan <= dims.rows; r++) {
     for (let c = 0; c + footprint.colSpan <= dims.cols; c++) {
       if (canPlace({ col: c, row: r, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan }, dims, occupancy)) {

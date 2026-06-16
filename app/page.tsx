@@ -22,7 +22,7 @@ export default function Home() {
           (graph) / localStorage["nutmag-slot-layout"] (slots). Mode itself
           comes from lib/layoutMode.ts, toggled via the AVN Hub widget. */}
       <LayoutProvider>
-        <HubCorePanel />
+        {mode !== "slots" && <HubCorePanel />}
         {mode === "slots" ? <SlotDashboard /> : <Dashboard />}
       </LayoutProvider>
     </main>

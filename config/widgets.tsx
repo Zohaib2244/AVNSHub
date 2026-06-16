@@ -9,7 +9,6 @@ import {
   GitCommitHorizontal,
   HardDrive,
   IdCard,
-  LayoutGrid,
   Link2,
   Music,
   Network,
@@ -30,7 +29,6 @@ import { Jellyfin, JellyfinMore } from "@/components/widgets/default/homelab/Jel
 import { ArrStack, ArrStackMore } from "@/components/widgets/default/homelab/ArrStack";
 import { StorageApps } from "@/components/widgets/default/homelab/StorageApps";
 import { NutBotFaceWidget } from "@/components/widgets/default/nutbot/NutBotFaceWidget";
-import { WidgetManager } from "@/components/widgets/default/system/WidgetManager";
 import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
 import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
 import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
@@ -83,7 +81,7 @@ export type WidgetManifest = {
   /** stable unique identifier — the object key, the layout/persistence key,
       and the DOM id of the card. Must be unique across the whole registry. */
   id: string;
-  /** human-readable name, shown as the card label and in the widget manager */
+  /** human-readable name, shown as the card label and in Hub widget controls */
   title: string;
   icon: LucideIcon;
   /** card content only — no .block markup, no label, no fetch boilerplate.
@@ -308,15 +306,6 @@ export const WIDGETS = {
     settings: [{ key: "flyoutCommits", label: "commits shown", type: "number", default: 5, min: 1, max: 15 }],
     flags: { customHeader: true, accent: true },
   },
-  widgets: {
-    id: "widgets",
-    title: "widget manager",
-    icon: LayoutGrid,
-    component: WidgetManager,
-    sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "M", orientation: "v" },
-  },
   "hub-settings": {
     id: "hub-settings",
     title: "avn hub settings",
@@ -365,7 +354,6 @@ export const DEFAULT_ORDER: string[] = [
   "quicklinks",
   "milestones",
   "tracker",
-  "widgets",
   "hub-settings",
   ...CUSTOM_DEFAULT_ORDER,
 ];

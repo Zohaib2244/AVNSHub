@@ -12,11 +12,12 @@ immediately — no save button, no page reload.
 
 ## Two access points
 
-### 1. Hub Core Panel (gear icon, top-right corner)
+### 1. Hub Core tabs (top-right corner)
 
-A fixed settings panel reachable from every screen regardless of which widget
-is where. Click the gear icon (⚙) to open it, click again or press `Escape`
-or click anywhere outside to close.
+A fixed control strip reachable from every screen regardless of which widget
+is where. In Slot Layout it sits as right-edge tabs on the main frame. Click
+the gear icon (settings) or grid icon (widget manager) to open that tab, click
+again, press `Escape`, or click anywhere outside to close.
 
 Contains two independently collapsible sections:
 
@@ -30,6 +31,8 @@ Contains two independently collapsible sections:
 **Default mode / Graph mode** — mode-specific settings for whichever layout is
 currently active. In Default mode this is the per-region grid-dims editor
 (see [Default Mode](#default-mode-slot-layout)).
+
+**Widget Manager tab** — add, remove, or permanently delete custom widgets.
 
 ### 2. Hub Settings widget (`#hub-settings`, "AVN Hub")
 
@@ -66,9 +69,11 @@ region shows a `rows × columns` input pair. Changing these re-tiles the grid;
 any placed widgets stay in their stored cell positions (clamped to the new
 bounds automatically).
 
-**Placing a widget** — enter edit mode, then click an empty `+` cell inside
-any region. A popover lists all unplaced widgets; click one to drop it into
-that cell at a 1×1 footprint. Resize from there.
+**Placing a widget** — open the Hub Core Widget Manager tab, then press `+`
+on an available widget. The add action asks where to place it and only shows
+regions (`left`, `right`, `base`) that currently have enough free cells. You
+can also enter edit mode and click an empty `+` cell inside any region to place
+directly into that cell.
 
 **Resizing a widget** — grab any of the four edge handles that appear in edit
 mode and drag outward to grow or inward to shrink. The widget cannot shrink
@@ -78,8 +83,8 @@ below its registered minimum footprint (1×1 by default).
 corner of the card in edit mode) to reposition it within its region.
 
 **Removing a widget** — click the × button in the top-right of the card in
-edit mode, or use the [Widget Manager](#widget-manager). Removed widgets go
-back to the "available" pool — they are never deleted.
+edit mode, or use the Hub Core Widget Manager tab. Removed widgets go back
+to the "available" pool — they are never deleted.
 
 **Hover On Expand (HOE)** — an opt-in visual preview available in Default mode.
 When enabled on a widget, hovering over it makes it visually expand into
@@ -97,8 +102,8 @@ you drag them to rearrange and use the gear menu to change each widget's size
 region structure — everything shares one flat grid. Useful for a denser,
 more fluid layout.
 
-Per-widget configuration (size, orientation, visibility) lives in each card's
-gear menu. There are no graph-mode global settings in Hub Core.
+Per-widget size/orientation settings live in each card's gear menu. Visibility
+and add/remove controls live in the Hub Core Widget Manager tab.
 
 ---
 
@@ -120,18 +125,15 @@ Lock the layout when done to prevent accidental moves.
 
 ## Widget Manager
 
-`#widgets` — available as a widget on the dashboard (cannot be removed — it is
-how you get other widgets back if you remove them).
+The Widget Manager is its own Hub Core tab, separate from the AVN Hub canvas
+settings.
 
-| Size | What you get |
-|------|-------------|
-| S | Count of on-screen widgets + how many are available |
-| M / L | Full add / remove gallery |
-| L | Gallery + one-line hint for widgets that have a detail view at L size |
+In Slot Layout it lists placed widgets and available widgets. Available widgets
+open a region chooser, and only regions with enough free cells are shown.
 
-**On-screen** widgets have a `−` (minus) button to remove them (sets
-`hidden: true`). **Available** widgets have a `+` button to add them back
-(`hidden: false`). The Widget Manager itself is locked and cannot remove itself.
+In Graph Layout, on-screen widgets have a `−` button to hide them
+(`hidden: true`). Available widgets have a `+` button to add them back
+(`hidden: false`).
 
 ---
 

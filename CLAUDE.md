@@ -66,9 +66,9 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 
 **Persistence** (`lib/layout.ts`): `localStorage["nutmag-layout"]` v2 — `{ version: 2, widgets: WidgetInstance[] }` where order = grid order and each instance carries `size/orientation/hidden/settings`. Every mutation persists immediately. `sanitize()` migrates v1 column layouts (pair ids `media`/`disk-network` expand to their member widgets), clamps values to manifest capabilities, drops unknown ids/settings, and re-appends missing widgets so nothing can disappear. Other keys: `nutmag-theme`, `nutmag-palette`, `nutmag-prefs` (`lib/prefs.ts`: polling on/off, boot sequence on/off), `nutmag-sessions` (`lib/sessions.ts`).
 
-**Widget manager** (`widgets`, "widget manager" — `components/widgets/WidgetManager.tsx`): the single surface for adding/removing widgets. Lists on-screen widgets (removable → `hidden: true`) and available/hidden ones (add-able → `hidden: false`), each with name + `#id`. Any registered widget appears automatically. It can never hide itself (`ALWAYS_VISIBLE` in `lib/layout.ts`), so there's always a way back. Per size: S = count summary, M/L = the gallery.
+**Widget controls** (Hub Core Widget Manager tab): the single surface for adding/removing widgets, opened from its own Hub Core tab rather than inside the AVN Hub canvas settings. In Graph Layout it lists on-screen widgets (removable → `hidden: true`) and available/hidden ones (add-able → `hidden: false`). In Slot Layout it lists placed/unplaced widgets and the add action expands into only the regions (`left`, `right`, `base`) that currently have room for that widget's footprint. Any registered widget appears automatically.
 
-**Hub settings widget** (`hub-settings`, "AVN Hub"): theme + palette + global prefs + layout reset, rendered per size (S = theme toggle, M = + palette, L = + prefs/reset). Visibility management lives in the widget manager, not here.
+**Hub settings widget** (`hub-settings`, "AVN Hub"): theme + palette + global prefs + layout reset, rendered per size (S = theme toggle, M = + palette, L = + prefs/reset). Visibility management lives in Hub Core, not here.
 
 ---
 
@@ -137,7 +137,6 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 │   │   └── WidgetSettingsPopover.tsx  # gear popover (placement + schema form)
 │   ├── widgets/
 │   │   ├── HubSettings.tsx       # "AVN Hub" — theme/palette/prefs/reset (per size)
-│   │   ├── WidgetManager.tsx     # add/remove gallery (on-screen vs available)
 │   │   └── NutBotFaceWidget.tsx  # face at S/M, terminal at L
 │   ├── Dashboard.tsx         # grid + dnd-kit drag/drop + edit mode
 │   ├── LayoutProvider.tsx    # layout store context (instances, editMode)
@@ -193,7 +192,7 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > - Ripped out all widget expansion (hover/grow/overlay): deleted `gridCascade.ts`, `WidgetFlyout`/`WidgetOverlay`/`MicroView`, the cascade/override/view-transition machinery, and the `expand`/`expandDirection`/`expandModes`/`expandedComponent` fields. (The hover system caused a reflow-oscillation loop.)
 > - Widgets are **resize + rearrange** at the layout level; "more when bigger" is per-size markup (`useWidget().size`) or a manifest `detail` component rendered at L
 > - Slot Layout has an opt-in visual-only **Hover On Expand** preview driven by `lib/grid/hoverExpand.ts`, `SlotRegion`, and `SlotWidgetCell`: real transient preview boxes, no persisted hover mutation, no overlays, no neighbor cascade
-> - New **widget manager** widget (`WidgetManager.tsx`) is the single add/remove surface; NutBot renders its terminal at L; Hub Settings renders its full panel at L
+> - Widget add/remove moved into the Hub Core Widget Manager tab; NutBot renders its terminal at L; Hub Settings renders its full panel at L
 > - Authoring guide written: [`docs/CREATING_WIDGETS.md`](./docs/CREATING_WIDGETS.md)
 
 > **Next — widget-creator chat (planned)**

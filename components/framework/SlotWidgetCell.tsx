@@ -9,6 +9,7 @@
 // cell-by-cell.
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Move, Settings2, X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
@@ -330,16 +331,20 @@ export function SlotWidgetCell({
           >
             <Settings2 size={12} strokeWidth={1.75} />
           </button>
-          {settingsOpen && (
-            <WidgetSettingsPopover
-              manifest={manifest}
-              instance={settingsInstance}
-              mode="slot"
-              onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
-              onHide={() => removeWidget(instance.id)}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
+          <AnimatePresence>
+            {settingsOpen && (
+              <WidgetSettingsPopover
+                key="slot-settings"
+                manifest={manifest}
+                instance={settingsInstance}
+                mode="slot"
+                hideWidgetSettings={editMode}
+                onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
+                onHide={() => removeWidget(instance.id)}
+                onClose={() => setActivePopover(null)}
+              />
+            )}
+          </AnimatePresence>
           {DIRECTIONS.map((dir) => (
             <div
               key={dir}

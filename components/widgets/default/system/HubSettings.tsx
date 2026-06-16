@@ -5,7 +5,7 @@ import "./HubSettings.css";
 //   S → theme mode toggle only
 //   M → theme mode + palette picker
 //   L → the full panel: theme, palette, global prefs, layout reset
-// (Adding/removing widgets lives in the separate widget manager.)
+// (Adding/removing widgets lives in Hub Core.)
 
 import { useSyncExternalStore } from "react";
 import { Moon, RotateCcw, Sun, SunMoon } from "lucide-react";

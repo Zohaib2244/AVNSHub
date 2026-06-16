@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import {
   DndContext,
   DragOverlay,
@@ -93,9 +94,16 @@ function GridWidget({
         aria-label={`configure ${instance.id} widget`}
         onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
       />
-      {settingsOpen && (
-        <WidgetSettingsPopover manifest={manifest} instance={instance} onClose={() => setActivePopover(null)} />
-      )}
+      <AnimatePresence>
+        {settingsOpen && (
+          <WidgetSettingsPopover
+            key="graph-settings"
+            manifest={manifest}
+            instance={instance}
+            onClose={() => setActivePopover(null)}
+          />
+        )}
+      </AnimatePresence>
       <WidgetShell manifest={manifest} config={instance} />
     </div>
   );

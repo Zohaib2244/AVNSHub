@@ -15,6 +15,7 @@
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
+import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
 import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios, setTerminalWidget } from "@/lib/slotLayout";
 import { terminalSizeClass } from "@/lib/grid/sizeClass";
@@ -166,7 +167,8 @@ export function SlotDashboard() {
 
   return (
     <div className="mx-auto max-w-[1800px] px-5 py-6">
-      <div className="frame">
+      <div className="frame frame-with-tabs">
+        <HubCorePanel slotMode />
         <div className="frame-inner">
           <div ref={frameRef} className="slot-frame" style={frameStyle}>
             <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} />

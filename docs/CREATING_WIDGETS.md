@@ -99,7 +99,7 @@ Add one entry to the `WIDGETS` object in
 ```tsx
 weather: {
   id: "weather",                 // MUST equal the object key — unique across the whole registry
-  title: "weather",              // human name (card label + widget manager)
+  title: "weather",              // human name (card label + Hub widget controls)
   icon: CloudSun,                // a lucide-react icon
   component: WeatherWidget,
   sizes: ["S", "M", "L"],        // which sizes are allowed (these are the resize limits)
@@ -116,7 +116,7 @@ weather: {
 | Field | Required | Meaning |
 |---|---|---|
 | `id` | ✅ | **Unique** stable identifier. Equals the object key. Becomes the persistence key and the card's DOM id (`#weather`). Pick a short kebab-case slug. |
-| `title` | ✅ | Display name shown as the card label and in the widget manager. |
+| `title` | ✅ | Display name shown as the card label and in Hub widget controls. |
 | `icon` | ✅ | A `lucide-react` icon component. |
 | `component` | ✅ | Your content component. |
 | `sizes` | ✅ | Allowed size tiers. **This is the resize limit** — the settings popover only offers these. Order them small→large. |
@@ -285,17 +285,17 @@ back to the field default automatically.
 
 ---
 
-## Showing / hiding & the widget manager
+## Showing / hiding & Hub widget controls
 
 Visibility is just the instance's `hidden` flag. Users add/remove widgets from
-the **widget manager** ([`components/widgets/WidgetManager.tsx`](../components/widgets/WidgetManager.tsx)),
-which lists on-screen widgets (removable) and available/hidden widgets
-(add-able). You don't wire anything up — any registered widget appears there
-automatically. To programmatically toggle one:
+the **Hub Core Widget Manager tab**, which lists on-screen/placed widgets and
+available widgets. Slot Layout add actions ask for a target region and only
+offer regions that currently have enough free cells. You don't wire anything
+up — any registered widget appears there automatically. To programmatically toggle one:
 `updateInstance(id, { hidden: true | false })` from `useLayout()`.
 
-The manager itself can never be hidden (`ALWAYS_VISIBLE` in `lib/layout.ts`), so
-there is always a way to bring widgets back.
+Slot Layout uses `placeWidget(id, region)` / `removeWidget(id)` from
+`lib/slotLayout.ts`; Graph Layout uses the `hidden` flag above.
 
 ---
 

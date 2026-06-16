@@ -13,7 +13,15 @@ import { buildOccupancy, findFit } from "@/lib/grid/occupancy";
 import { fuzzyFilter } from "@/lib/fuzzy";
 import { getSlotLayout, getUnplacedWidgets, placeWidget, setTerminalWidget } from "@/lib/slotLayout";
 
-export function SlotPlacementPopover({ region, onClose }: { region: RegionId; onClose: () => void }) {
+export function SlotPlacementPopover({
+  region,
+  onClose,
+  preferredCell,
+}: {
+  region: RegionId;
+  onClose: () => void;
+  preferredCell?: { col: number; row: number };
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState("");
   // keyboard-highlighted row; the top match starts selected so a plain Enter
@@ -70,7 +78,7 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
 
   function handlePick(id: string) {
     if (region === "terminal") setTerminalWidget(id);
-    else placeWidget(id, region);
+    else placeWidget(id, region, preferredCell);
     onClose();
   }
 

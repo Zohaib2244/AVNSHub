@@ -6,6 +6,7 @@
 // auto-generated from the manifest's settings schema.
 
 import { useEffect, useRef } from "react";
+import { motion } from "framer-motion";
 import { EyeOff, X } from "lucide-react";
 import {
   FRAMEWORK_SETTINGS,
@@ -89,6 +90,7 @@ export function WidgetSettingsPopover({
   mode = "graph",
   onUpdateSettings,
   onHide,
+  hideWidgetSettings = false,
 }: {
   manifest: WidgetManifest;
   instance: WidgetInstance;
@@ -96,6 +98,7 @@ export function WidgetSettingsPopover({
   mode?: "graph" | "slot";
   onUpdateSettings?: (settings: SettingsValues) => void;
   onHide?: () => void;
+  hideWidgetSettings?: boolean;
 }) {
   const { updateInstance } = useLayout();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -125,7 +128,14 @@ export function WidgetSettingsPopover({
   }, [onClose]);
 
   return (
-    <div ref={panelRef} className="wset-panel">
+    <motion.div
+      ref={panelRef}
+      className="wset-panel"
+      initial={{ opacity: 0, y: -6, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -6, scale: 0.97 }}
+      transition={{ duration: 0.15, ease: "easeOut" }}
+    >
       <div className="wset-head">
         <span className="wset-title">{manifest.title}</span>
         <button type="button" className="overlay-close" onClick={onClose} aria-label="close widget settings">
@@ -200,7 +210,7 @@ export function WidgetSettingsPopover({
         </button>
       ) : null}
 
-      {(manifest.settings?.length ?? 0) > 0 && (
+      {!hideWidgetSettings && (manifest.settings?.length ?? 0) > 0 && (
         <>
           <div className="wset-section">widget</div>
           {manifest.settings!.map((field) => (
@@ -213,6 +223,6 @@ export function WidgetSettingsPopover({
           ))}
         </>
       )}
-    </div>
+    </motion.div>
   );
 }

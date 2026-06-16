@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { DotGothic16, JetBrains_Mono } from "next/font/google";
 import "../styles/globals.css";
 import "../styles/widgets.css";
@@ -33,7 +34,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
-        <script
+        <Script
+          id="nutmag-theme-init"
+          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("nutmag-theme");var h=new Date().getHours();if(t==="light"||(t==="auto"&&h>=6&&h<20)){document.documentElement.dataset.theme="light";}var p=localStorage.getItem("nutmag-palette");if(p&&p!=="ember"){document.documentElement.dataset.palette=p;}}catch(e){}})();`,
           }}

@@ -35,10 +35,6 @@ export type LayoutState = {
 const STORAGE_KEY = "nutmag-layout";
 const listeners = new Set<() => void>();
 
-/* widgets the user must never lose access to — the widget manager is the only
-   surface for re-adding hidden widgets, so it can never hide itself */
-const ALWAYS_VISIBLE: string[] = ["widgets"];
-
 let layout: LayoutState | null = null;
 let defaultLayout: LayoutState | null = null;
 
@@ -118,7 +114,7 @@ function sanitize(raw: unknown): LayoutState | null {
             id,
             size: clamp(item.size, manifest.sizes, base.size),
             orientation: clamp(item.orientation, manifest.orientations, base.orientation),
-            hidden: ALWAYS_VISIBLE.includes(id) ? false : typeof item.hidden === "boolean" ? item.hidden : base.hidden,
+            hidden: typeof item.hidden === "boolean" ? item.hidden : base.hidden,
             settings: resolveSettings(
               manifest,
               item.settings && typeof item.settings === "object" ? (item.settings as SettingsValues) : undefined,

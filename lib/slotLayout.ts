@@ -17,7 +17,7 @@ import {
   type RegionDims,
   type SlotRegionId,
 } from "@/config/slotLayout";
-import { WIDGETS, getManifest, resolveSettings, type SettingsValues, type WidgetId } from "@/config/widgets";
+import { WIDGETS, getManifest, resolveSettings, type SettingsValues } from "@/config/widgets";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
 
@@ -102,7 +102,6 @@ function buildDefaultState(): SlotLayoutState {
         entry("currently-playing", "right", 0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both" }),
         entry("homelab",        "right", 0, 2, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both", pollSeconds: "60" }),
         entry("hub-settings",   "right", 0, 4, 2, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
-        entry("widgets",        "right", 0, 5, 1, 3, { hoverExpand: false, hoverExpandAxis: "height" }),
         // ── base row ─────────────────────────────────────────────
         entry("identity",       "base",  0, 0, 3, 1, { hoverExpand: false, hoverExpandAxis: "height" }),
         entry("github",         "base",  0, 1, 3, 1, { hoverExpand: true,  hoverExpandAxis: "height", flyoutCommits: 5 }),
@@ -284,20 +283,20 @@ export function getUnplacedWidgets(): string[] {
   return [...builtIn, ...custom];
 }
 
-/** place an unplaced widget at the first cell in `region` that fits its
-    minimum footprint; no-op if already placed or the region is full */
-export function placeWidget(id: string, region: SlotRegionId) {
+/** place an unplaced widget at `preferredCell` if it fits, otherwise the
+    first available cell in `region`; no-op if already placed or region is full */
+export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { col: number; row: number }): boolean {
   const current = getSlotLayout();
-  if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return;
+  if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return false;
 
   const manifest = getManifest(id);
-  if (!manifest) return;
+  if (!manifest) return false;
 
   const dims = current.regionDims[region];
   const occupancy = buildOccupancy(dims, current.widgets.filter((w) => w.region === region).map(rectOf));
   const footprint = minFootprint(id);
-  const spot = findFit(dims, occupancy, footprint);
-  if (!spot) return;
+  const spot = findFit(dims, occupancy, footprint, preferredCell);
+  if (!spot) return false;
 
   commit({
     ...current,
@@ -306,16 +305,26 @@ export function placeWidget(id: string, region: SlotRegionId) {
       { id, region, col: spot.col, row: spot.row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan, settings: resolveSettings(manifest) },
     ],
   });
+  return true;
+}
+
+export function getRegionsThatFitWidget(id: string, layout: SlotLayoutState = getSlotLayout()): SlotRegionId[] {
+  if (layout.widgets.some((w) => w.id === id) || layout.terminalWidgetId === id) return [];
+  if (!getManifest(id)) return [];
+
+  const footprint = minFootprint(id);
+  return REGION_IDS.filter((region) => {
+    const dims = layout.regionDims[region];
+    const occupancy = buildOccupancy(dims, layout.widgets.filter((w) => w.region === region).map(rectOf));
+    return findFit(dims, occupancy, footprint) !== null;
+  });
 }
 
 /** try to place an unplaced widget in the first region that has room;
     returns the region it was placed in, or null if all regions are full */
 export function placeWidgetAuto(id: string): SlotRegionId | null {
   for (const region of REGION_IDS) {
-    const before = getSlotLayout().widgets.filter((w) => w.region === region).length;
-    placeWidget(id, region);
-    const after = getSlotLayout().widgets.filter((w) => w.region === region).length;
-    if (after > before) return region;
+    if (placeWidget(id, region)) return region;
   }
   return null;
 }
