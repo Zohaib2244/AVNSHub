@@ -14,7 +14,7 @@
 
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { X } from "lucide-react";
-import { WIDGETS } from "@/config/widgets";
+import { getManifest } from "@/config/widgets";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
 import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios, setTerminalWidget } from "@/lib/slotLayout";
 import { terminalSizeClass } from "@/lib/grid/sizeClass";
@@ -66,7 +66,7 @@ export function SlotDashboard() {
   const right = slotLayout.widgets.filter((w) => w.region === "right");
   const base = slotLayout.widgets.filter((w) => w.region === "base");
 
-  const terminalManifest = slotLayout.terminalWidgetId ? WIDGETS[slotLayout.terminalWidgetId] : null;
+  const terminalManifest = slotLayout.terminalWidgetId ? (getManifest(slotLayout.terminalWidgetId) ?? null) : null;
   const terminalConfig = terminalManifest ? terminalSizeClass(terminalManifest.sizes, terminalManifest.orientations) : null;
 
   const ratios = previewRatios ?? slotLayout.frameRatios;

@@ -1,5 +1,6 @@
 "use client";
 import "./NutBotTerminal.css";
+import "./creator/WidgetCreatorPanel.css";
 
 // NutBot's full terminal — log ticker, mock shell tabs, and the optional
 // xterm real shell. Lives in the face widget's click-to-expand overlay, so
@@ -10,6 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X } from "lucide-react";
 import { NutBotFace } from "@/components/widgets/default/nutbot/NutBotFace";
 import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
+import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
+import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 
 const SHELL_WS_URL = process.env.NEXT_PUBLIC_NUTBOT_SHELL_URL;
 
@@ -77,6 +80,7 @@ export function NutBotTerminal() {
     { id: "log", title: "log" },
     { id: "shell-1", title: "shell 1" },
     ...(SHELL_WS_URL ? [{ id: "real-shell", title: "real shell" }] : []),
+    { id: "creator", title: "creator" },
   ]);
   const [activeTab, setActiveTab] = useState("log");
   const [shells, setShells] = useState<Record<string, ShellState>>({ "shell-1": { history: [], input: "" } });
@@ -125,7 +129,7 @@ export function NutBotTerminal() {
   const activeShell = shells[activeTab];
 
   return (
-    <>
+    <div className="nutbot-terminal">
       <div className="term-row">
         <div className="term-tabs">
           {tabs.map((tab) => (
@@ -154,10 +158,11 @@ export function NutBotTerminal() {
           </button>
         </div>
 
+        <HarnessPill />
         <NutBotFace />
       </div>
 
-      <div className={`term-body${activeTab === "real-shell" ? " term-body-real" : ""}`} ref={bodyRef}>
+      <div className={`term-body${activeTab === "real-shell" ? " term-body-real" : ""}${activeTab === "creator" ? " term-body-creator" : ""}`} ref={bodyRef}>
         {activeTab === "log" ? (
           <AnimatePresence initial={false}>
             {logLines.map((line) => (
@@ -172,6 +177,8 @@ export function NutBotTerminal() {
               </motion.div>
             ))}
           </AnimatePresence>
+        ) : activeTab === "creator" ? (
+          <WidgetCreatorPanel />
         ) : activeTab === "real-shell" ? (
           <RealShell wsUrl={SHELL_WS_URL ?? ""} />
         ) : (
@@ -185,7 +192,7 @@ export function NutBotTerminal() {
           ))
         )}
 
-        {activeTab !== "log" && activeTab !== "real-shell" && activeShell && (
+        {activeTab !== "log" && activeTab !== "real-shell" && activeTab !== "creator" && activeShell && (
           <div className="term-prompt">
             <span className="term-prompt-prefix">{PROMPT}</span>
             <input
@@ -202,6 +209,6 @@ export function NutBotTerminal() {
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }

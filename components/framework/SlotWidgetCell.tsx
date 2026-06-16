@@ -10,7 +10,7 @@
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { Move, Settings2, X } from "lucide-react";
-import { WIDGETS } from "@/config/widgets";
+import { getManifest } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
 import { getSlotLayout, removeWidget, setWidgetRect, updateWidgetSettings, type SlotWidgetInstance } from "@/lib/slotLayout";
 import type { WidgetInstance } from "@/lib/layout";
@@ -94,7 +94,8 @@ export function SlotWidgetCell({
   onHoverExit?: () => void;
 }) {
   const { editMode, activePopover, setActivePopover } = useLayout();
-  const manifest = WIDGETS[instance.id];
+  const manifest = getManifest(instance.id);
+  if (!manifest) return null;
   const cellRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [previewRect, setPreviewRect] = useState<Rect | null>(null);
@@ -323,7 +324,7 @@ export function SlotWidgetCell({
           </button>
           <button
             type="button"
-            className="gear-btn slot-settings-btn"
+            className="slot-settings-btn"
             aria-label={`configure ${instance.id} widget`}
             onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
           >

@@ -12,8 +12,8 @@
   --border: #3d3220;
   --shadow: #070604;
   --text-primary: #e8dfc8;
-  --text-muted: #4a4030;
-  --text-muted-dim: #3a3020;
+  --text-muted: #9f9887;
+  --text-muted-dim: #8b8475;
   --accent-orange: #ff6b2b;
   --accent-cyan: #00b4c8;
   --accent-warm: #e8dfc8;
@@ -52,8 +52,8 @@
   --border: #2c3440;
   --shadow: #04060a;
   --text-primary: #d8e2ec;
-  --text-muted: #3e4a5a;
-  --text-muted-dim: #303a48;
+  --text-muted: #929aa3;
+  --text-muted-dim: #7f868f;
   --accent-orange: #4da3ff;
   --accent-cyan: #00c8a0;
   --accent-warm: #d8e2ec;
@@ -86,8 +86,8 @@
   --border: #2c3a28;
   --shadow: #040704;
   --text-primary: #dce8d0;
-  --text-muted: #44503c;
-  --text-muted-dim: #343f2e;
+  --text-muted: #949f8c;
+  --text-muted-dim: #808a7a;
   --accent-orange: #8fc63c;
   --accent-cyan: #d89a28;
   --accent-warm: #dce8d0;
@@ -120,8 +120,8 @@
   --border: #3a2c40;
   --shadow: #060408;
   --text-primary: #ecdce8;
-  --text-muted: #4c3c52;
-  --text-muted-dim: #3c2f42;
+  --text-muted: #a1949f;
+  --text-muted-dim: #8c808b;
   --accent-orange: #e84a8a;
   --accent-cyan: #d8a830;
   --accent-warm: #ecdce8;
@@ -355,7 +355,10 @@ body {
 .slot-terminal.editing .namecard {
   outline: 1.5px dashed var(--accent-cyan);
   outline-offset: 3px;
+  /* block clicks/interactions on widget content in edit mode */
+  pointer-events: none;
 }
+
 
 .slot-terminal {
   position: relative;
@@ -454,7 +457,25 @@ body {
 }
 
 .slot-settings-btn {
+  position: absolute;
+  top: -7px;
   right: 36px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 16px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: var(--bg-card);
+  color: var(--accent-cyan);
+  cursor: pointer;
+}
+
+.slot-settings-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
 }
 
 .slot-move-btn:hover {
@@ -827,11 +848,19 @@ body {
   position: relative;
 }
 
-/* dashed outline on every block while rearranging */
+/* dashed outline on every block while rearranging, and block interactions */
 .widget-slot.editing .block,
 .widget-slot.editing .namecard {
   outline: 1.5px dashed var(--accent-cyan);
   outline-offset: 3px;
+  /* block clicks/interactions on widget content in edit mode */
+  pointer-events: none;
+}
+
+/* restore pointer-events for the edit controls themselves */
+.widget-slot.editing .drag-handle,
+.widget-slot.editing .settings-tab {
+  pointer-events: auto;
 }
 
 .widget-slot.dragging {
@@ -877,28 +906,45 @@ body {
   border-color: var(--accent-orange);
 }
 
-/* ─── widget settings (gear popover) ─────────────────────────── */
+/* ─── widget settings (right-edge tab) ───────────────────────── */
 
-.gear-btn {
+/* A thin tab that protrudes from the card's right edge.
+   Visible on card hover (or when the popover is open). */
+.settings-tab {
   position: absolute;
-  top: -7px;
-  right: 8px;
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
   z-index: 20;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 16px;
-  border-radius: 5px;
-  border: 1px solid var(--accent-cyan);
+  width: 12px;
+  height: 32px;
+  border-radius: 0 6px 6px 0;
+  border: 1.5px solid var(--border);
+  border-left: none;
   background: var(--bg-card);
-  color: var(--accent-cyan);
+  color: var(--text-muted);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.gear-btn:hover {
+.widget-slot:hover .settings-tab,
+.settings-tab.open {
+  opacity: 1;
+}
+
+.settings-tab:hover {
   color: var(--accent-orange);
   border-color: var(--accent-orange);
+}
+
+.settings-tab.open {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  background: var(--bg-nested);
 }
 
 .wset-panel {
@@ -1092,6 +1138,9 @@ body {
   top: 14px;
   right: 14px;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .hub-core-panel {
@@ -1167,4 +1216,41 @@ body {
   color: var(--text-muted-dim);
   font-size: 0.66rem;
   line-height: 1.5;
+}
+
+.hub-core-io-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.hub-core-io-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.hub-core-io-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.hub-core-io-error {
+  margin-top: 4px;
+  font-size: 0.6rem;
+  color: var(--status-down);
+  font-family: var(--font-jetbrains-mono), monospace;
 }

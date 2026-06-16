@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Search, X } from "lucide-react";
-import { WIDGETS, type WidgetId } from "@/config/widgets";
+import { getManifest } from "@/config/widgets";
 import { minFootprint, type RegionId } from "@/config/slotLayout";
 import { buildOccupancy, findFit } from "@/lib/grid/occupancy";
 import { fuzzyFilter } from "@/lib/fuzzy";
@@ -55,7 +55,7 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
           return findFit(dims, occupancy, minFootprint(id)) !== null;
         });
 
-  const filtered = fuzzyFilter(candidates, query, (id) => WIDGETS[id].title);
+  const filtered = fuzzyFilter(candidates, query, (id) => getManifest(id)?.title ?? id);
   const clampedIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : 0;
 
   // reset the highlight to the top match whenever the result set changes
@@ -68,7 +68,7 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
     itemRefs.current[clampedIndex]?.scrollIntoView({ block: "nearest" });
   }, [clampedIndex]);
 
-  function handlePick(id: WidgetId) {
+  function handlePick(id: string) {
     if (region === "terminal") setTerminalWidget(id);
     else placeWidget(id, region);
     onClose();
@@ -122,7 +122,8 @@ export function SlotPlacementPopover({ region, onClose }: { region: RegionId; on
           ) : (
             <div className="slot-popover-list">
               {filtered.map((id, i) => {
-                const manifest = WIDGETS[id];
+                const manifest = getManifest(id);
+                if (!manifest) return null;
                 const Icon = manifest.icon;
                 return (
                   <button

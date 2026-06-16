@@ -17,13 +17,14 @@ import {
   type RegionDims,
   type SlotRegionId,
 } from "@/config/slotLayout";
-import { WIDGETS, resolveSettings, type SettingsValues, type WidgetId } from "@/config/widgets";
+import { WIDGETS, getManifest, resolveSettings, type SettingsValues, type WidgetId } from "@/config/widgets";
+import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
 
 export type SlotWidgetInstance = {
-  id: WidgetId;
+  id: string;
   region: SlotRegionId;
   col: number;
   row: number;
@@ -36,7 +37,7 @@ export type SlotLayoutState = {
   version: 3;
   /** order is insignificant — placement is purely positional (region + rect) */
   widgets: SlotWidgetInstance[];
-  terminalWidgetId: WidgetId | null;
+  terminalWidgetId: string | null;
   /** per-region grid dims, editable via AVN Hub Core Settings; defaults to
       REGION_GRID */
   regionDims: Record<SlotRegionId, RegionDims>;
@@ -172,7 +173,7 @@ function sanitize(raw: unknown): SlotLayoutState | null {
           centerRows: [...DEFAULT_FRAME_RATIOS.centerRows] as FrameRatios["centerRows"],
         };
 
-  const seen = new Set<WidgetId>();
+  const seen = new Set<string>();
   const byRegion: Record<SlotRegionId, Rect[]> = { left: [], right: [], base: [] };
   const widgets: SlotWidgetInstance[] = [];
 
@@ -182,7 +183,7 @@ function sanitize(raw: unknown): SlotLayoutState | null {
       const it = item as Record<string, unknown>;
 
       const id = it.id;
-      if (typeof id !== "string" || !(id in WIDGETS) || seen.has(id as WidgetId)) continue;
+      if (typeof id !== "string" || !(id in WIDGETS || id in CUSTOM_WIDGETS) || seen.has(id)) continue;
 
       const region = it.region;
       if (!isRegionId(region)) continue;
@@ -191,20 +192,23 @@ function sanitize(raw: unknown): SlotLayoutState | null {
       if (![col, row, colSpan, rowSpan].every((v) => typeof v === "number" && Number.isInteger(v))) continue;
       const rect: Rect = { col: col as number, row: row as number, colSpan: colSpan as number, rowSpan: rowSpan as number };
 
-      const min = minFootprint(id as WidgetId);
+      const min = minFootprint(id);
       if (rect.colSpan < min.colSpan || rect.rowSpan < min.rowSpan) continue;
 
       const dims = regionDims[region];
       if (!isValidPlacement(dims, [...byRegion[region], rect])) continue;
 
-      seen.add(id as WidgetId);
+      const manifest = getManifest(id);
+      if (!manifest) continue;
+
+      seen.add(id);
       byRegion[region].push(rect);
       widgets.push({
-        id: id as WidgetId,
+        id,
         region,
         ...rect,
         settings: resolveSettings(
-          WIDGETS[id as WidgetId],
+          manifest,
           it.settings && typeof it.settings === "object" ? (it.settings as SettingsValues) : undefined,
         ),
       });
@@ -213,8 +217,8 @@ function sanitize(raw: unknown): SlotLayoutState | null {
 
   const terminal = stored.terminalWidgetId;
   const terminalWidgetId =
-    typeof terminal === "string" && terminal in WIDGETS && !seen.has(terminal as WidgetId)
-      ? (terminal as WidgetId)
+    typeof terminal === "string" && (terminal in WIDGETS || terminal in CUSTOM_WIDGETS) && !seen.has(terminal)
+      ? terminal
       : null;
 
   return { version: 3, widgets, terminalWidgetId, regionDims, frameRatios };
@@ -263,18 +267,23 @@ export function subscribeSlotLayout(listener: () => void) {
 
 /** widgets that aren't placed in any region and aren't the terminal occupant
     — the candidates offered by the placement popover */
-export function getUnplacedWidgets(): WidgetId[] {
+export function getUnplacedWidgets(): string[] {
   const current = getSlotLayout();
-  const placed = new Set<WidgetId>(current.widgets.map((w) => w.id));
+  const placed = new Set<string>(current.widgets.map((w) => w.id));
   if (current.terminalWidgetId) placed.add(current.terminalWidgetId);
-  return (Object.keys(WIDGETS) as WidgetId[]).filter((id) => !placed.has(id));
+  const builtIn = (Object.keys(WIDGETS) as string[]).filter((id) => !placed.has(id));
+  const custom = Object.keys(CUSTOM_WIDGETS).filter((id) => !placed.has(id));
+  return [...builtIn, ...custom];
 }
 
 /** place an unplaced widget at the first cell in `region` that fits its
     minimum footprint; no-op if already placed or the region is full */
-export function placeWidget(id: WidgetId, region: SlotRegionId) {
+export function placeWidget(id: string, region: SlotRegionId) {
   const current = getSlotLayout();
   if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return;
+
+  const manifest = getManifest(id);
+  if (!manifest) return;
 
   const dims = current.regionDims[region];
   const occupancy = buildOccupancy(dims, current.widgets.filter((w) => w.region === region).map(rectOf));
@@ -286,25 +295,40 @@ export function placeWidget(id: WidgetId, region: SlotRegionId) {
     ...current,
     widgets: [
       ...current.widgets,
-      { id, region, col: spot.col, row: spot.row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan, settings: resolveSettings(WIDGETS[id]) },
+      { id, region, col: spot.col, row: spot.row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan, settings: resolveSettings(manifest) },
     ],
   });
 }
 
+/** try to place an unplaced widget in the first region that has room;
+    returns the region it was placed in, or null if all regions are full */
+export function placeWidgetAuto(id: string): SlotRegionId | null {
+  for (const region of REGION_IDS) {
+    const before = getSlotLayout().widgets.filter((w) => w.region === region).length;
+    placeWidget(id, region);
+    const after = getSlotLayout().widgets.filter((w) => w.region === region).length;
+    if (after > before) return region;
+  }
+  return null;
+}
+
 /** un-place a widget, returning it to the pool */
-export function removeWidget(id: WidgetId) {
+export function removeWidget(id: string) {
   const current = getSlotLayout();
   if (!current.widgets.some((w) => w.id === id)) return;
   commit({ ...current, widgets: current.widgets.filter((w) => w.id !== id) });
 }
 
 /** update the settings stored on a placed slot widget */
-export function updateWidgetSettings(id: WidgetId, settings: SettingsValues) {
+export function updateWidgetSettings(id: string, settings: SettingsValues) {
   const current = getSlotLayout();
   const instance = current.widgets.find((w) => w.id === id);
   if (!instance) return;
 
-  const nextSettings = resolveSettings(WIDGETS[id], { ...instance.settings, ...settings });
+  const manifest = getManifest(id);
+  if (!manifest) return;
+
+  const nextSettings = resolveSettings(manifest, { ...instance.settings, ...settings });
   commit({
     ...current,
     widgets: current.widgets.map((w) => (w.id === id ? { ...w, settings: nextSettings } : w)),
@@ -313,7 +337,7 @@ export function updateWidgetSettings(id: WidgetId, settings: SettingsValues) {
 
 /** set/clear the terminal slot's occupant; if `id` was placed in a region
     it's removed from there first */
-export function setTerminalWidget(id: WidgetId | null) {
+export function setTerminalWidget(id: string | null) {
   const current = getSlotLayout();
   if (current.terminalWidgetId === id) return;
   commit({
@@ -325,7 +349,7 @@ export function setTerminalWidget(id: WidgetId | null) {
 
 /** resize/move commit for a placed widget — validates against `minFootprint`
     and sibling occupancy, no-op if the rect doesn't fit */
-export function setWidgetRect(id: WidgetId, rect: Rect) {
+export function setWidgetRect(id: string, rect: Rect) {
   const current = getSlotLayout();
   const instance = current.widgets.find((w) => w.id === id);
   if (!instance) return;
@@ -400,4 +424,27 @@ export function resetSlotLayout() {
     // ignore
   }
   listeners.forEach((listener) => listener());
+}
+
+/** import a previously-exported slot layout JSON; runs through sanitize()
+    so invalid/unknown widget ids and out-of-bounds rects are silently dropped.
+    Returns true on success, false if the JSON shape isn't recognisable. */
+export function importSlotLayout(raw: unknown): boolean {
+  const cleaned = sanitize(raw);
+  if (!cleaned) return false;
+  commit(cleaned);
+  return true;
+}
+
+/** export the current slot layout as a downloadable JSON file */
+export function exportSlotLayout(): void {
+  const current = getSlotLayout();
+  const json = JSON.stringify(current, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "nutmag-slot-layout.json";
+  a.click();
+  URL.revokeObjectURL(url);
 }

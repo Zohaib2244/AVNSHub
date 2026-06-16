@@ -1,14 +1,13 @@
 "use client";
 
-// AVN Hub Core Settings — a fixed top-right panel hosting global dashboard
-// controls that don't belong to any one widget: the edit-mode toggle, the
-// graph/default layout-mode switch, and (for the active mode) mode-specific
-// settings — currently the per-region grid-dims editor for default mode.
-// Two independently-collapsible sections: "avn hub" (always) and
+// AVN Hub Core Settings — a fixed top-right area with two controls:
+// 1. A persistent edit-mode toggle (wrench/lock) — always visible, one click.
+// 2. A settings gear that opens a panel for layout mode + mode-specific config.
+// The panel has two independently-collapsible sections: "avn hub" and
 // "default mode" / "graph mode" (content depends on the active layout mode).
 
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { ChevronDown, Lock, RotateCcw, Settings, Wrench, X } from "lucide-react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { ChevronDown, Download, Lock, RotateCcw, Settings, Upload, Wrench, X } from "lucide-react";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import {
   getLayoutMode,
@@ -17,7 +16,7 @@ import {
   subscribeLayoutMode,
   type LayoutMode,
 } from "@/lib/layoutMode";
-import { getSlotLayout, getServerSlotLayout, resetSlotLayout, setRegionDims, subscribeSlotLayout } from "@/lib/slotLayout";
+import { exportSlotLayout, getSlotLayout, getServerSlotLayout, importSlotLayout, resetSlotLayout, setRegionDims, subscribeSlotLayout } from "@/lib/slotLayout";
 import { REGION_DIMS_BOUNDS, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
 
 const LAYOUT_MODE_OPTIONS: { mode: LayoutMode; label: string }[] = [
@@ -59,6 +58,15 @@ export function HubCorePanel() {
 
   return (
     <div ref={panelRef} className="hub-core">
+      <button
+        type="button"
+        className={`theme-toggle${editMode ? " edit-active" : ""}`}
+        onClick={editMode ? lockLayout : startEdit}
+        aria-label={editMode ? "exit edit mode" : "enter edit mode"}
+        title={editMode ? "exit edit mode" : "enter edit mode"}
+      >
+        {editMode ? <Lock size={12} strokeWidth={1.75} /> : <Wrench size={12} strokeWidth={1.75} />}
+      </button>
       <button
         type="button"
         className={`theme-toggle hub-core-trigger${open ? " edit-active" : ""}`}
@@ -145,6 +153,26 @@ function CoreSection({
 
 function DefaultModeSettings() {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const raw = JSON.parse(reader.result as string);
+        const ok = importSlotLayout(raw);
+        setImportError(ok ? null : "unrecognised layout file");
+      } catch {
+        setImportError("invalid json");
+      }
+      // reset so re-importing the same file fires onChange again
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    };
+    reader.readAsText(file);
+  }
 
   return (
     <>
@@ -155,6 +183,18 @@ function DefaultModeSettings() {
         <span>nutbot</span>
         <span className="hub-core-fixed-note">1 slot · fixed</span>
       </div>
+      <div className="hub-core-io-row">
+        <button type="button" className="hub-core-io-btn" onClick={exportSlotLayout} title="download current layout as JSON">
+          <Download size={11} strokeWidth={1.75} />
+          export
+        </button>
+        <button type="button" className="hub-core-io-btn" onClick={() => fileInputRef.current?.click()} title="load a previously exported layout JSON">
+          <Upload size={11} strokeWidth={1.75} />
+          import
+        </button>
+        <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleImport} />
+      </div>
+      {importError && <div className="hub-core-io-error">{importError}</div>}
     </>
   );
 }

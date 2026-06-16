@@ -9,24 +9,75 @@ import "./WidgetManager.css";
 // Per-size layout: S shows a compact count summary, M/L show the full
 // add/remove gallery (L adds a one-line description of what each does).
 
+import { useSyncExternalStore } from "react";
 import { Lock, Minus, Plus } from "lucide-react";
-import { DEFAULT_ORDER, WIDGETS, type WidgetId, type WidgetManifest } from "@/config/widgets";
+import { DEFAULT_ORDER, WIDGETS, getManifest, type WidgetManifest } from "@/config/widgets";
+import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { getLayoutMode, getServerLayoutMode, subscribeLayoutMode } from "@/lib/layoutMode";
+import { getSlotLayout, getUnplacedWidgets, placeWidgetAuto, removeWidget as removeSlotWidget } from "@/lib/slotLayout";
 
 /** the widget manager can never remove itself — it's the only way to re-add
     hidden widgets (mirrors ALWAYS_VISIBLE in lib/layout.ts) */
-const LOCKED: WidgetId[] = ["widgets"];
+const LOCKED: string[] = ["widgets"];
 
 export function WidgetManager() {
   const { size } = useWidget();
-  const { layout, updateInstance } = useLayout();
+  const { layout, updateInstance, addWidget } = useLayout();
+  const layoutMode = useSyncExternalStore(subscribeLayoutMode, getLayoutMode, getServerLayoutMode);
+  const isSlot = layoutMode === "slots";
 
-  // keep a stable registry order regardless of current grid order
+  // keep a stable registry order regardless of current grid order;
+  // include custom widgets after built-ins
   const byId = new Map(layout.widgets.map((w) => [w.id, w]));
-  const ordered = DEFAULT_ORDER.filter((id) => byId.has(id));
-  const onScreen = ordered.filter((id) => !byId.get(id)!.hidden);
-  const available = ordered.filter((id) => byId.get(id)!.hidden);
+  const allIds = [...DEFAULT_ORDER, ...Object.keys(CUSTOM_WIDGETS).filter((id) => !DEFAULT_ORDER.includes(id))];
+
+  if (isSlot) {
+    // Slot layout: "on screen" = placed in a region or terminal; "available" = unplaced
+    const slotLayout = getSlotLayout();
+    const placedIds = new Set([...slotLayout.widgets.map((w) => w.id), ...(slotLayout.terminalWidgetId ? [slotLayout.terminalWidgetId] : [])]);
+    const unplacedIds = getUnplacedWidgets();
+    const onScreenSlot = allIds.filter((id) => placedIds.has(id));
+    const availableSlot = unplacedIds.filter((id) => allIds.includes(id) || id in CUSTOM_WIDGETS);
+
+    if (size === "S") {
+      return (
+        <div className="wm-summary">
+          <div className="block-stat">{onScreenSlot.length}</div>
+          <div className="block-sub">placed · {availableSlot.length} unplaced</div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="wm">
+        <Section
+          heading={`placed · ${onScreenSlot.length}`}
+          ids={onScreenSlot}
+          action="remove"
+          showDesc={size === "L"}
+          onToggle={(id) => removeSlotWidget(id)}
+        />
+        <Section
+          heading={`unplaced · ${availableSlot.length}`}
+          ids={availableSlot}
+          action="add"
+          showDesc={size === "L"}
+          onToggle={(id) => placeWidgetAuto(id)}
+          empty="all widgets are placed"
+          addHint="places in first available region"
+        />
+      </div>
+    );
+  }
+
+  // Graph layout: tracked = in the layout store; untracked = in registry but layout was cached before it was generated
+  const tracked = allIds.filter((id) => byId.has(id));
+  const untracked = allIds.filter((id) => !byId.has(id));
+
+  const onScreen = tracked.filter((id) => !byId.get(id)!.hidden);
+  const available = [...tracked.filter((id) => byId.get(id)!.hidden), ...untracked];
 
   if (size === "S") {
     return (
@@ -55,7 +106,7 @@ export function WidgetManager() {
         ids={available}
         action="add"
         showDesc={showDesc}
-        onToggle={(id) => updateInstance(id, { hidden: false })}
+        onToggle={(id) => (byId.has(id) ? updateInstance(id, { hidden: false }) : addWidget(id))}
         empty="every widget is on screen"
       />
     </div>
@@ -69,23 +120,26 @@ function Section({
   showDesc,
   onToggle,
   empty,
+  addHint,
 }: {
   heading: string;
-  ids: WidgetId[];
+  ids: string[];
   action: "add" | "remove";
   showDesc: boolean;
-  onToggle: (id: WidgetId) => void;
+  onToggle: (id: string) => void;
   empty?: string;
+  addHint?: string;
 }) {
   return (
     <div className="wm-section">
-      <div className="more-head">{heading}</div>
+      <div className="more-head">{heading}{addHint && <span className="wm-hint"> · {addHint}</span>}</div>
       {ids.length === 0 && empty ? (
         <div className="block-sub">{empty}</div>
       ) : (
         <div className="wm-list">
           {ids.map((id) => {
-            const manifest: WidgetManifest = WIDGETS[id];
+            const manifest: WidgetManifest | undefined = getManifest(id);
+            if (!manifest) return null;
             const Icon = manifest.icon;
             const locked = LOCKED.includes(id);
             return (

@@ -2,16 +2,24 @@
 // Server renders the defaults; the client lazily reads the saved values from
 // localStorage["nutmag-prefs"]. Written immediately on change.
 
+import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "./widget-creator/harnessAdapters";
+
 export type Prefs = {
   /** false = every usePolling consumer fetches once and stops refreshing */
   pollingEnabled: boolean;
   /** false = skip the boot-sequence intro entirely */
   bootSequence: boolean;
+  /** active CLI harness for the widget creator */
+  activeHarness: HarnessId;
+  /** ordered fallback chain for rate-limit auto-switching */
+  harnessChain: HarnessId[];
 };
 
 export const DEFAULT_PREFS: Prefs = {
   pollingEnabled: true,
   bootSequence: true,
+  activeHarness: "claude",
+  harnessChain: [...HARNESS_CHAIN_DEFAULT],
 };
 
 const STORAGE_KEY = "nutmag-prefs";
@@ -19,12 +27,23 @@ const listeners = new Set<() => void>();
 
 let prefs: Prefs | null = null;
 
+const VALID_HARNESS_IDS: HarnessId[] = ["claude", "codex", "opencode"];
+
+function isHarnessId(v: unknown): v is HarnessId {
+  return typeof v === "string" && (VALID_HARNESS_IDS as string[]).includes(v);
+}
+
 function sanitize(raw: unknown): Prefs {
   const stored = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const chain = Array.isArray(stored.harnessChain)
+    ? (stored.harnessChain as unknown[]).filter(isHarnessId)
+    : DEFAULT_PREFS.harnessChain;
   return {
     pollingEnabled:
       typeof stored.pollingEnabled === "boolean" ? stored.pollingEnabled : DEFAULT_PREFS.pollingEnabled,
     bootSequence: typeof stored.bootSequence === "boolean" ? stored.bootSequence : DEFAULT_PREFS.bootSequence,
+    activeHarness: isHarnessId(stored.activeHarness) ? stored.activeHarness : DEFAULT_PREFS.activeHarness,
+    harnessChain: chain.length > 0 ? chain : DEFAULT_PREFS.harnessChain,
   };
 }
 

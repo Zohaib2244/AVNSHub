@@ -7,6 +7,7 @@
 import {
   DEFAULT_ORDER,
   WIDGETS,
+  getManifest,
   resolveSettings,
   type Orientation,
   type SettingsValues,
@@ -14,9 +15,11 @@ import {
   type WidgetManifest,
   type WidgetSize,
 } from "@/config/widgets";
+import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "@/config/customWidgets";
 
 export type WidgetInstance = {
-  id: WidgetId;
+  /** built-in widget id (WidgetId) or a custom widget slug (string) */
+  id: string;
   size: WidgetSize;
   orientation: Orientation;
   hidden: boolean;
@@ -39,8 +42,9 @@ const ALWAYS_VISIBLE: string[] = ["widgets"];
 let layout: LayoutState | null = null;
 let defaultLayout: LayoutState | null = null;
 
-export function defaultInstance(id: WidgetId): WidgetInstance {
-  const manifest = WIDGETS[id];
+export function defaultInstance(id: string): WidgetInstance {
+  const manifest = getManifest(id);
+  if (!manifest) throw new Error(`Unknown widget id: ${id}`);
   const defaults: WidgetManifest["defaults"] = manifest.defaults;
   return {
     id,
@@ -53,7 +57,8 @@ export function defaultInstance(id: WidgetId): WidgetInstance {
 
 function buildDefaultLayout(): LayoutState {
   if (!defaultLayout) {
-    defaultLayout = { version: 2, widgets: DEFAULT_ORDER.map(defaultInstance) };
+    const all = [...DEFAULT_ORDER, ...CUSTOM_DEFAULT_ORDER.filter((id) => !DEFAULT_ORDER.includes(id as WidgetId))];
+    defaultLayout = { version: 2, widgets: all.map(defaultInstance) };
   }
   return defaultLayout;
 }
@@ -66,15 +71,19 @@ const V1_PAIR_IDS: Record<string, WidgetId[]> = {
   "disk-network": ["disk-storage", "network-stats"],
 };
 
-function migrateV1(stored: Record<string, unknown>): WidgetId[] {
-  const order: WidgetId[] = [];
+function isKnownId(id: string): boolean {
+  return id in WIDGETS || id in CUSTOM_WIDGETS;
+}
+
+function migrateV1(stored: Record<string, unknown>): string[] {
+  const order: string[] = [];
   const keys = [...V1_COLUMN_ORDER, ...Object.keys(stored).filter((k) => !V1_COLUMN_ORDER.includes(k))];
   for (const key of keys) {
     const ids = stored[key];
     if (!Array.isArray(ids)) continue;
     for (const raw of ids) {
       if (typeof raw !== "string") continue;
-      const expanded = V1_PAIR_IDS[raw] ?? (raw in WIDGETS ? [raw as WidgetId] : []);
+      const expanded: string[] = V1_PAIR_IDS[raw] ?? (isKnownId(raw) ? [raw] : []);
       for (const id of expanded) {
         if (!order.includes(id)) order.push(id);
       }
@@ -94,13 +103,14 @@ function sanitize(raw: unknown): LayoutState | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const stored = raw as Record<string, unknown>;
 
-  const seen = new Set<WidgetId>();
+  const seen = new Set<string>();
   const widgets: WidgetInstance[] = [];
 
-  function push(id: WidgetId, item?: Record<string, unknown>) {
+  function push(id: string, item?: Record<string, unknown>) {
     if (seen.has(id)) return;
     seen.add(id);
-    const manifest = WIDGETS[id];
+    const manifest = getManifest(id);
+    if (!manifest) return;
     const base = defaultInstance(id);
     widgets.push(
       item
@@ -122,7 +132,7 @@ function sanitize(raw: unknown): LayoutState | null {
     for (const item of stored.widgets) {
       if (!item || typeof item !== "object") continue;
       const id = (item as Record<string, unknown>).id;
-      if (typeof id === "string" && id in WIDGETS) push(id as WidgetId, item as Record<string, unknown>);
+      if (typeof id === "string" && isKnownId(id)) push(id, item as Record<string, unknown>);
     }
   } else if (stored.version === undefined) {
     for (const id of migrateV1(stored)) push(id);
@@ -132,6 +142,9 @@ function sanitize(raw: unknown): LayoutState | null {
 
   // anything registered since the layout was saved joins at the end
   for (const id of DEFAULT_ORDER) {
+    if (!seen.has(id)) push(id);
+  }
+  for (const id of CUSTOM_DEFAULT_ORDER) {
     if (!seen.has(id)) push(id);
   }
 
@@ -172,8 +185,21 @@ function commit(next: LayoutState) {
   listeners.forEach((listener) => listener());
 }
 
+/** add a widget that exists in the registry but isn't yet in the layout store */
+export function addWidget(id: string): void {
+  const manifest = getManifest(id);
+  if (!manifest) return;
+  const current = getLayout();
+  if (current.widgets.some((w) => w.id === id)) {
+    // already tracked — just make it visible
+    updateInstance(id, { hidden: false });
+    return;
+  }
+  commit({ version: 2, widgets: [...current.widgets, defaultInstance(id)] });
+}
+
 /** move `activeId` to `overId`'s position (dnd live reorder) */
-export function reorderWidget(activeId: WidgetId, overId: WidgetId) {
+export function reorderWidget(activeId: string, overId: string) {
   const current = getLayout();
   const from = current.widgets.findIndex((w) => w.id === activeId);
   const to = current.widgets.findIndex((w) => w.id === overId);
@@ -184,7 +210,7 @@ export function reorderWidget(activeId: WidgetId, overId: WidgetId) {
   commit({ version: 2, widgets });
 }
 
-export function updateInstance(id: WidgetId, patch: Partial<Omit<WidgetInstance, "id">>) {
+export function updateInstance(id: string, patch: Partial<Omit<WidgetInstance, "id">>) {
   const current = getLayout();
   commit({
     version: 2,

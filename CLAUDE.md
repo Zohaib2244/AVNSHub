@@ -27,7 +27,7 @@ A living developer identity card for NutMag2469. A single webpage that shows rea
 | Border | `#3d3220` | `#7a6a52` |
 | Sticker shadow | `#070604` | `#a89878` |
 | Text primary | `#e8dfc8` | `#1c1810` |
-| Text muted | `#4a4030` / `#3a3020` | `#9a8870` / `#b0a090` |
+| Text muted | `#9f9887` / `#8b8475` | `#9a8870` / `#b0a090` |
 | Orange accent | `#ff6b2b` | `#e05a18` |
 | Cyan/teal accent | `#00b4c8` | `#00768a` |
 

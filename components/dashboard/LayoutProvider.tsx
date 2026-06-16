@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
+  addWidget,
   getLayout,
   getServerLayout,
   reorderWidget,
@@ -16,6 +17,8 @@ type LayoutContextValue = {
   /** mutations persist immediately — see lib/layout.ts */
   reorderWidget: typeof reorderWidget;
   updateInstance: typeof updateInstance;
+  /** add a widget that exists in the registry but isn't tracked in the layout yet */
+  addWidget: typeof addWidget;
   editMode: boolean;
   startEdit: () => void;
   /** exit edit mode (the arrangement is already saved) */
@@ -49,6 +52,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         layout,
         reorderWidget,
         updateInstance,
+        addWidget,
         editMode,
         startEdit,
         lockLayout,

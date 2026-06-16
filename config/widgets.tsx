@@ -37,6 +37,7 @@ import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPl
 import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
 import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
 import { HubSettings } from "@/components/widgets/default/system/HubSettings";
+import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
 
 /* ─── widget framework contracts ─────────────────────────────────────
    A widget = a content component + a manifest entry here. The shell
@@ -260,11 +261,10 @@ export const WIDGETS = {
     title: "nutbot v1.4",
     icon: SquareTerminal,
     component: NutBotFaceWidget,
-    // no `detail` — the component renders the face at S/M and the full
-    // terminal at L (see NutBotFaceWidget); a per-size layout example
     sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
     defaults: { size: "S", orientation: "h" },
+    flags: { className: "nutbot-block" },
   },
   identity: {
     id: "identity",
@@ -341,9 +341,14 @@ export const WIDGETS = {
 
 export type WidgetId = keyof typeof WIDGETS;
 
+/** look up a manifest by id — checks built-in registry first, then custom */
+export function getManifest(id: string): WidgetManifest | undefined {
+  return (WIDGETS as Record<string, WidgetManifest>)[id] ?? CUSTOM_WIDGETS[id];
+}
+
 /** default grid order — instances flow into the grid in this sequence
-    (dense auto-placement back-fills gaps) */
-export const DEFAULT_ORDER: WidgetId[] = [
+    (dense auto-placement back-fills gaps); custom widget ids appended at end */
+export const DEFAULT_ORDER: string[] = [
   "identity",
   "clock",
   "nutbot",
@@ -362,4 +367,5 @@ export const DEFAULT_ORDER: WidgetId[] = [
   "tracker",
   "widgets",
   "hub-settings",
+  ...CUSTOM_DEFAULT_ORDER,
 ];

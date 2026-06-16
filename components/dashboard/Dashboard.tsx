@@ -13,8 +13,9 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { SortableContext, useSortable } from "@dnd-kit/sortable";
-import { GripHorizontal, Settings2 } from "lucide-react";
-import { SPAN_MAP, WIDGETS, type WidgetId, type WidgetManifest } from "@/config/widgets";
+import { GripHorizontal } from "lucide-react";
+import { SPAN_MAP, getManifest, type WidgetManifest } from "@/config/widgets";
+import type { WidgetId } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
 import { useGridColumns } from "@/lib/useGridColumns";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -42,7 +43,7 @@ function GridWidget({
   instance: WidgetInstance;
   editMode: boolean;
   gridCols: number;
-  slotRefs: { current: Map<WidgetId, HTMLDivElement> };
+  slotRefs: { current: Map<string, HTMLDivElement> };
 }) {
   // no sortable transform strategy — with variable spans + dense flow the
   // grid itself reflows on live reorder; the DragOverlay carries the visual.
@@ -60,7 +61,8 @@ function GridWidget({
   const popoverKey = `settings:${instance.id}`;
   const settingsOpen = activePopover === popoverKey;
 
-  const manifest: WidgetManifest = WIDGETS[instance.id];
+  const manifest: WidgetManifest | undefined = getManifest(instance.id);
+  if (!manifest) return null;
 
   const setRefs = (el: HTMLDivElement | null) => {
     setNodeRef(el);
@@ -75,28 +77,24 @@ function GridWidget({
       style={spanStyle(instance, gridCols)}
     >
       {editMode && (
-        <>
-          <button
-            type="button"
-            className="drag-handle"
-            aria-label={`move ${instance.id} widget`}
-            {...attributes}
-            {...listeners}
-          >
-            <GripHorizontal size={12} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            className="gear-btn"
-            aria-label={`configure ${instance.id} widget`}
-            onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
-          >
-            <Settings2 size={12} strokeWidth={1.75} />
-          </button>
-          {settingsOpen && (
-            <WidgetSettingsPopover manifest={manifest} instance={instance} onClose={() => setActivePopover(null)} />
-          )}
-        </>
+        <button
+          type="button"
+          className="drag-handle"
+          aria-label={`move ${instance.id} widget`}
+          {...attributes}
+          {...listeners}
+        >
+          <GripHorizontal size={12} strokeWidth={1.75} />
+        </button>
+      )}
+      <button
+        type="button"
+        className={`settings-tab${settingsOpen ? " open" : ""}`}
+        aria-label={`configure ${instance.id} widget`}
+        onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
+      />
+      {settingsOpen && (
+        <WidgetSettingsPopover manifest={manifest} instance={instance} onClose={() => setActivePopover(null)} />
       )}
       <WidgetShell manifest={manifest} config={instance} />
     </div>
@@ -106,8 +104,8 @@ function GridWidget({
 export function Dashboard() {
   const { layout, reorderWidget, editMode } = useLayout();
   const gridCols = useGridColumns();
-  const [activeId, setActiveId] = useState<WidgetId | null>(null);
-  const slotRefs = useRef(new Map<WidgetId, HTMLDivElement>());
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const slotRefs = useRef(new Map<string, HTMLDivElement>());
   // last (active, over) pair we reordered for — dedupes onDragOver storms so a
   // dense-reflow-triggered re-measure can't feed back into another reorder
   const lastOverPair = useRef<string | null>(null);
@@ -119,7 +117,7 @@ export function Dashboard() {
   const activeInstance = activeId ? visible.find((w) => w.id === activeId) : null;
 
   function handleDragStart(event: DragStartEvent) {
-    setActiveId(event.active.id as WidgetId);
+    setActiveId(event.active.id as string);
     lastOverPair.current = null;
   }
 
@@ -130,7 +128,7 @@ export function Dashboard() {
     const pairKey = `${active.id}:${over.id}`;
     if (lastOverPair.current === pairKey) return;
     lastOverPair.current = pairKey;
-    reorderWidget(active.id as WidgetId, over.id as WidgetId);
+    reorderWidget(active.id as string, over.id as string);
   }
 
   return (
@@ -166,7 +164,9 @@ export function Dashboard() {
       <DragOverlay dropAnimation={null}>
         {activeInstance && (
           <div className="widget-slot drag-preview">
-            <WidgetShell manifest={WIDGETS[activeInstance.id]} config={activeInstance} />
+            {getManifest(activeInstance.id) && (
+              <WidgetShell manifest={getManifest(activeInstance.id)!} config={activeInstance} />
+            )}
           </div>
         )}
       </DragOverlay>

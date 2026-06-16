@@ -19,6 +19,14 @@
   flex-direction: column;
 }
 
+.wm-hint {
+  color: var(--text-muted-dim);
+  font-size: 0.58rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 .wm-list {
   display: flex;
   flex-direction: column;

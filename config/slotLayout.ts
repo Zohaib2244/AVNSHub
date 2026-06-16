@@ -65,6 +65,6 @@ export const FRAME_RATIO_MIN_FR = 1;
 /** per-widget minimum footprint a resize can't shrink below; 1x1 if absent */
 export const MIN_FOOTPRINT: Partial<Record<WidgetId, { colSpan: number; rowSpan: number }>> = {};
 
-export function minFootprint(id: WidgetId): { colSpan: number; rowSpan: number } {
-  return MIN_FOOTPRINT[id] ?? { colSpan: 1, rowSpan: 1 };
+export function minFootprint(id: string): { colSpan: number; rowSpan: number } {
+  return MIN_FOOTPRINT[id as WidgetId] ?? { colSpan: 1, rowSpan: 1 };
 }
