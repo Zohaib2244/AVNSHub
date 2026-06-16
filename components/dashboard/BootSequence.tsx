@@ -11,14 +11,14 @@ import { getPrefs } from "@/lib/prefs";
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const LINES = [
-  { text: "NUTMAGCARD / v2.0  ——  IDENTITY RUNTIME", type: "header" },
+  { text: "AVN HUB / v2.0  ——  IDENTITY RUNTIME", type: "header" },
   { text: "────────────────────────────────────────", type: "divider" },
   { text: "  init display drivers            OK", type: "ok" },
   { text: "  mount /dev/homelab              OK", type: "ok" },
   { text: "  spotify.auth.handshake          OK", type: "ok" },
   { text: "  steam.api.connect               OK", type: "ok" },
   { text: "  homelab.ping                    PARTIAL", type: "warn" },
-  { text: "  rendering identity card...", type: "default" },
+  { text: "  rendering dashboard...", type: "default" },
 ];
 
 const colorFor = {

@@ -6,9 +6,9 @@ export type QuickLink = {
   icon: LucideIcon;
 };
 
-// Add or remove entries here to change the namecard's quicklinks row.
+// Add or remove entries here to change the quicklinks widget.
 export const quickLinks: QuickLink[] = [
-  { label: "youtube", href: "https://youtube.com/@NutMag2469", icon: Youtube },
-  { label: "linkedin", href: "https://linkedin.com/in/nutmag2469", icon: Linkedin },
-  { label: "chatgpt", href: "https://chatgpt.com/g/nutmag2469", icon: Bot },
+  { label: "youtube", href: "https://youtube.com", icon: Youtube },
+  { label: "linkedin", href: "https://linkedin.com", icon: Linkedin },
+  { label: "chatgpt", href: "https://chatgpt.com", icon: Bot },
 ];

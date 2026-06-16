@@ -1,8 +1,8 @@
-# AGENTS.md - NutMag Card
+﻿# AGENTS.md - AVN Hub
 
 ## Project Shape
 
-NutMag Card is a Next.js App Router dashboard rendered as a living personal identity card. The UI is a dense widget system inside the chunky "G - Chunky Blocks + Accent Border" design direction from `DESIGN_VARIATIONS.md`.
+AVN Hub is a Next.js App Router dashboard rendered as a living personal identity card. The UI is a dense widget system inside the chunky "G - Chunky Blocks + Accent Border" design direction from `DESIGN_VARIATIONS.md`.
 
 Use these files as the source of truth:
 

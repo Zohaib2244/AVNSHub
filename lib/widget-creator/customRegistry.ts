@@ -6,7 +6,7 @@
 // CRUD mechanics live in one place: JSON parse→mutate→stringify for data, and
 // marker-anchored string replacement for the two code lines. No regex, no
 // brace-counting — the fragile part of the old single-file approach.
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { join } from "path";
 
 const ROOT = process.cwd();
@@ -131,28 +131,62 @@ export function mergeWidgetManifest(base: RegistryEntry, raw: unknown): Registry
   return out;
 }
 
-function lazyDeclLine(id: string): string {
-  const comp = componentName(id);
-  return `const _${id} = lazy(() => import("@/components/widgets/custom/${id}/${comp}").then((m) => ({ default: m.${comp} })));\n`;
+/** how to lazy-load a widget's component: which file (basename, no extension)
+    to import and which named export to remap to `default` (null = the file
+    already has a default export, so no remap is needed) */
+export type ComponentModule = { file: string; exportName: string | null };
+
+/** Inspect a widget's folder and work out how to import its component, instead
+    of assuming the conventional `<Pascal>Widget.tsx` name. The generator nudges
+    the LLM toward that name, but it doesn't always comply (and imported widgets
+    may be named differently), so detect the real file + export. */
+export function findComponentModule(id: string): ComponentModule | null {
+  const dir = join(ROOT, "components/widgets/custom", id);
+  if (!existsSync(dir)) return null;
+  const tsxFiles = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
+  if (tsxFiles.length === 0) return null;
+
+  // prefer the conventional <Pascal>Widget.tsx, else the first .tsx file
+  const preferred = `${componentName(id)}.tsx`;
+  const chosen = tsxFiles.includes(preferred) ? preferred : tsxFiles.sort()[0];
+  const file = chosen.slice(0, -4); // strip ".tsx"
+  const src = readFileSync(join(dir, chosen), "utf-8");
+
+  if (/export\s+default\b/.test(src)) return { file, exportName: null };
+  // a named export matching the basename, else the first PascalCase export
+  const matchesBase = new RegExp(`export\\s+(?:async\\s+)?(?:function|const|class)\\s+${file}\\b`).test(src);
+  const firstExport = src.match(/export\s+(?:async\s+)?(?:function|const|class)\s+([A-Z]\w*)/)?.[1] ?? null;
+  return { file, exportName: matchesBase ? file : firstExport };
+}
+
+function lazyDeclLine(id: string, mod: ComponentModule): string {
+  const path = `@/components/widgets/custom/${id}/${mod.file}`;
+  return mod.exportName
+    ? `const _${id} = lazy(() => import("${path}").then((m) => ({ default: m.${mod.exportName} })));\n`
+    : `const _${id} = lazy(() => import("${path}"));\n`;
 }
 
 function mapEntryLine(id: string): string {
   return `  ${id}: _${id},\n`;
 }
 
-/** append the lazy declaration + map entry between the markers (idempotent) */
-export function addToComponentMap(id: string): void {
+/** append the lazy declaration + map entry between the markers (idempotent).
+    `mod` defaults to the detected module, falling back to the conventional name. */
+export function addToComponentMap(id: string, mod?: ComponentModule): void {
   let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
   if (content.includes(`const _${id} =`)) return; // already registered
-  content = content.replace("// --- custom-components end ---", lazyDeclLine(id) + "// --- custom-components end ---");
+  const resolved = mod ?? findComponentModule(id) ?? { file: componentName(id), exportName: componentName(id) };
+  content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
   writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");
 }
 
-/** remove the two matching lines by exact string match — no regex, no brace counting */
+/** remove this widget's declaration + map entry by id — line-based so it works
+    regardless of which file/export the declaration happened to point at */
 export function removeFromComponentMap(id: string): void {
-  let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  content = content.replace(lazyDeclLine(id), "");
-  content = content.replace(mapEntryLine(id), "");
-  writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");
+  const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
+  const declPrefix = `const _${id} = `;
+  const entryLine = `  ${id}: _${id},`;
+  const kept = content.split("\n").filter((line) => !line.startsWith(declPrefix) && line !== entryLine);
+  writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
 }

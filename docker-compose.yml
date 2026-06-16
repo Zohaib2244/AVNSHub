@@ -1,7 +1,7 @@
 services:
-  nutmagcard:
+  avn-hub:
     build: .
-    container_name: nutmagcard
+    container_name: avn-hub
     restart: unless-stopped
     ports:
       - "3000:3000"

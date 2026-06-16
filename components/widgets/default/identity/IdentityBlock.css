@@ -14,18 +14,60 @@
   transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
+.namecard-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
+}
+
+.namecard-mark {
+  grid-row: span 2;
+  width: 48px;
+  min-height: 48px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-nested);
+  box-shadow: 2px 2px 0 var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--accent-orange);
+}
+
+.namecard-mark span {
+  max-width: 100%;
+  padding: 0 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.66rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-cyan);
+}
+
+.namecard-identity {
+  min-width: 0;
+}
+
 .namecard-logo {
   font-family: var(--font-dot-gothic), monospace;
   font-size: 1.7rem;
   letter-spacing: 0.04em;
   color: var(--text-primary);
+  overflow-wrap: anywhere;
 }
 
 .namecard-sub {
+  grid-column: 2;
   font-size: 0.75rem;
   color: var(--text-muted);
   letter-spacing: 0.04em;
-  margin-top: 4px;
+  min-width: 0;
 }
 
 .namecard-sub a {
@@ -49,4 +91,30 @@
   font-size: 0.75rem;
   color: var(--text-muted);
   font-style: italic;
+  overflow-wrap: anywhere;
+}
+
+@container widget (max-width: 420px) {
+  .namecard {
+    align-items: flex-start;
+  }
+
+  .namecard-main {
+    grid-template-columns: 1fr;
+  }
+
+  .namecard-mark {
+    grid-row: auto;
+    width: 100%;
+    min-height: 40px;
+    flex-direction: row;
+  }
+
+  .namecard-sub {
+    grid-column: 1;
+  }
+
+  .namecard-right {
+    align-items: flex-start;
+  }
 }

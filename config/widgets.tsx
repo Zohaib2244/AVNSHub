@@ -272,6 +272,11 @@ export const WIDGETS = {
     sizes: ["M", "L"],
     orientations: ["h"],
     defaults: { size: "M", orientation: "h" },
+    settings: [
+      { key: "displayName", label: "display name", type: "text", default: "AVN Hub", placeholder: "Name to show" },
+      { key: "tagline", label: "tagline", type: "text", default: "front page to your life", placeholder: "Short tagline" },
+      { key: "initials", label: "initials", type: "text", default: "AVN", placeholder: "AVN" },
+    ],
     flags: { plainChrome: true },
   },
   "now-playing": {

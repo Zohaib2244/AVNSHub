@@ -429,6 +429,21 @@
   color: var(--accent-cyan);
 }
 
+.wc-msg-error {
+  border: 1px solid var(--status-down, #c0392b);
+  border-left-width: 2px;
+  background: color-mix(in srgb, var(--status-down, #c0392b) 8%, transparent);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.wc-msg-error-tag {
+  color: var(--status-down, #c0392b);
+  font-weight: 600;
+}
+
 .wc-chat-footer {
   display: flex;
   gap: 6px;

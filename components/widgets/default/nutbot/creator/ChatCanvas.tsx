@@ -89,10 +89,18 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
   }, [messages, phase]);
 
   async function generate() {
-    if (!prompt.trim() || phase.id !== "idle") return;
+    // allow a new attempt from idle / done / error — only block while a run is
+    // actually in flight (otherwise an error would strand the chat)
+    const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
+    if (!prompt.trim() || inFlight) return;
 
     const userText = prompt.trim();
     setPrompt("");
+
+    // clear any prior run's result so retrying after done/error starts clean
+    setDoneWidgetId(null);
+    setAdded(false);
+    try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
 
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
@@ -193,7 +201,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
       if ((err as Error).name === "AbortError") {
         setPhase({ id: "idle" });
       } else {
-        setPhase({ id: "error", message: (err as Error).message ?? "request failed" });
+        fail((err as Error).message ?? "request failed");
       }
     } finally {
       abortRef.current = null;
@@ -286,6 +294,14 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
 
           if (msg.role === "ok") {
             return <div key={i} className="wc-msg wc-msg-ok">{msg.text}</div>;
+          }
+
+          if (msg.role === "error") {
+            return (
+              <div key={i} className="wc-msg wc-msg-error">
+                <span className="wc-msg-error-tag">[error]</span> {msg.text}
+              </div>
+            );
           }
 
           return null;

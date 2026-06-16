@@ -2,7 +2,7 @@
 // existing widget "just work" in Slot Layout. iOS WidgetKit (widgetFamily)
 // and Android Jetpack Glance (SizeMode.Responsive) both converge on the same
 // rule: a discrete size class picks a discrete content variant, chosen by
-// best fit. NutMagCard's widgets already branch on useWidget().size/
+// best fit. AVN Hub widgets already branch on useWidget().size/
 // .orientation (S/M/L x h/v) — Slot Layout just derives that size class from
 // a widget's cell footprint and feeds it through the existing plumbing.
 

@@ -8,7 +8,7 @@ import {
   addToComponentMap,
   buildRegistryEntry,
   mergeWidgetManifest,
-  componentName,
+  findComponentModule,
 } from "@/lib/widget-creator/customRegistry";
 
 const ROOT = process.cwd();
@@ -77,14 +77,13 @@ export async function POST(req: Request) {
   });
   const entry = mergeWidgetManifest(base, rawEntry);
 
-  // the component file the lazy import will point at must be in the archive
-  const comp = componentName(id);
-  const compEntry = zip.getEntry(`${id}/${comp}.tsx`);
-  if (!compEntry) {
-    return NextResponse.json(
-      { error: `archive is missing the component ${id}/${comp}.tsx` },
-      { status: 400 },
-    );
+  // the archive must carry at least one component file under "<id>/"
+  const hasComponent = zip.getEntries().some((ze) => {
+    const name = ze.entryName.split("\\").join("/");
+    return !ze.isDirectory && name.startsWith(`${id}/`) && name.endsWith(".tsx");
+  });
+  if (!hasComponent) {
+    return NextResponse.json({ error: `archive has no component .tsx under ${id}/` }, { status: 400 });
   }
 
   // write every file under "<id>/" into components/widgets/custom/<id>/
@@ -100,9 +99,9 @@ export async function POST(req: Request) {
     writeFileSync(dest, ze.getData());
   }
 
-  // register: JSON first, then the one lazy line (same as create)
+  // register: JSON first, then the one lazy line (detect the real component file)
   upsertRegistryEntry(id, entry);
-  addToComponentMap(id);
+  addToComponentMap(id, findComponentModule(id) ?? undefined);
 
   return NextResponse.json({ ok: true, id, title: entry.title });
 }

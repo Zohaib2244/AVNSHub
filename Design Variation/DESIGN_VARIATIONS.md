@@ -1,8 +1,8 @@
-# Design System — NutMag Card
+﻿# Design System â€” AVN Hub
 
-**Status: Finalized.** Direction chosen: **"G — Chunky Blocks + Accent Border"**, in both dark and light themes, with a hover-to-expand capsule interaction. This is the spec to build up on.
+**Status: Finalized.** Direction chosen: **"G â€” Chunky Blocks + Accent Border"**, in both dark and light themes, with a hover-to-expand capsule interaction. This is the spec to build up on.
 
-Live reference mockup: [`DESIGN_VARIATIONS.html`](./DESIGN_VARIATIONS.html) — open directly in a browser, no build step. Look at the 4th column ("G") in both the Dark Mode and Light Mode sections.
+Live reference mockup: [`DESIGN_VARIATIONS.html`](./DESIGN_VARIATIONS.html) â€” open directly in a browser, no build step. Look at the 4th column ("G") in both the Dark Mode and Light Mode sections.
 
 ---
 
@@ -43,69 +43,69 @@ Live reference mockup: [`DESIGN_VARIATIONS.html`](./DESIGN_VARIATIONS.html) — 
 | Role | Size | Font | Notes |
 |---|---|---|---|
 | Logo / wordmark | `1.7rem` | DotGothic16 | `letter-spacing: 0.04em` |
-| Headline stat (uptime %, etc.) | `2.2rem` | DotGothic16 | `line-height: 1` — largest element on the page |
+| Headline stat (uptime %, etc.) | `2.2rem` | DotGothic16 | `line-height: 1` â€” largest element on the page |
 | Primary value (track/game/project name) | `1.25rem` | JetBrains Mono | `font-weight: 500` |
 | Sub text (artist, hours, commit meta) | `0.75rem` | JetBrains Mono | muted color |
 | Section/field label | `0.62rem` | DotGothic16 | uppercase, `letter-spacing: 0.14em` |
-| Chips / pills / badges | `0.6–0.65rem` | JetBrains Mono | uppercase |
-| Icons | 14×14px | Lucide | `stroke-width: 1.75` |
+| Chips / pills / badges | `0.6â€“0.65rem` | JetBrains Mono | uppercase |
+| Icons | 14Ã—14px | Lucide | `stroke-width: 1.75` |
 
 ---
 
 ## Layout
 
 ```
-┌──────────────────────────────────────────────┐
-│  NAMECARD  (logo+tagline+links | live badge)  │
-├───────────────────────┬────────────────────────┤
-│  Now Playing (.al)    │  Currently Playing      │  ← paired row, flex
-├───────────────────────┴────────────────────────┤
-│  Currently Building (.al, full width)          │  ← standalone hero block
-├───────────────────────┬────────────────────────┤
-│  Homelab               │  Stack                  │  ← paired row, flex
-└───────────────────────┴────────────────────────┘
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  NAMECARD  (logo+tagline+links | live badge)  â”‚
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  Now Playing (.al)    â”‚  Currently Playing      â”‚  â† paired row, flex
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  Currently Building (.al, full width)          â”‚  â† standalone hero block
+â”œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¤
+â”‚  Homelab               â”‚  Stack                  â”‚  â† paired row, flex
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
 ```
 
 - **Namecard**: identity (logo, tagline, links) on the left; live badge + tagline on the right
-- **Blocks**: `border-radius: 12–16px`, `border: 1.5px solid` (border token), hard offset `box-shadow: 3-5px 3-5px 0` (shadow token, **no blur**) — the "sticker/stamp" treatment
+- **Blocks**: `border-radius: 12â€“16px`, `border: 1.5px solid` (border token), hard offset `box-shadow: 3-5px 3-5px 0` (shadow token, **no blur**) â€” the "sticker/stamp" treatment
 - **Accent border**: featured blocks (Now Playing, Currently Building) get `border-left: 3px solid` orange accent (`.al` modifier in the mockup)
 - **Paired rows**: Now Playing/Currently Playing and Homelab/Stack sit side-by-side as flex children
 
 ---
 
-## Interaction — Hover-to-Expand Capsules
+## Interaction â€” Hover-to-Expand Capsules
 
 Each block in a paired row is a flex item: `flex-grow: 1; flex-shrink: 1; flex-basis: 0%; min-width: 0`.
 
 On hover over a block:
-1. Hovered block → `flex-grow: 2.5`; sibling(s) → `flex-grow: 0.65` — `transition: flex-grow 0.4s cubic-bezier(0.4, 0, 0.2, 1)`
+1. Hovered block â†’ `flex-grow: 2.5`; sibling(s) â†’ `flex-grow: 0.65` â€” `transition: flex-grow 0.4s cubic-bezier(0.4, 0, 0.2, 1)`
 2. The shrunken sibling's primary value truncates with an ellipsis (`white-space: nowrap; overflow: hidden; text-overflow: ellipsis`)
-3. The hovered block's border brightens to the orange accent and its sticker shadow offset increases (5px instead of 3px) — a "pressed forward" feel
-4. A "more info" panel reveals below the existing content (`max-height: 0 → 240px`, `opacity: 0 → 1`, `margin-top: 0 → 10px`), containing extra contextual data:
+3. The hovered block's border brightens to the orange accent and its sticker shadow offset increases (5px instead of 3px) â€” a "pressed forward" feel
+4. A "more info" panel reveals below the existing content (`max-height: 0 â†’ 240px`, `opacity: 0 â†’ 1`, `margin-top: 0 â†’ 10px`), containing extra contextual data:
 
 | Block | "More" content |
 |---|---|
-| Now Playing | Recently played tracks (track — artist) |
-| Currently Playing | Recently played games (name — hours total) |
-| Currently Building | Recent commits (message — relative time) |
-| Homelab | Per-service uptime breakdown (service — uptime % · window) |
+| Now Playing | Recently played tracks (track â€” artist) |
+| Currently Playing | Recently played games (name â€” hours total) |
+| Currently Building | Recent commits (message â€” relative time) |
+| Homelab | Per-service uptime breakdown (service â€” uptime % Â· window) |
 | Stack | What each tool is currently used for |
 
-Standalone full-width blocks (Currently Building) get steps 2–4 of the hover state without the flex rearrangement — there are no siblings to shrink.
+Standalone full-width blocks (Currently Building) get steps 2â€“4 of the hover state without the flex rearrangement â€” there are no siblings to shrink.
 
 ---
 
 ## Implementation notes
-- `DESIGN_VARIATIONS.html` uses `.dg-*` (dark G) / `.lg-*` (light G) class names as a reference — port these patterns into Tailwind utilities + component-scoped styles per [`CLAUDE.md`](./CLAUDE.md)
+- `DESIGN_VARIATIONS.html` uses `.dg-*` (dark G) / `.lg-*` (light G) class names as a reference â€” port these patterns into Tailwind utilities + component-scoped styles per [`CLAUDE.md`](./CLAUDE.md)
 - Both themes are fully designed; implement dark as default with a theme toggle (Post-MVP Backlog in `CLAUDE.md`)
-- Everything below this line is the original brainstorm that led here — kept for historical context only
+- Everything below this line is the original brainstorm that led here â€” kept for historical context only
 
 ---
 
 <details>
 <summary>Original brainstorm variations (superseded)</summary>
 
-# Design Variation References — NutMag Card
+# Design Variation References â€” AVN Hub
 
 Based on your orange/cyan/retro/offwhite theme, here are 4 distinct approaches. Pick elements you like; we'll synthesize a direction.
 
@@ -118,7 +118,7 @@ Based on your orange/cyan/retro/offwhite theme, here are 4 distinct approaches. 
 - **Modules**: Square tiles on dark background, each with a thick cyan border
 - **Typography**: All DotGothic16 (even body), extreme contrast
 - **Accents**: Orange used only for "hot" states (playing, online, building)
-- **Animation**: None — or rare, jittery state changes (glitch style)
+- **Animation**: None â€” or rare, jittery state changes (glitch style)
 - **Background**: Solid `#0d0d0f`, no grain/scanlines
 - **Hierarchy**: Bold borders, no shadows
 
@@ -129,7 +129,7 @@ Based on your orange/cyan/retro/offwhite theme, here are 4 distinct approaches. 
 
 ---
 
-## Variation 2: Analog/Mechanical (Inspired by Old Dashboards — VU Meters, Dials)
+## Variation 2: Analog/Mechanical (Inspired by Old Dashboards â€” VU Meters, Dials)
 **Vibe**: Physical instrument aesthetic. Warm beige front panel with pop of neon.
 
 - **Layout**: Asymmetric but grounded; "panels" with beveled edges (inset shadows)
@@ -156,7 +156,7 @@ Based on your orange/cyan/retro/offwhite theme, here are 4 distinct approaches. 
 - **Accents**: Neon cyan text on dark, orange only for CTAs or status "hot" states
 - **Animation**: Smooth, subtle glow pulse, text reveal on load
 - **Background**: Solid black `#0d0d0f`, maybe very faint cyan vertical scanlines (not pervasive)
-- **Hierarchy**: Extreme minimalism — only what's essential visible
+- **Hierarchy**: Extreme minimalism â€” only what's essential visible
 
 ### Key Files to Update:
 - Strip out non-essential UI elements

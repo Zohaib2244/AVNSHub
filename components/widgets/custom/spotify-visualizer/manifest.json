@@ -1,0 +1,50 @@
+{
+  "title": "spotify visualizer",
+  "iconName": "AudioLines",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "style",
+      "label": "style",
+      "type": "select",
+      "default": "bars",
+      "options": [
+        { "value": "bars", "label": "bars" },
+        { "value": "wave", "label": "wave" },
+        { "value": "pulse", "label": "pulse" }
+      ]
+    },
+    {
+      "key": "scheme",
+      "label": "color",
+      "type": "select",
+      "default": "duotone",
+      "options": [
+        { "value": "duotone", "label": "duotone" },
+        { "value": "orange", "label": "orange" },
+        { "value": "cyan", "label": "cyan" }
+      ]
+    },
+    {
+      "key": "intensity",
+      "label": "intensity",
+      "type": "select",
+      "default": "medium",
+      "options": [
+        { "value": "low", "label": "low" },
+        { "value": "medium", "label": "medium" },
+        { "value": "high", "label": "high" }
+      ]
+    },
+    {
+      "key": "bars",
+      "label": "bar count",
+      "type": "number",
+      "default": 24,
+      "min": 6,
+      "max": 64
+    }
+  ]
+}

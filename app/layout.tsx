@@ -16,8 +16,8 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "NutMag2469",
-  description: "A living developer identity card — what I'm listening to, playing, building, and running.",
+  title: "AVN Hub",
+  description: "A living personal dashboard for what I'm listening to, playing, building, and running.",
 };
 
 export default function RootLayout({

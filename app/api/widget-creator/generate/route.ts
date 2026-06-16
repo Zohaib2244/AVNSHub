@@ -1,4 +1,4 @@
-import { spawn } from "child_process";
+﻿import { spawn } from "child_process";
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { HARNESS_ADAPTERS, HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -10,6 +10,7 @@ import {
   buildRegistryEntry,
   mergeWidgetManifest,
   componentName,
+  findComponentModule,
 } from "@/lib/widget-creator/customRegistry";
 
 const REPO_ROOT = process.cwd();
@@ -61,27 +62,27 @@ function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
     .join("\n");
 
   const taskSection = isEdit
-    ? `## Your task — EDITING an existing widget
+    ? `## Your task â€” EDITING an existing widget
 
 You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT create a new widget.
 - Overwrite \`components/widgets/custom/${settings.editSlug}/${comp}.tsx\` with the updated component (keep the named export \`export function ${comp}() { ... }\`)
 - If sizes / icon / settings-schema change, also overwrite \`components/widgets/custom/${settings.editSlug}/manifest.json\` to match
-- DO NOT touch any file under \`config/\` — the registration is managed automatically. The slug must stay the same.
+- DO NOT touch any file under \`config/\` â€” the registration is managed automatically. The slug must stay the same.
 
 ## Current implementation (modify this)
 
 \`\`\`tsx
-${existingCode || "(could not read existing file — write a corrected version)"}
+${existingCode || "(could not read existing file â€” write a corrected version)"}
 \`\`\``
-    : `## Your task — creating a new widget
+    : `## Your task â€” creating a new widget
 
 Write a new widget following the rules in the authoring guide below. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
-- \`${comp}.tsx\` — the component, with a named export \`export function ${comp}() { ... }\`
-- \`manifest.json\` — the widget's manifest data (see "Required output" below)
+- \`${comp}.tsx\` â€” the component, with a named export \`export function ${comp}() { ... }\`
+- \`manifest.json\` â€” the widget's manifest data (see "Required output" below)
 
-Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file — the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.`;
+Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file â€” the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.`;
 
-  return `You are generating a widget for the NutMag Card project — a living developer identity card built with Next.js, Tailwind, and Framer Motion.
+  return `You are generating a widget for the AVN Hub project â€” a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
 
 ${taskSection}
 
@@ -91,7 +92,7 @@ ${creatingWidgetsDoc}
 
 ## Widget spec from the user
 
-${settingsSummary || "(No structured settings provided — infer from the prompt below.)"}
+${settingsSummary || "(No structured settings provided â€” infer from the prompt below.)"}
 
 ## User prompt
 
@@ -99,9 +100,9 @@ ${userPrompt}
 
 ## Required output
 
-1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export — the file basename and export name must both be \`${comp}\`).
+1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export â€” the file basename and export name must both be \`${comp}\`).
 
-2. Write \`components/widgets/custom/${slug || "<slug>"}/manifest.json\` describing the widget. This is pure data — DO NOT write any config/*.ts(x) file; the build picks this manifest up automatically. Shape:
+2. Write \`components/widgets/custom/${slug || "<slug>"}/manifest.json\` describing the widget. This is pure data â€” DO NOT write any config/*.ts(x) file; the build picks this manifest up automatically. Shape:
 \`\`\`json
 {
   "title": "${settings.name ?? (slug || "widget name")}",
@@ -114,7 +115,7 @@ ${userPrompt}
   ]
 }
 \`\`\`
-\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) — use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
+\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) â€” use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
 
 3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/${slug || "<slug>"}/route.ts\`.
 
@@ -123,7 +124,7 @@ Design rules to follow:
 - Never hard-code hex values or use Inter/Roboto/Arial
 - Use \`block-value\`, \`block-sub\`, \`block-label\`, \`more-head\`, \`more-row\` classes for consistent styling
 - DotGothic16 for labels/stats, JetBrains Mono for data values
-- Border radius 12–16px, hard offset box-shadow (no blur), 1.5px solid border
+- Border radius 12â€“16px, hard offset box-shadow (no blur), 1.5px solid border
 - Use \`usePolling\` from \`@/lib/usePolling\` for any data fetching, never bare setInterval
 
 Start writing the files now.`;
@@ -164,7 +165,7 @@ function runHarness(
   write: SSEWriter,
   signal: AbortSignal,
   continuationNote?: string,
-): Promise<"done" | "limit"> {
+): Promise<"done" | "limit" | "error"> {
   return new Promise((resolve) => {
     const fullPrompt = continuationNote ? `${continuationNote}\n\n${prompt}` : prompt;
 
@@ -174,6 +175,9 @@ function runHarness(
       cwd: REPO_ROOT,
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
+      // on Windows the CLIs are .cmd/.ps1 shims that bare spawn can't resolve
+      // (ENOENT) — run through the shell so PATHEXT resolution applies
+      shell: process.platform === "win32",
     });
 
     // write prompt to stdin
@@ -210,8 +214,11 @@ function runHarness(
     });
 
     child.on("error", (err) => {
-      sendEvent(write, "error", { message: `Failed to start ${adapter.id}: ${err.message}` });
-      resolve("done");
+      const hint = (err as NodeJS.ErrnoException).code === "ENOENT"
+        ? ` — is the "${adapter.command}" CLI installed and on PATH?`
+        : "";
+      sendEvent(write, "error", { message: `Failed to start ${adapter.id}: ${err.message}${hint}` });
+      resolve("error");
     });
 
     signal.addEventListener("abort", () => {
@@ -256,18 +263,27 @@ export async function POST(req: Request) {
 
         const result = await runHarness(adapter, fullPrompt, write, abortController.signal, continuationNote);
 
-        if (result === "limit") {
+        if (result === "limit" || result === "error") {
+          // rate-limited or failed to start — fall back to the next harness
           const nextId = orderedChain[i + 1];
           if (nextId) {
-            sendEvent(write, "switch", { from: harnessId, to: nextId, reason: "rate limit" });
+            const reason = result === "limit" ? "rate limit" : "failed to start";
+            sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
+            // only a rate-limited run left partial work worth continuing
             continuationNote =
-              `The previous harness (${harnessId}) started but hit its rate limit. ` +
-              `Inspect the partial output already written to disk and CONTINUE from where it stopped.`;
-          } else {
+              result === "limit"
+                ? `The previous harness (${harnessId}) started but hit its rate limit. ` +
+                  `Inspect the partial output already written to disk and CONTINUE from where it stopped.`
+                : undefined;
+            continue;
+          }
+          // no fallback left — for a limit, say so; an error already emitted its message
+          if (result === "limit") {
             sendEvent(write, "error", { message: "All harnesses hit their rate limit. Try again later." });
           }
+          break;
         } else {
-          // done cleanly — wire the new/edited widget into the registry
+          // done cleanly â€” wire the new/edited widget into the registry
           // deterministically (JSON entry + one lazy line), THEN type-check the
           // wired-up state. The harness only wrote the component + manifest.json.
           const wired = writeWidgetConfig(settings);
@@ -313,9 +329,9 @@ function writeWidgetConfig(settings: GenerateSettings): { ok: boolean; error?: s
   if (!/^[a-z0-9-]+$/.test(id)) return { ok: false, error: `invalid slug "${id}"` };
 
   const dir = join(REPO_ROOT, "components/widgets/custom", id);
-  const comp = componentName(id);
-  if (!existsSync(join(dir, `${comp}.tsx`))) {
-    return { ok: false, error: `expected component ${comp}.tsx was not created` };
+  const mod = findComponentModule(id);
+  if (!mod) {
+    return { ok: false, error: `no component .tsx file was created in components/widgets/custom/${id}/` };
   }
 
   const existing = readRegistry()[id];
@@ -336,7 +352,7 @@ function writeWidgetConfig(settings: GenerateSettings): { ok: boolean; error?: s
   }
 
   upsertRegistryEntry(id, entry);
-  addToComponentMap(id);
+  addToComponentMap(id, mod);
   return { ok: true };
 }
 
@@ -345,6 +361,8 @@ async function runTscCheck(): Promise<{ errors: string[] }> {
     const child = spawn("npx", ["tsc", "--noEmit", "--pretty", "false"], {
       cwd: REPO_ROOT,
       stdio: ["ignore", "pipe", "pipe"],
+      // npx is npx.cmd on Windows — needs the shell to resolve (ENOENT otherwise)
+      shell: process.platform === "win32",
     });
 
     let output = "";
