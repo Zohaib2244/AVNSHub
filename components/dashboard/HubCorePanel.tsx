@@ -189,18 +189,6 @@ function RegionDimsRow({ region, dims }: { region: SlotRegionId; dims: RegionDim
         <input
           type="number"
           className="wset-input dims-input"
-          min={REGION_DIMS_BOUNDS.minCols}
-          max={REGION_DIMS_BOUNDS.maxCols}
-          value={cols}
-          onChange={(e) => setCols(e.target.value)}
-          onBlur={commit}
-          onKeyDown={onKeyDown}
-          aria-label={`${REGION_LABELS[region]} columns`}
-        />
-        <span className="hub-core-dims-sep">×</span>
-        <input
-          type="number"
-          className="wset-input dims-input"
           min={REGION_DIMS_BOUNDS.minRows}
           max={REGION_DIMS_BOUNDS.maxRows}
           value={rows}
@@ -208,6 +196,18 @@ function RegionDimsRow({ region, dims }: { region: SlotRegionId; dims: RegionDim
           onBlur={commit}
           onKeyDown={onKeyDown}
           aria-label={`${REGION_LABELS[region]} rows`}
+        />
+        <span className="hub-core-dims-sep">×</span>
+        <input
+          type="number"
+          className="wset-input dims-input"
+          min={REGION_DIMS_BOUNDS.minCols}
+          max={REGION_DIMS_BOUNDS.maxCols}
+          value={cols}
+          onChange={(e) => setCols(e.target.value)}
+          onBlur={commit}
+          onKeyDown={onKeyDown}
+          aria-label={`${REGION_LABELS[region]} columns`}
         />
       </div>
     </div>

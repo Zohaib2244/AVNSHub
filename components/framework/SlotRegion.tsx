@@ -220,6 +220,7 @@ export function SlotRegion({
 
     // Outside the active box, but clearly over a different widget → hand off
     // immediately and smoothly (in-place re-target, no clear-to-null).
+    // If the target doesn't support HOE, fall through to the exit debounce.
     const activeVisualRects = Object.fromEntries(
       Object.entries(activeHoverPreview.effects).map(([id, effect]) => [id, effect.visualRect]),
     );
@@ -227,20 +228,23 @@ export function SlotRegion({
     if (visualTarget && visualTarget.id !== activeHoverPreview.activeId) {
       clearHoverIntent();
       clearHoverExit();
-      applyHoverExpand(visualTarget.id, visualTarget.preferredDirections);
-      return;
+      const applied = applyHoverExpand(visualTarget.id, visualTarget.preferredDirections);
+      if (applied) return;
+      // target doesn't support HOE → fall through to schedule the exit debounce
     }
 
-    // Genuinely over a gap / empty cell → schedule a debounced exit. If by the
-    // time it fires the pointer has landed on another widget, hand off directly
-    // rather than clearing first (keeps the transition continuous).
+    // Genuinely over a gap / empty cell (or a non-HOE widget) → schedule a
+    // debounced exit. If by the time it fires the pointer has landed on a HOE
+    // widget, hand off directly rather than clearing first (keeps the transition
+    // continuous).
     if (hoverExitRef.current !== null) return;
     hoverExitRef.current = window.setTimeout(() => {
       hoverExitRef.current = null;
       const pointer = lastPointerRef.current;
       const nextTarget = pointer ? targetFromPointer(pointer.clientX, pointer.clientY) : null;
       if (nextTarget && nextTarget.id !== activeHoverPreview.activeId) {
-        applyHoverExpand(nextTarget.id, nextTarget.preferredDirections);
+        const applied = applyHoverExpand(nextTarget.id, nextTarget.preferredDirections);
+        if (!applied) clearHoverExpand();
       } else {
         clearHoverExpand();
       }
