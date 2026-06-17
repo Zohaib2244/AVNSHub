@@ -1,215 +1,225 @@
-﻿# AVN Hub — Front Page to Your Life
+# AVN Hub
 
-AVN Hub is a living personal dashboard for what you are listening to, playing,
-building, and running. It is how you configure what you see, how it looks,
-where everything lives, and how the dashboard behaves without touching code.
+> A configurable personal OS for your dashboard — drag, resize, and create widgets with AI.
 
-Everything the Hub controls is persisted to `localStorage` and applied
-immediately â€” no save button, no page reload.
+AVN Hub is a self-hosted living dashboard. It shows what you're listening to, what game you're playing, whether your homelab is alive, your latest commits — all on one page, running on your own hardware, private by default.
 
 ---
 
-## Two access points
+![AVN Hub dark mode](docs/screenshots/hero-dark.png)
 
-### 1. Hub Core tabs (top-right corner)
-
-A fixed control strip reachable from every screen regardless of which widget
-is where. In Slot Layout it sits as right-edge tabs on the main frame. Click
-the gear icon (settings) or grid icon (widget manager) to open that tab, click
-again, press `Escape`, or click anywhere outside to close.
-
-Contains two independently collapsible sections:
-
-**AVN Hub** â€” global controls:
-- **Edit mode** â€” toggle between `locked` (layout is frozen) and `editing`
-  (drag handles, gear icons, and resize handles appear on every widget).
-  In editing mode a **reset** button also appears to wipe the current
-  layout back to defaults.
-- **Layout** â€” switch between the two layout modes (see below).
-
-**Default mode / Graph mode** â€” mode-specific settings for whichever layout is
-currently active. In Default mode this is the per-region grid-dims editor
-(see [Default Mode](#default-mode-slot-layout)).
-
-**Widget Manager tab** â€” add, remove, or permanently delete custom widgets.
-
-### 2. Hub Settings widget (`#hub-settings`, "AVN Hub")
-
-A widget you can place on the dashboard like any other. It exposes the same
-theme and palette controls at different levels of detail depending on its size:
-
-| Size | What you get |
-|------|-------------|
-| S | Theme mode toggle only (light / auto / dark) |
-| M | Theme mode + colour palette picker |
-| L | Theme mode + palette + general prefs + reset button |
+![AVN Hub light mode](docs/screenshots/hero-light.png)
 
 ---
 
-## Layout modes
+## What it is
 
-### Default Mode (Slot Layout)
+Not a portfolio. Not a status page. A personal control surface that reflects your digital life in real time — music, games, homelab, code — laid out exactly how you want it, with widgets you can build yourself just by describing them.
 
-The default. The page is divided into three named **regions**:
-
-| Region | Where it appears | Configurable? |
-|--------|-----------------|--------------|
-| Column L | Left sidebar column | Yes â€” rows Ã— cols in Hub Core |
-| Column R | Right sidebar column | Yes |
-| Base | Bottom-center grid | Yes |
-| Terminal | Center terminal slot (NutBot lives here) | No â€” 1 fixed slot |
-
-Each region is an independent CSS grid. You place widgets into cells of that
-grid manually (in edit mode). Widgets occupy a rectangle of cells
-(`colSpan Ã— rowSpan`), which you can resize by dragging the edge handles.
-
-**Configuring region grid size** â€” open Hub Core â†’ Default Mode section. Each
-region shows a `rows Ã— columns` input pair. Changing these re-tiles the grid;
-any placed widgets stay in their stored cell positions (clamped to the new
-bounds automatically).
-
-**Placing a widget** â€” open the Hub Core Widget Manager tab, then press `+`
-on an available widget. The add action asks where to place it and only shows
-regions (`left`, `right`, `base`) that currently have enough free cells. You
-can also enter edit mode and click an empty `+` cell inside any region to place
-directly into that cell.
-
-**Resizing a widget** â€” grab any of the four edge handles that appear in edit
-mode and drag outward to grow or inward to shrink. The widget cannot shrink
-below its registered minimum footprint (1Ã—1 by default).
-
-**Moving a widget** â€” drag the move handle (cross-arrow icon in the top-left
-corner of the card in edit mode) to reposition it within its region.
-
-**Removing a widget** â€” click the Ã— button in the top-right of the card in
-edit mode, or use the Hub Core Widget Manager tab. Removed widgets go back
-to the "available" pool â€” they are never deleted.
-
-**Hover On Expand (HOE)** â€” an opt-in visual preview available in Default mode.
-When enabled on a widget, hovering over it makes it visually expand into
-adjacent space while directly edge-touching neighbors contract to make room.
-This is transient (no layout is saved) and reverts the moment you move away.
-Enable per-widget via its gear menu â†’ `slot hover expand`. HOE requires a
-fine-pointer device (mouse); it is disabled on touch screens and when
-`prefers-reduced-motion` is set.
-
-### Graph Mode
-
-A free-form auto-flow grid. Widgets are placed by the framework in order;
-you drag them to rearrange and use the gear menu to change each widget's size
-(`S / M / L`) and orientation (`horizontal / vertical`). There is no fixed
-region structure â€” everything shares one flat grid. Useful for a denser,
-more fluid layout.
-
-Per-widget size/orientation settings live in each card's gear menu. Visibility
-and add/remove controls live in the Hub Core Widget Manager tab.
+**Built with:** Next.js · Tailwind CSS · Framer Motion · TypeScript  
+**Deployed on:** Self-hosted Docker, accessed privately over Tailscale (no public domain needed)
 
 ---
 
-## Edit mode
+## Features
 
-Toggle edit mode from Hub Core â†’ AVN Hub â†’ edit mode or from any widget's gear
-menu. While editing:
+### Live data widgets out of the box
 
-- Every widget card shows a **move handle** (top-left), **Ã— remove** (top-right),
-  and **gear** (settings) button.
-- In Default mode, four edge **resize handles** also appear.
-- In Graph mode, you can drag cards to rearrange them.
-- A **reset** button appears in Hub Core to wipe the current mode's layout back
-  to its default arrangement.
-
-Lock the layout when done to prevent accidental moves.
-
----
-
-## Widget Manager
-
-The Widget Manager is its own Hub Core tab, separate from the AVN Hub canvas
-settings.
-
-In Slot Layout it lists placed widgets and available widgets. Available widgets
-open a region chooser, and only regions with enough free cells are shown.
-
-In Graph Layout, on-screen widgets have a `âˆ’` button to hide them
-(`hidden: true`). Available widgets have a `+` button to add them back
-(`hidden: false`).
+| Widget | What it shows |
+| --- | --- |
+| **Now Playing** | Spotify track, artist, album art, playback controls, animated EQ bars |
+| **Currently Playing** | Steam game, session hours, total hours |
+| **Homelab Status** | Per-service uptime dots (immich, jellyfin, sonarr, radarr…) + average uptime % |
+| **GitHub Activity** | Most recent commit, repo, relative timestamp |
+| **Clock & Date** | Live clock with sunrise/dusk/sunset bar |
+| **NutBot v2.0** | SVG robot mascot with idle eye-tracking, expressions, and a full AI widget creator terminal |
 
 ---
 
-## Theme system
+### NutBot Widget Creator — build widgets by describing them
 
-### Mode
+![Widget creator](docs/screenshots/widget-creator.png)
 
-Three options, set from Hub Settings or Hub Core:
+NutBot's `CREATOR` tab is an in-dashboard AI terminal. Describe a widget, pick sizes and layout options, and NutBot generates the full React component and wires it into the dashboard — no file editing required.
 
-| Mode | Behaviour |
-|------|-----------|
-| `light` | Always light |
-| `dark` | Always dark |
-| `auto` | Follows the OS `prefers-color-scheme` setting |
-
-Persisted to the legacy `localStorage["nutmag-theme"]` key. Applied via a pre-paint inline
-script in the root layout so there is never a flash of the wrong theme on load.
-
-### Colour palettes
-
-Four palettes, each fully designed for both dark and light modes:
-
-| Palette | Accent colours | Mood |
-|---------|---------------|------|
-| **ember** (default) | Orange `#ff6b2b` + Cyan `#00b4c8` | Warm, amber |
-| **slate** | Blue `#4da3ff` + Teal `#00c8a0` | Cool, monochromatic |
-| **moss** | Green `#8fc63c` + Amber `#d89a28` | Earthy, natural |
-| **plum** | Pink `#e84a8a` + Gold `#d8a830` | Vivid, expressive |
-
-Switch palette from the Hub Settings widget (M or L size) or Hub Core. The
-picker shows a three-swatch preview (card bg + two accents) for each option.
-
-Persisted to the legacy `localStorage["nutmag-palette"]` key.
+- Powered by your choice of CLI backend: **Claude Code**, **OpenCode**, or **Codex**
+- Auto-fallback chain: if one hits a rate limit it hands off to the next
+- TypeScript-checked before registration; rolls back automatically on failure
+- Created widgets are drag-placeable, resizable, and configurable like any built-in widget
 
 ---
 
-## General preferences
+### Configurable layout
 
-Available in Hub Settings at L size, or via the `lib/prefs.ts` store:
+![Edit mode](docs/screenshots/edit-mode.png)
 
-| Preference | Default | What it does |
-|------------|---------|-------------|
-| **Live data polling** | on | When off, all `usePolling` hooks pause â€” no API calls are made. Useful when working offline or debugging. |
-| **Boot sequence intro** | on | The retro terminal "boot log" animation that plays on first load. Turn off for an instant card. |
+The dashboard is a three-region slot grid — left column, right column, and a base strip — with NutBot fixed in the center terminal slot. In **edit mode**:
 
-Persisted to the legacy `localStorage["nutmag-prefs"]` key.
+- **Drag** any widget to a new cell with the move handle
+- **Resize** by dragging any of the four edge handles
+- **Add** widgets from the widget manager into any region that has space
+- **Remove** widgets back to the available pool (never deleted)
 
----
-
-## Reset
-
-Resets are destructive and cannot be undone:
-
-| Reset | Where | What it clears |
-|-------|-------|---------------|
-| Reset graph layout | Hub Core (edit mode, graph active) | Graph mode widget order, sizes, orientations, and settings |
-| Reset default layout | Hub Core (edit mode, default active) | Slot placements and region dims |
-| Reset layout & widget config | Hub Settings (L size) | Both layout modes + resets layout mode to Default |
-
-None of the resets touch theme, palette, or global prefs.
+Lock the layout when done to prevent accidental changes.
 
 ---
 
-## Persistence keys
+### Widget Manager
 
-These retain the original `nutmag-*` names for compatibility with existing
-layouts and preferences.
+![Widget manager](docs/screenshots/widget-manager.png)
 
-| Key | What's stored |
-|-----|--------------|
-| `nutmag-layout` | Graph mode widget order, size, orientation, hidden, per-widget settings |
-| `nutmag-slot-layout` | Default mode: region dims + per-region widget placements |
-| `nutmag-layout-mode` | Active layout mode (`graph` or `slots`) |
-| `nutmag-theme` | Theme mode (`light`, `auto`, `dark`) |
-| `nutmag-palette` | Active colour palette (`ember`, `slate`, `moss`, `plum`) |
-| `nutmag-prefs` | Global prefs (polling, boot sequence) |
-| `nutmag-sessions` | Session tracker (uptime stats) |
+The Widget Manager tab lists every placed widget (with its region) and every available widget waiting to be placed. Custom widgets created by NutBot appear here automatically alongside built-in ones. You can also import a widget exported as a `.zip` from another card.
 
-All keys are written immediately on change and read on mount. Corrupted or
-missing keys fall back to sensible defaults automatically.
+---
+
+### Hub Core — settings without leaving the page
+
+![Hub Core settings](docs/screenshots/hub-core.png)
+
+A fixed control strip in the top-right corner. Always reachable regardless of layout. Three tabs:
+
+- **Wrench/Lock** — toggle edit mode in one click
+- **Settings** — edit mode toggle, layout reset, region grid-size controls (rows × cols per region), layout export/import
+- **Widget Manager** — add, remove, export, delete custom widgets
+
+---
+
+### Two fully-designed themes, eight palettes
+
+Both dark and light modes are first-class — not an afterthought. Eight colour palettes (ember, slate, moss, plum, reef, raspberry, circuit, graphite) each have complete dark and light variants. Switch from the Hub Settings widget or Hub Core. Persisted to `localStorage`, applied pre-paint so there's never a flash of the wrong theme.
+
+---
+
+### Hover On Expand (HOE)
+
+Enable per-widget via its gear menu. Hover over a widget to see a real-time preview of its expanded content — neighbours contract slightly to make room. Reverts the moment you move away. No layout is saved. Requires a fine-pointer device.
+
+---
+
+## Self-hosting
+
+### Requirements
+
+- Node.js 20+
+- Docker + Docker Compose
+- A [Tailscale](https://tailscale.com) account (free) for private HTTPS
+
+### 1. Clone & configure
+
+```bash
+git clone https://github.com/Zohaib2244/AVN-Hub.git
+cd AVN-Hub
+cp .env.local.example .env.local   # fill in your API keys
+```
+
+### 2. Environment variables
+
+```env
+# Spotify (Authorization Code flow)
+SPOTIFY_CLIENT_ID=
+SPOTIFY_CLIENT_SECRET=
+SPOTIFY_REFRESH_TOKEN=
+
+# Steam
+STEAM_API_KEY=
+STEAM_PROFILE_ID=        # e.g. 76561199044933923
+
+# Homelab
+HOMELAB_STATUS_URL=      # your self-hosted /status endpoint
+
+# GitHub (optional — raises rate limit from 60/hr to 5000/hr)
+GITHUB_TOKEN=
+
+# Dev only
+HOMELAB_MOCK_DATA=true   # serve realistic mock telemetry without a real homelab
+```
+
+### 3. Run with Docker
+
+```bash
+docker compose up -d --build
+```
+
+### 4. Expose over Tailscale (free private HTTPS, no domain purchase)
+
+```bash
+tailscale serve https / http://localhost:3000
+# → https://avn-hub.<your-tailnet>.ts.net on every device in your tailnet
+```
+
+That's it. No reverse proxy, no Let's Encrypt setup, no public DNS.
+
+---
+
+## Adding custom widgets
+
+NutBot's `CREATOR` tab is the intended path. But you can also follow [`docs/CREATING_WIDGETS.md`](docs/CREATING_WIDGETS.md) to write one by hand — the authoring guide is written so any developer (or LLM) can follow it literally.
+
+Every widget is:
+
+```text
+components/widgets/custom/<slug>/
+  <Name>Widget.tsx   ← React component (named export)
+  manifest.json      ← metadata (title, icon, sizes, settings schema)
+```
+
+Registration into the dashboard happens automatically after the files are written.
+
+---
+
+## Project structure
+
+```text
+app/
+  page.tsx              # root — BootSequence + GlyphStrip + SlotDashboard
+  layout.tsx            # fonts, pre-paint theme/palette script
+  api/                  # proxy routes (Spotify, Steam, homelab, GitHub, widget creator)
+components/
+  framework/            # widget shell, context, settings popover, error boundary
+  widgets/default/      # built-in widgets (nutbot, now-playing, homelab, github…)
+  widgets/custom/       # NutBot-generated custom widgets live here
+  dashboard/            # SlotDashboard, HubCorePanel, LayoutProvider, etc.
+config/
+  widgets.tsx           # manifest registry + DEFAULT_ORDER
+  themes.ts             # palette metadata
+  customRegistry.json   # auto-managed by widget creator
+  customComponentMap.tsx
+lib/
+  slotLayout.ts         # slot layout store
+  layout.ts             # widget instance types + graph layout store
+  usePolling.ts         # shared per-URL polling cache
+  format.ts             # timeAgo, formatDuration, formatMins
+  nutbotSignal.ts       # cross-component NutBot expression signalling
+styles/
+  globals.css           # design tokens, theme packs, grid, card CSS
+docs/
+  CREATING_WIDGETS.md   # widget authoring guide
+```
+
+---
+
+## Persistence
+
+All layout and preference state lives in `localStorage` — no database needed.
+
+| Key | Contents |
+| --- | --- |
+| `nutmag-slot-layout` | Region dims + widget placements |
+| `nutmag-theme` | Theme mode (light / auto / dark) |
+| `nutmag-palette` | Active colour palette |
+| `nutmag-prefs` | Polling on/off, boot sequence on/off |
+| `nutmag-sessions` | Session uptime tracker |
+
+---
+
+## Tech stack
+
+| | |
+| --- | --- |
+| Framework | Next.js 15 (App Router) |
+| Styling | Tailwind CSS + CSS custom properties |
+| Animations | Framer Motion |
+| Drag & resize | dnd-kit + custom resize handles |
+| NutBot face | SVG with RAF animation loop |
+| Widget AI | Claude Code / OpenCode / Codex CLI |
+| Deployment | Docker + Tailscale |

@@ -5,9 +5,7 @@ import { Send, Square, PlusCircle } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
-import { getLayoutMode } from "@/lib/layoutMode";
 import { placeWidgetAuto } from "@/lib/slotLayout";
-import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 type Phase =
   | { id: "idle" }
@@ -58,7 +56,6 @@ function StatusBar({ phase }: { phase: Phase }) {
 const MESSAGES_KEY = "nutmag-creator-messages";
 
 export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
-  const { addWidget } = useLayout();
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -257,12 +254,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
 
   function handleAddToLayout() {
     if (!doneWidgetId) return;
-    const mode = getLayoutMode();
-    if (mode === "slots") {
-      placeWidgetAuto(doneWidgetId);
-    } else {
-      addWidget(doneWidgetId);
-    }
+    placeWidgetAuto(doneWidgetId);
     setAdded(true);
   }
 

@@ -1,0 +1,203 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - button "enter edit mode" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+        - button "open avn hub core settings" [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+        - button "open widget manager" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - img [ref=e31]
+              - text: clock & date
+            - generic [ref=e34]: "--:--:--"
+            - generic [ref=e35]: —
+            - generic [ref=e37]:
+              - generic [ref=e38]: sunrise 05:12
+              - generic [ref=e39]: —
+              - generic [ref=e40]: sunset 19:48
+            - generic [ref=e41]:
+              - button "Play lofi radio" [ref=e42] [cursor=pointer]:
+                - img [ref=e43]
+              - generic [ref=e51]: lofi hip-hop radio
+            - generic [ref=e52]:
+              - button "light" [ref=e53] [cursor=pointer]:
+                - img [ref=e54]
+                - text: light
+              - button "auto" [ref=e60] [cursor=pointer]:
+                - img [ref=e61]
+                - text: auto
+              - button "dark" [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - text: dark
+          - generic [ref=e71]:
+            - img [ref=e73]
+            - generic: —
+          - generic [ref=e79]:
+            - generic [ref=e80]:
+              - img [ref=e81]
+              - text: weather
+            - generic [ref=e83]: locating current area...
+          - generic [ref=e86]:
+            - generic [ref=e87]:
+              - img [ref=e88]
+              - text: disk storage
+            - generic [ref=e90]: —
+            - generic [ref=e91]: no data
+            - generic [ref=e93]: no drive data
+          - generic [ref=e96]:
+            - generic [ref=e97]:
+              - img [ref=e98]
+              - text: server stats
+            - generic [ref=e101]:
+              - generic [ref=e102]:
+                - generic [ref=e103]:
+                  - img [ref=e104]
+                  - text: cpu
+                - generic [ref=e107]: —
+              - generic [ref=e108]:
+                - generic [ref=e109]:
+                  - img [ref=e110]
+                  - text: memory
+                - generic [ref=e112]: —
+              - generic [ref=e113]:
+                - generic [ref=e114]:
+                  - img [ref=e115]
+                  - text: storage
+                - generic [ref=e117]: —
+              - generic [ref=e118]:
+                - generic [ref=e119]:
+                  - img [ref=e120]
+                  - text: network
+                - generic [ref=e125]: —
+            - generic [ref=e127]: no host data
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - img [ref=e132]
+              - text: storage apps
+            - generic [ref=e136]: —
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - img [ref=e141]
+              - text: network stats
+            - generic [ref=e146]: —
+            - generic [ref=e147]: combined rx + tx
+          - generic [ref=e150]:
+            - generic [ref=e151]:
+              - img [ref=e152]
+              - text: arr stack
+            - generic [ref=e155]: —
+            - generic [ref=e157]: no queue data
+        - generic [ref=e158]:
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - img [ref=e163]
+              - text: nutbot v2.0
+            - generic [ref=e167]:
+              - generic [ref=e168]:
+                - button "log" [ref=e169] [cursor=pointer]
+                - button "shell 1" [ref=e170] [cursor=pointer]:
+                  - text: shell 1
+                  - img [ref=e171]
+                - button "creator" [ref=e174] [cursor=pointer]
+                - button "new shell tab" [ref=e175] [cursor=pointer]:
+                  - img [ref=e176]
+              - button "select harness" [ref=e178] [cursor=pointer]:
+                - text: ⚡ claude
+                - img [ref=e180]
+              - button "NutBot" [ref=e183] [cursor=pointer]:
+                - generic [ref=e184]:
+                  - img [ref=e188]
+                  - generic [ref=e195]: NUT-B0T
+          - generic [ref=e198]:
+            - generic [ref=e200]:
+              - generic [ref=e201]:
+                - img [ref=e202]
+                - text: identity
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]:
+                    - img [ref=e209]
+                    - generic [ref=e213]: AVN
+                  - generic [ref=e214]:
+                    - generic [ref=e215]: AVN Hub
+                    - generic [ref=e216]: front page to your life
+                  - generic [ref=e217]:
+                    - link "github" [ref=e218] [cursor=pointer]:
+                      - /url: https://github.com/Zohaib2244
+                      - img [ref=e219]
+                      - text: github
+                    - generic [ref=e222]: ·
+                    - link "homelab" [ref=e223] [cursor=pointer]:
+                      - /url: "#homelab"
+                      - img [ref=e224]
+                      - text: homelab
+                    - generic [ref=e227]: ·
+                    - generic [ref=e228]: — uptime
+                - generic [ref=e230]:
+                  - 'button "Theme: dark — switch to light" [ref=e231] [cursor=pointer]':
+                    - img [ref=e232]
+                  - generic [ref=e234]: live
+            - generic [ref=e238]:
+              - generic [ref=e240]:
+                - generic [ref=e241]:
+                  - img [ref=e242]
+                  - text: github activity
+                - generic [ref=e244]: —
+              - generic [ref=e245]: —
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - button "commits" [ref=e248] [cursor=pointer]
+                  - button "repos" [ref=e249] [cursor=pointer]
+                - generic [ref=e250]: no recent commits
+        - generic [ref=e251]:
+          - generic [ref=e254]:
+            - generic [ref=e255]:
+              - generic [ref=e256]:
+                - generic [ref=e257]: Last played
+                - generic [ref=e258]:
+                  - generic [ref=e259]: —
+                  - generic [ref=e260]: —
+              - generic [ref=e261]:
+                - generic [ref=e263]: Online Status
+                - generic [ref=e264]:
+                  - generic [ref=e265]: pfp
+                  - generic [ref=e266]: User name
+            - generic [ref=e268]: nothing played recently
+          - generic [ref=e271]:
+            - generic [ref=e272]:
+              - img [ref=e273]
+              - text: a very nutty home server
+            - generic [ref=e276]: —
+            - generic [ref=e278]: no service data
+          - generic [ref=e281]:
+            - generic [ref=e282]:
+              - img [ref=e283]
+              - text: avn hub settings
+            - generic [ref=e284]:
+              - generic [ref=e285]: theme
+              - generic [ref=e286]:
+                - button "light" [ref=e287] [cursor=pointer]:
+                  - img [ref=e288]
+                  - text: light
+                - button "auto" [ref=e294] [cursor=pointer]:
+                  - img [ref=e295]
+                  - text: auto
+                - button "dark" [ref=e299] [cursor=pointer]:
+                  - img [ref=e300]
+                  - text: dark
+            - generic [ref=e302]:
+              - button "ember" [ref=e303] [cursor=pointer]: ember
+              - button "slate" [ref=e307] [cursor=pointer]: slate
+              - button "moss" [ref=e311] [cursor=pointer]: moss
+              - button "plum" [ref=e315] [cursor=pointer]: plum
+              - button "reef" [ref=e319] [cursor=pointer]: reef
+              - button "berry" [ref=e323] [cursor=pointer]: berry
+              - button "circuit" [ref=e327] [cursor=pointer]: circuit
+              - button "graphite" [ref=e331] [cursor=pointer]: graphite
+  - button "Open Next.js Dev Tools" [ref=e340] [cursor=pointer]:
+    - img [ref=e341]

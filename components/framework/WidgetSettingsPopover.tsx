@@ -17,9 +17,6 @@ import {
 import type { WidgetInstance } from "@/lib/layout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 
-const SIZE_LABELS = { S: "small", M: "medium", L: "large" } as const;
-const ORIENTATION_LABELS = { h: "horizontal", v: "vertical" } as const;
-
 function SchemaField({
   field,
   value,
@@ -87,7 +84,6 @@ export function WidgetSettingsPopover({
   manifest,
   instance,
   onClose,
-  mode = "graph",
   onUpdateSettings,
   onHide,
   hideWidgetSettings = false,
@@ -95,14 +91,12 @@ export function WidgetSettingsPopover({
   manifest: WidgetManifest;
   instance: WidgetInstance;
   onClose: () => void;
-  mode?: "graph" | "slot";
   onUpdateSettings?: (settings: SettingsValues) => void;
   onHide?: () => void;
   hideWidgetSettings?: boolean;
 }) {
   const { updateInstance } = useLayout();
   const panelRef = useRef<HTMLDivElement>(null);
-  const showPlacement = mode === "graph";
 
   function updateSettings(settings: SettingsValues) {
     if (onUpdateSettings) onUpdateSettings(settings);
@@ -143,47 +137,6 @@ export function WidgetSettingsPopover({
         </button>
       </div>
 
-      {showPlacement && (
-        <>
-          <div className="wset-section">placement</div>
-
-          <div className="wset-row">
-            <span>size</span>
-            <div className="seg-row">
-              {manifest.sizes.map((s) => (
-                <button
-                  key={s}
-                  type="button"
-                  className={`seg-btn${instance.size === s ? " active" : ""}`}
-                  onClick={() => updateInstance(instance.id, { size: s })}
-                  title={SIZE_LABELS[s]}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {manifest.orientations.length > 1 && (
-            <div className="wset-row">
-              <span>shape</span>
-              <div className="seg-row">
-                {manifest.orientations.map((o) => (
-                  <button
-                    key={o}
-                    type="button"
-                    className={`seg-btn${instance.orientation === o ? " active" : ""}`}
-                    onClick={() => updateInstance(instance.id, { orientation: o })}
-                    title={ORIENTATION_LABELS[o]}
-                  >
-                    {ORIENTATION_LABELS[o]}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
 
       <div className="wset-section">interaction</div>
       {FRAMEWORK_SETTINGS.map((field) => (
@@ -195,20 +148,19 @@ export function WidgetSettingsPopover({
         />
       ))}
 
-      {onHide || showPlacement ? (
+      {onHide && (
         <button
           type="button"
           className="wset-hide-btn"
           onClick={() => {
-            if (onHide) onHide();
-            else updateInstance(instance.id, { hidden: true });
+            onHide();
             onClose();
           }}
         >
           <EyeOff size={12} strokeWidth={1.75} />
-          {mode === "slot" ? "remove widget" : "hide widget"}
+          remove widget
         </button>
-      ) : null}
+      )}
 
       {!hideWidgetSettings && (manifest.settings?.length ?? 0) > 0 && (
         <>

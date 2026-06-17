@@ -337,7 +337,6 @@ export function SlotWidgetCell({
                 key="slot-settings"
                 manifest={manifest}
                 instance={settingsInstance}
-                mode="slot"
                 hideWidgetSettings={editMode}
                 onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
                 onHide={() => removeWidget(instance.id)}

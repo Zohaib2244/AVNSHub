@@ -21,7 +21,6 @@ import {
   type ThemeMode,
 } from "@/lib/theme";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
-import { DEFAULT_LAYOUT_MODE, setLayoutMode } from "@/lib/layoutMode";
 import { resetSlotLayout } from "@/lib/slotLayout";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -81,7 +80,6 @@ function GeneralPrefs() {
   function resetAll() {
     resetLayout();
     resetSlotLayout();
-    setLayoutMode(DEFAULT_LAYOUT_MODE);
   }
 
   return (

@@ -12,13 +12,6 @@ import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { DEFAULT_ORDER, WIDGETS, getManifest, type WidgetManifest } from "@/config/widgets";
 import {
-  getLayoutMode,
-  getServerLayoutMode,
-  setLayoutMode,
-  subscribeLayoutMode,
-  type LayoutMode,
-} from "@/lib/layoutMode";
-import {
   exportSlotLayout,
   getRegionsThatFitWidget,
   getSlotLayout,
@@ -32,11 +25,6 @@ import {
   subscribeSlotLayout,
 } from "@/lib/slotLayout";
 import { REGION_DIMS_BOUNDS, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
-
-const LAYOUT_MODE_OPTIONS: { mode: LayoutMode; label: string }[] = [
-  { mode: "graph", label: "graph" },
-  { mode: "slots", label: "default" },
-];
 
 const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
 type HubCoreTab = "settings" | "widgets";
@@ -73,13 +61,12 @@ function widgetEmptyText(filter: WidgetFilter, allText: string, systemText: stri
   return allText;
 }
 
-export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
+export function HubCorePanel() {
   const [activeTab, setActiveTab] = useState<HubCoreTab | null>(null);
   const [activeSettingsSection, setActiveSettingsSection] = useState<HubSettingsSection | null>("avn");
   const panelRef = useRef<HTMLDivElement>(null);
 
-  const { editMode, startEdit, lockLayout, resetLayout } = useLayout();
-  const layoutMode = useSyncExternalStore(subscribeLayoutMode, getLayoutMode, getServerLayoutMode);
+  const { editMode, startEdit, lockLayout } = useLayout();
 
   useEffect(() => {
     if (!activeTab) return;
@@ -97,13 +84,8 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
     };
   }, [activeTab]);
 
-  function resetCurrentLayout() {
-    if (layoutMode === "slots") resetSlotLayout();
-    else resetLayout();
-  }
-
   return (
-    <div ref={panelRef} className={`hub-core${slotMode ? " hub-core-slot" : ""}`}>
+    <div ref={panelRef} className="hub-core hub-core-slot">
       <button
         type="button"
         className={`hub-core-btn${editMode ? " active" : ""}`}
@@ -161,39 +143,24 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
                       </button>
                     </div>
                   </div>
-                  <div className="wset-row">
-                    <span>layout</span>
-                    <div className="seg-row">
-                      {LAYOUT_MODE_OPTIONS.map(({ mode, label }) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={`seg-btn${layoutMode === mode ? " active" : ""}`}
-                          onClick={() => setLayoutMode(mode)}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                   {editMode && (
-                    <button type="button" className="wset-hide-btn hub-reset" onClick={resetCurrentLayout}>
+                    <button type="button" className="wset-hide-btn hub-reset" onClick={resetSlotLayout}>
                       <RotateCcw size={12} strokeWidth={1.75} />
-                      reset {layoutMode === "slots" ? "default" : "graph"} layout
+                      reset layout
                     </button>
                   )}
                 </CoreSection>
 
                 <CoreSection
-                  title={layoutMode === "slots" ? "default mode" : "graph mode"}
+                  title="layout"
                   open={activeSettingsSection === "mode"}
                   onToggle={() => setActiveSettingsSection((section) => (section === "mode" ? null : "mode"))}
                 >
-                  {layoutMode === "slots" ? <DefaultModeSettings /> : <GraphModeSettings />}
+                  <DefaultModeSettings />
                 </CoreSection>
               </>
             ) : (
-              <WidgetManagerTab layoutMode={layoutMode} />
+              <WidgetManagerTab />
             )}
           </motion.div>
         )}
@@ -202,7 +169,7 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
   );
 }
 
-function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
+function WidgetManagerTab() {
   const [widgetFilter, setWidgetFilter] = useState<WidgetFilter>("all");
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const registeredIds = registryIds().filter((id) => getManifest(id));
@@ -216,7 +183,6 @@ function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
     <div className="hub-core-tab-content">
       <div className="hub-core-tab-head">
         <span className="wset-title">widget manager</span>
-        <span className="hub-core-tab-meta">{layoutMode === "slots" ? "default layout" : "graph layout"}</span>
       </div>
       <WidgetImportBar />
       <div className="hub-widget-filter-tabs" role="tablist" aria-label="widget category">
@@ -235,11 +201,7 @@ function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
         ))}
       </div>
       <div className="hub-widget-scroll" role="region" aria-label="widget manager list">
-        {layoutMode === "slots" ? (
-          <SlotWidgetControls filter={widgetFilter} />
-        ) : (
-          <GraphWidgetControls filter={widgetFilter} />
-        )}
+        <SlotWidgetControls filter={widgetFilter} />
       </div>
     </div>
   );
@@ -479,85 +441,6 @@ function SlotWidgetControls({ filter }: { filter: WidgetFilter }) {
           );
         }}
       />
-    </div>
-  );
-}
-
-function GraphWidgetControls({ filter }: { filter: WidgetFilter }) {
-  const { layout, updateInstance, addWidget } = useLayout();
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
-  const byId = new Map(layout.widgets.map((w) => [w.id, w]));
-  const tracked = registryIds().filter((id) => byId.has(id));
-  const untracked = registryIds().filter((id) => !byId.has(id));
-  const onScreen = tracked
-    .filter((id) => !byId.get(id)!.hidden)
-    .filter((id) => matchesWidgetFilter(id, filter, customIds));
-  const available = [...tracked.filter((id) => byId.get(id)!.hidden), ...untracked].filter(
-    (id) => getManifest(id) && matchesWidgetFilter(id, filter, customIds),
-  );
-
-  async function deleteCustomWidget(id: string) {
-    if (!customIds.has(id) || deletingId) return;
-    setDeletingId(id);
-    if (byId.has(id)) updateInstance(id, { hidden: true });
-    try {
-      await fetch("/api/widget-creator/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-    } finally {
-      setDeletingId(null);
-    }
-  }
-
-  return (
-    <div className="hub-widget-panel">
-      <HubWidgetList
-        heading={`on screen · ${onScreen.length}`}
-        ids={onScreen}
-        empty={widgetEmptyText(filter, "no widgets visible", "no system widgets visible", "no custom widgets visible")}
-        actionFor={(id) => (
-          <HubWidgetActions
-            id={id}
-            manifest={getManifest(id)}
-            isCustom={customIds.has(id)}
-            deleting={deletingId === id}
-            onDelete={deleteCustomWidget}
-            primaryLabel="hide widget"
-            primaryTitle="hide widget"
-            onPrimary={() => updateInstance(id, { hidden: true })}
-            primaryIcon={<Minus size={13} strokeWidth={2} />}
-          />
-        )}
-      />
-      <HubWidgetList
-        heading={`available · ${available.length}`}
-        ids={available}
-        empty={widgetEmptyText(filter, "every widget is on screen", "every system widget is on screen", "no custom widgets available")}
-        actionFor={(id) => (
-          <HubWidgetActions
-            id={id}
-            manifest={getManifest(id)}
-            isCustom={customIds.has(id)}
-            deleting={deletingId === id}
-            onDelete={deleteCustomWidget}
-            primaryLabel="show widget"
-            primaryTitle="show widget"
-            onPrimary={() => (byId.has(id) ? updateInstance(id, { hidden: false }) : addWidget(id))}
-            primaryIcon={<Plus size={13} strokeWidth={2} />}
-          />
-        )}
-      />
-    </div>
-  );
-}
-
-function GraphModeSettings() {
-  return (
-    <div className="hub-core-placeholder">
-      no graph-mode settings yet — widget size and orientation are configured per-widget via each card&rsquo;s gear menu.
     </div>
   );
 }

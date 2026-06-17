@@ -1,0 +1,248 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - button "enter edit mode" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+        - button "open avn hub core settings" [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+        - button "open widget manager" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - generic [ref=e29]:
+            - generic [ref=e30]:
+              - img [ref=e31]
+              - text: clock & date
+            - generic [ref=e34]: 18:19:04
+            - generic [ref=e35]: Wednesday, June 17 2026
+            - generic [ref=e37]:
+              - generic [ref=e38]: sunrise 05:12
+              - generic [ref=e39]: dusk
+              - generic [ref=e40]: sunset 19:48
+            - generic [ref=e41]:
+              - button "Play lofi radio" [ref=e42] [cursor=pointer]:
+                - img [ref=e43]
+              - generic [ref=e51]: lofi hip-hop radio
+            - generic [ref=e52]:
+              - button "light" [ref=e53] [cursor=pointer]:
+                - img [ref=e54]
+                - text: light
+              - button "auto" [ref=e60] [cursor=pointer]:
+                - img [ref=e61]
+                - text: auto
+              - button "dark" [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - text: dark
+            - generic [ref=e345]:
+              - generic [ref=e347]: Jun 2026
+              - generic [ref=e348]:
+                - generic [ref=e349]: S
+                - generic [ref=e350]: M
+                - generic [ref=e351]: T
+                - generic [ref=e352]: W
+                - generic [ref=e353]: T
+                - generic [ref=e354]: F
+                - generic [ref=e355]: S
+                - generic [ref=e357]: "1"
+                - generic [ref=e358]: "2"
+                - generic [ref=e359]: "3"
+                - generic [ref=e360]: "4"
+                - generic [ref=e361]: "5"
+                - generic [ref=e362]: "6"
+                - generic [ref=e363]: "7"
+                - generic [ref=e364]: "8"
+                - generic [ref=e365]: "9"
+                - generic [ref=e366]: "10"
+                - generic [ref=e367]: "11"
+                - generic [ref=e368]: "12"
+                - generic [ref=e369]: "13"
+                - generic [ref=e370]: "14"
+                - generic [ref=e371]: "15"
+                - generic [ref=e372]: "16"
+                - generic [ref=e373]: "17"
+                - generic [ref=e374]: "18"
+                - generic [ref=e375]: "19"
+                - generic [ref=e376]: "20"
+                - generic [ref=e377]: "21"
+                - generic [ref=e378]: "22"
+                - generic [ref=e379]: "23"
+                - generic [ref=e380]: "24"
+                - generic [ref=e381]: "25"
+                - generic [ref=e382]: "26"
+                - generic [ref=e383]: "27"
+                - generic [ref=e384]: "28"
+                - generic [ref=e385]: "29"
+                - generic [ref=e386]: "30"
+          - generic [ref=e70]:
+            - generic [ref=e71]:
+              - img [ref=e387]
+              - text: now playing
+            - generic [ref=e392]:
+              - generic [ref=e394]:
+                - generic [ref=e395]: Go Easy
+                - generic [ref=e396]: Matt Maeson · 3h ago
+              - generic [ref=e397]:
+                - button "previous track" [ref=e398] [cursor=pointer]:
+                  - img [ref=e399]
+                - button "play" [ref=e401] [cursor=pointer]:
+                  - img [ref=e402]
+                - button "next track" [ref=e404] [cursor=pointer]:
+                  - img [ref=e405]
+            - generic [ref=e408]:
+              - generic [ref=e409]: Recently Played / Queue
+              - button "Sinner Andy Grammer" [ref=e410] [cursor=pointer]:
+                - generic [ref=e411]: Sinner
+                - generic [ref=e412]: Andy Grammer
+              - button "don't worry, you will lovelytheband" [ref=e413] [cursor=pointer]:
+                - generic [ref=e414]: don't worry, you will
+                - generic [ref=e415]: lovelytheband
+              - button "Back Home Andy Grammer" [ref=e416] [cursor=pointer]:
+                - generic [ref=e417]: Back Home
+                - generic [ref=e418]: Andy Grammer
+              - button "I'm Born To Run American Authors" [ref=e419] [cursor=pointer]:
+                - generic [ref=e420]: I'm Born To Run
+                - generic [ref=e421]: American Authors
+        - generic [ref=e158]:
+          - generic [ref=e161]:
+            - generic [ref=e162]:
+              - img [ref=e163]
+              - text: nutbot v2.0
+            - generic [ref=e166]:
+              - generic [ref=e167]:
+                - generic [ref=e168]:
+                  - button "log" [ref=e169] [cursor=pointer]
+                  - button "shell 1" [ref=e170] [cursor=pointer]:
+                    - text: shell 1
+                    - img [ref=e171]
+                  - button "creator" [ref=e174] [cursor=pointer]
+                  - button "new shell tab" [ref=e175] [cursor=pointer]:
+                    - img [ref=e176]
+                - button "select harness" [ref=e178] [cursor=pointer]:
+                  - text: ⚡ claude
+                  - img [ref=e180]
+                - button "NutBot" [ref=e183] [cursor=pointer]:
+                  - generic [ref=e184]:
+                    - img [ref=e188]
+                    - generic [ref=e195]: NUT-B0T
+              - generic [ref=e197]:
+                - generic [ref=e424]: "[ok] homelab uplink ... stable"
+                - generic [ref=e425]: "[ok] github.sync ... up to date"
+                - generic [ref=e426]: "[ok] jellyfin ... 2 active sessions"
+                - generic [ref=e427]: "[info] nutbot v1.5 idle, awaiting input..."
+          - generic [ref=e198]:
+            - generic [ref=e200]:
+              - generic [ref=e201]:
+                - img [ref=e202]
+                - text: identity
+              - generic [ref=e206]:
+                - generic [ref=e207]:
+                  - generic [ref=e208]:
+                    - img [ref=e209]
+                    - generic [ref=e213]: AVN
+                  - generic [ref=e214]:
+                    - generic [ref=e215]: AVN Hub
+                    - generic [ref=e216]: front page to your life
+                  - generic [ref=e217]:
+                    - link "github" [ref=e218] [cursor=pointer]:
+                      - /url: https://github.com/Zohaib2244
+                      - img [ref=e219]
+                      - text: github
+                    - generic [ref=e222]: ·
+                    - link "homelab" [ref=e223] [cursor=pointer]:
+                      - /url: "#homelab"
+                      - img [ref=e224]
+                      - text: homelab
+                    - generic [ref=e227]: ·
+                    - generic [ref=e228]: 8h 40m uptime
+                - generic [ref=e230]:
+                  - 'button "Theme: dark — switch to light" [ref=e231] [cursor=pointer]':
+                    - img [ref=e232]
+                  - generic [ref=e234]: live
+            - generic [ref=e238]:
+              - generic [ref=e240]:
+                - generic [ref=e241]:
+                  - img [ref=e242]
+                  - text: github activity
+                - generic [ref=e244]: —
+              - generic [ref=e245]: —
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - button "commits" [ref=e248] [cursor=pointer]
+                  - button "repos" [ref=e249] [cursor=pointer]
+                - generic [ref=e250]: no recent commits
+        - generic [ref=e251]:
+          - generic [ref=e254]:
+            - generic [ref=e255]:
+              - generic [ref=e256]:
+                - generic [ref=e257]: Last played
+                - generic [ref=e428]:
+                  - generic [ref=e429]: TEKKEN 8
+                  - generic [ref=e430]: 10.9h recent
+                - button "View Library" [ref=e431] [cursor=pointer]:
+                  - img [ref=e432]
+                  - text: View Library
+              - generic [ref=e261]:
+                - generic [ref=e262]:
+                  - generic [ref=e263]: Online Status
+                  - generic [ref=e434]: offline
+                - generic [ref=e264]:
+                  - img "steam avatar" [ref=e436]
+                  - generic [ref=e266]: halalInsaan
+                - button "copy steam friend code" [ref=e437] [cursor=pointer]:
+                  - img [ref=e438]
+                  - text: copy friend code
+            - generic [ref=e267]:
+              - generic [ref=e268]: last 2 weeks
+              - generic [ref=e441]:
+                - generic: Forza Horizon 6
+                - generic [ref=e442]: 19.2h · 90h total
+              - generic [ref=e443]:
+                - generic: TEKKEN 8
+                - generic [ref=e444]: 10.9h · 183.8h total
+              - generic [ref=e445]:
+                - generic: Wallpaper Engine
+                - generic [ref=e446]: 0.1h · 79.8h total
+          - generic [ref=e271]:
+            - generic [ref=e272]:
+              - img [ref=e273]
+              - text: a very nutty home server
+            - generic [ref=e276]: 99.0%
+            - generic [ref=e447]:
+              - generic [ref=e448]: immich
+              - generic [ref=e450]: jellyfin
+              - generic [ref=e452]: jellyseerr
+              - generic [ref=e454]: radarr
+              - generic [ref=e456]: sonarr
+              - generic [ref=e458]: jackett
+              - generic [ref=e460]: qbittorrent
+              - generic [ref=e462]: nextcloud
+            - generic [ref=e277]:
+              - generic [ref=e278]: services
+              - generic [ref=e464]:
+                - generic [ref=e465]: immich
+                - generic [ref=e466]: 99.9%
+              - generic [ref=e467]:
+                - generic [ref=e468]: jellyfin
+                - generic [ref=e469]: 99.8%
+              - generic [ref=e470]:
+                - generic [ref=e471]: jellyseerr
+                - generic [ref=e472]: 99.7%
+              - generic [ref=e473]:
+                - generic [ref=e474]: radarr
+                - generic [ref=e475]: 99.6%
+              - generic [ref=e476]:
+                - generic [ref=e477]: sonarr
+                - generic [ref=e478]: 99.9%
+              - generic [ref=e479]:
+                - generic [ref=e480]: jackett
+                - generic [ref=e481]: 94.2%
+              - generic [ref=e482]:
+                - generic [ref=e483]: qbittorrent
+                - generic [ref=e484]: 99.4%
+              - generic [ref=e485]:
+                - generic [ref=e486]: nextcloud
+                - generic [ref=e487]: 99.9%
+  - button "Open Next.js Dev Tools" [ref=e340] [cursor=pointer]:
+    - img [ref=e341]
+  - alert [ref=e488]

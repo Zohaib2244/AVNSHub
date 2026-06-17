@@ -168,7 +168,7 @@ export function SlotDashboard() {
   return (
     <div className="mx-auto max-w-[1800px] px-5 py-6">
       <div className="frame frame-with-tabs">
-        <HubCorePanel slotMode />
+        <HubCorePanel />
         <div className="frame-inner">
           <div ref={frameRef} className="slot-frame" style={frameStyle}>
             <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} />
