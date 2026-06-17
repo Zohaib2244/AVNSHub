@@ -13,8 +13,12 @@ import type { LucideIcon } from "lucide-react";
 import type { WidgetManifest, SettingsField } from "./widgets";
 import registry from "./customRegistry.json";
 import { CUSTOM_COMPONENT_MAP } from "./customComponentMap";
+import { IframeWidget } from "@/components/widgets/default/system/IframeWidget";
 
 type RegistryEntry = {
+  /** "iframe" — content lives in /public/custom-widgets/<id>/index.html, no React code needed.
+   *  Omit (or any other value) → compiled React component from CUSTOM_COMPONENT_MAP. */
+  type?: "iframe";
   title: string;
   iconName: string;
   sizes: WidgetManifest["sizes"];
@@ -35,7 +39,7 @@ export const CUSTOM_WIDGETS: Record<string, WidgetManifest> = Object.fromEntries
       id,
       title: meta.title,
       icon: iconLib[meta.iconName] ?? Icons.Box,
-      component: CUSTOM_COMPONENT_MAP[id] ?? fallback,
+      component: meta.type === "iframe" ? IframeWidget : (CUSTOM_COMPONENT_MAP[id] ?? fallback),
       sizes: meta.sizes,
       orientations: meta.orientations,
       defaults: meta.defaults,

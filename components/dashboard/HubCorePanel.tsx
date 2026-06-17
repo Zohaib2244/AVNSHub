@@ -41,6 +41,13 @@ const LAYOUT_MODE_OPTIONS: { mode: LayoutMode; label: string }[] = [
 const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
 type HubCoreTab = "settings" | "widgets";
 type HubSettingsSection = "avn" | "mode";
+type WidgetFilter = "all" | "system" | "custom";
+
+const WIDGET_FILTER_OPTIONS: { filter: WidgetFilter; label: string }[] = [
+  { filter: "all", label: "all" },
+  { filter: "system", label: "system" },
+  { filter: "custom", label: "custom" },
+];
 
 function registryIds() {
   const ids: string[] = [];
@@ -52,6 +59,18 @@ function registryIds() {
 
 function regionShortLabel(region: SlotRegionId) {
   return REGION_LABELS[region].replace(" grid", "");
+}
+
+function matchesWidgetFilter(id: string, filter: WidgetFilter, customIds: Set<string>) {
+  if (filter === "all") return true;
+  const custom = customIds.has(id);
+  return filter === "custom" ? custom : !custom;
+}
+
+function widgetEmptyText(filter: WidgetFilter, allText: string, systemText: string, customText: string) {
+  if (filter === "system") return systemText;
+  if (filter === "custom") return customText;
+  return allText;
 }
 
 export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
@@ -184,6 +203,15 @@ export function HubCorePanel({ slotMode = false }: { slotMode?: boolean }) {
 }
 
 function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
+  const [widgetFilter, setWidgetFilter] = useState<WidgetFilter>("all");
+  const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
+  const registeredIds = registryIds().filter((id) => getManifest(id));
+  const counts = {
+    all: registeredIds.length,
+    system: registeredIds.filter((id) => !customIds.has(id)).length,
+    custom: registeredIds.filter((id) => customIds.has(id)).length,
+  } satisfies Record<WidgetFilter, number>;
+
   return (
     <div className="hub-core-tab-content">
       <div className="hub-core-tab-head">
@@ -191,8 +219,27 @@ function WidgetManagerTab({ layoutMode }: { layoutMode: LayoutMode }) {
         <span className="hub-core-tab-meta">{layoutMode === "slots" ? "default layout" : "graph layout"}</span>
       </div>
       <WidgetImportBar />
+      <div className="hub-widget-filter-tabs" role="tablist" aria-label="widget category">
+        {WIDGET_FILTER_OPTIONS.map(({ filter, label }) => (
+          <button
+            key={filter}
+            type="button"
+            role="tab"
+            aria-selected={widgetFilter === filter}
+            className={`hub-widget-filter-tab${widgetFilter === filter ? " active" : ""}`}
+            onClick={() => setWidgetFilter(filter)}
+          >
+            {label}
+            <span>{counts[filter]}</span>
+          </button>
+        ))}
+      </div>
       <div className="hub-widget-scroll" role="region" aria-label="widget manager list">
-        {layoutMode === "slots" ? <SlotWidgetControls /> : <GraphWidgetControls />}
+        {layoutMode === "slots" ? (
+          <SlotWidgetControls filter={widgetFilter} />
+        ) : (
+          <GraphWidgetControls filter={widgetFilter} />
+        )}
       </div>
     </div>
   );
@@ -324,19 +371,22 @@ function DefaultModeSettings() {
   );
 }
 
-function SlotWidgetControls() {
+function SlotWidgetControls({ filter }: { filter: WidgetFilter }) {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
-  const placedRows = [
+  const allPlacedRows = [
     ...slotLayout.widgets.map((w) => ({ id: w.id, location: regionShortLabel(w.region), terminal: false })),
     ...(slotLayout.terminalWidgetId
       ? [{ id: slotLayout.terminalWidgetId, location: "terminal", terminal: true }]
       : []),
   ].filter((row) => getManifest(row.id));
-  const placedIds = new Set(placedRows.map((row) => row.id));
-  const availableIds = registryIds().filter((id) => !placedIds.has(id) && getManifest(id));
+  const placedRows = allPlacedRows.filter((row) => matchesWidgetFilter(row.id, filter, customIds));
+  const placedIds = new Set(allPlacedRows.map((row) => row.id));
+  const availableIds = registryIds().filter(
+    (id) => !placedIds.has(id) && getManifest(id) && matchesWidgetFilter(id, filter, customIds),
+  );
 
   async function deleteCustomWidget(id: string) {
     if (!customIds.has(id) || deletingId) return;
@@ -364,7 +414,7 @@ function SlotWidgetControls() {
         heading={`placed · ${placedRows.length}`}
         ids={placedRows.map((row) => row.id)}
         metaFor={(id) => placedRows.find((row) => row.id === id)?.location}
-        empty="no widgets placed"
+        empty={widgetEmptyText(filter, "no widgets placed", "no system widgets placed", "no custom widgets placed")}
         actionFor={(id) => (
           <HubWidgetActions
             id={id}
@@ -385,7 +435,7 @@ function SlotWidgetControls() {
       <HubWidgetList
         heading={`available · ${availableIds.length}`}
         ids={availableIds}
-        empty="all widgets are placed"
+        empty={widgetEmptyText(filter, "all widgets are placed", "all system widgets are placed", "no custom widgets available")}
         actionFor={(id) => {
           const fitRegions = getRegionsThatFitWidget(id, slotLayout);
           const open = addingId === id;
@@ -433,15 +483,19 @@ function SlotWidgetControls() {
   );
 }
 
-function GraphWidgetControls() {
+function GraphWidgetControls({ filter }: { filter: WidgetFilter }) {
   const { layout, updateInstance, addWidget } = useLayout();
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const byId = new Map(layout.widgets.map((w) => [w.id, w]));
   const tracked = registryIds().filter((id) => byId.has(id));
   const untracked = registryIds().filter((id) => !byId.has(id));
-  const onScreen = tracked.filter((id) => !byId.get(id)!.hidden);
-  const available = [...tracked.filter((id) => byId.get(id)!.hidden), ...untracked].filter((id) => getManifest(id));
+  const onScreen = tracked
+    .filter((id) => !byId.get(id)!.hidden)
+    .filter((id) => matchesWidgetFilter(id, filter, customIds));
+  const available = [...tracked.filter((id) => byId.get(id)!.hidden), ...untracked].filter(
+    (id) => getManifest(id) && matchesWidgetFilter(id, filter, customIds),
+  );
 
   async function deleteCustomWidget(id: string) {
     if (!customIds.has(id) || deletingId) return;
@@ -463,7 +517,7 @@ function GraphWidgetControls() {
       <HubWidgetList
         heading={`on screen · ${onScreen.length}`}
         ids={onScreen}
-        empty="no widgets visible"
+        empty={widgetEmptyText(filter, "no widgets visible", "no system widgets visible", "no custom widgets visible")}
         actionFor={(id) => (
           <HubWidgetActions
             id={id}
@@ -481,7 +535,7 @@ function GraphWidgetControls() {
       <HubWidgetList
         heading={`available · ${available.length}`}
         ids={available}
-        empty="every widget is on screen"
+        empty={widgetEmptyText(filter, "every widget is on screen", "every system widget is on screen", "no custom widgets available")}
         actionFor={(id) => (
           <HubWidgetActions
             id={id}

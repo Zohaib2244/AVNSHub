@@ -7,6 +7,7 @@ import { LayoutProvider } from "@/components/dashboard/LayoutProvider";
 import { Dashboard } from "@/components/dashboard/Dashboard";
 import { SlotDashboard } from "@/components/dashboard/SlotDashboard";
 import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
+import { ThemeRuntimeSync } from "@/components/dashboard/ThemeRuntimeSync";
 import { getLayoutMode, getServerLayoutMode, subscribeLayoutMode } from "@/lib/layoutMode";
 
 export default function Home() {
@@ -14,6 +15,7 @@ export default function Home() {
 
   return (
     <main className="relative min-h-screen w-full">
+      <ThemeRuntimeSync />
       <BootSequence />
       <GlyphStrip />
 

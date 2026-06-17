@@ -31,7 +31,7 @@ different markup per size** (see [Per-size UI](#per-size-ui-the-core-feature)).
 
 ## 1. Anatomy
 
-```
+```text
 config/widgets.tsx          ← the registry: WIDGETS map + DEFAULT_ORDER
 components/<YourWidget>.tsx  ← your content component (data + markup only)
 ```
@@ -309,6 +309,156 @@ Slot Layout uses `placeWidget(id, region)` / `removeWidget(id)` from
 - [ ] Colors/spacing use CSS variables / existing classes — no hard-coded hex.
 - [ ] Added to `DEFAULT_ORDER`.
 - [ ] `npx tsc --noEmit` and `npx eslint` are clean.
+
+---
+
+## Iframe widgets (LLM / no-rebuild path)
+
+Iframe widgets let you add content without touching any React or TypeScript code.
+The widget renders in a sandboxed `<iframe>` — you write one HTML file and one
+JSON entry, nothing else. **No bundler step, no restart.**
+
+### What to create
+
+```text
+public/custom-widgets/<id>/
+  index.html       ← your entire widget (HTML + inline CSS + inline/linked JS)
+```
+
+Add one entry to [`config/customRegistry.json`](../config/customRegistry.json):
+
+```json
+"my-widget": {
+  "type": "iframe",
+  "title": "My Widget",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" }
+}
+```
+
+That is the complete installation. The widget appears in the Hub widget manager
+automatically. No other file needs to change.
+
+### What NOT to touch
+
+When creating or generating an iframe widget, **never modify**:
+
+- `config/widgets.tsx`
+- `config/customComponentMap.tsx`
+- `components/framework/` (any file)
+- `components/widgets/default/` (any file)
+- `lib/` (any file)
+- `app/` (any file)
+- `styles/globals.css`
+
+Touching any of those can break the core hub. The only two files an iframe widget
+ever needs are `index.html` + the `customRegistry.json` entry.
+
+### Receiving theme tokens
+
+The host sends a `NUTMAG_THEME` message immediately after the iframe loads and
+again whenever the user changes theme or palette. Apply the tokens as CSS variables:
+
+```html
+<script>
+  window.addEventListener("message", (e) => {
+    if (e.data?.type !== "NUTMAG_THEME") return;
+    const root = document.documentElement;
+    for (const [name, value] of Object.entries(e.data.tokens)) {
+      root.style.setProperty(name, value);
+    }
+    root.dataset.mode = e.data.mode;       // "dark" | "light"
+    root.dataset.palette = e.data.palette; // "ember" | "slate" | "moss" | "plum"
+  });
+</script>
+```
+
+Token names match the design system exactly: `--bg-card`, `--text-primary`,
+`--accent-orange`, `--accent-cyan`, `--border`, `--shadow`, etc. Use them in
+your CSS — never hard-code hex values.
+
+### Receiving size and settings
+
+The host sends `NUTMAG_CONTEXT` on load and whenever the user resizes the widget
+or changes its settings in the gear popover:
+
+```js
+window.addEventListener("message", (e) => {
+  if (e.data?.type !== "NUTMAG_CONTEXT") return;
+  const { size, settings } = e.data;
+  // size: "S" | "M" | "L"
+  // settings: { [key]: value } — values from the manifest settings schema
+  render(size, settings);
+});
+```
+
+### Reporting height
+
+If your content has a dynamic height, tell the host so the card resizes:
+
+```js
+function reportHeight() {
+  window.parent.postMessage(
+    { type: "NUTMAG_RESIZE", height: document.body.scrollHeight },
+    window.location.origin,
+  );
+}
+// call after initial render and after any content change
+```
+
+If you don't send `NUTMAG_RESIZE`, the iframe defaults to 128px tall. Set a
+fixed height in your CSS if your content is a known size.
+
+### Fetching data
+
+Since the iframe is same-origin, you can call any of the hub's API routes directly:
+
+```js
+const res = await fetch("/api/now-playing");
+const data = await res.json();
+```
+
+### Minimal template
+
+```html
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    :root { --bg-card: #1e1a14; --text-primary: #e8dfc8; }
+    body { margin: 0; padding: 12px; background: var(--bg-card); color: var(--text-primary);
+           font-family: monospace; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <div id="root">loading…</div>
+  <script>
+    window.addEventListener("message", (e) => {
+      if (e.data?.type === "NUTMAG_THEME") {
+        for (const [k, v] of Object.entries(e.data.tokens))
+          document.documentElement.style.setProperty(k, v);
+      }
+      if (e.data?.type === "NUTMAG_CONTEXT") {
+        // e.data.size, e.data.settings
+      }
+    });
+
+    async function init() {
+      // fetch data, build DOM …
+      document.getElementById("root").textContent = "hello from iframe";
+      window.parent.postMessage(
+        { type: "NUTMAG_RESIZE", height: document.body.scrollHeight },
+        window.location.origin,
+      );
+    }
+    init();
+  </script>
+</body>
+</html>
+```
 
 ---
 

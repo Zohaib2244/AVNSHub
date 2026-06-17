@@ -39,6 +39,20 @@ export function applyTheme() {
   }
 }
 
+export function applyPalette() {
+  const id = getPalette();
+  if (id === DEFAULT_PALETTE) {
+    delete document.documentElement.dataset.palette;
+  } else {
+    document.documentElement.dataset.palette = id;
+  }
+}
+
+export function applyThemeSettings() {
+  applyTheme();
+  applyPalette();
+}
+
 export function setThemeMode(mode: ThemeMode) {
   localStorage.setItem(STORAGE_KEY, mode);
   applyTheme();
@@ -56,12 +70,7 @@ export function getServerPalette(): PaletteId {
 
 export function setPalette(id: PaletteId) {
   localStorage.setItem(PALETTE_KEY, id);
-  // the default palette is the attribute-less :root tokens
-  if (id === DEFAULT_PALETTE) {
-    delete document.documentElement.dataset.palette;
-  } else {
-    document.documentElement.dataset.palette = id;
-  }
+  applyPalette();
   listeners.forEach((listener) => listener());
 }
 

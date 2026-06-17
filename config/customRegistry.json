@@ -40,13 +40,13 @@
       }
     ]
   },
-  "spotify-visualizer": {
-    "title": "spotify visualizer",
-    "iconName": "AudioLines",
+  "slideshow": {
+    "title": "slideshow",
+    "iconName": "Tv",
     "sizes": [
-      "S",
       "M",
-      "L"
+      "L",
+      "S"
     ],
     "orientations": [
       "h"
@@ -57,72 +57,46 @@
     },
     "settings": [
       {
-        "key": "style",
-        "label": "style",
-        "type": "select",
-        "default": "bars",
-        "options": [
-          {
-            "value": "bars",
-            "label": "bars"
-          },
-          {
-            "value": "wave",
-            "label": "wave"
-          },
-          {
-            "value": "pulse",
-            "label": "pulse"
-          }
-        ]
+        "key": "hoverExpand",
+        "label": "slot hover expand",
+        "type": "toggle",
+        "default": true
       },
       {
-        "key": "scheme",
-        "label": "color",
-        "type": "select",
-        "default": "duotone",
-        "options": [
-          {
-            "value": "duotone",
-            "label": "duotone"
-          },
-          {
-            "value": "orange",
-            "label": "orange"
-          },
-          {
-            "value": "cyan",
-            "label": "cyan"
-          }
-        ]
+        "key": "autoplay",
+        "label": "autoplay",
+        "type": "toggle",
+        "default": true
       },
       {
-        "key": "intensity",
-        "label": "intensity",
-        "type": "select",
-        "default": "medium",
-        "options": [
-          {
-            "value": "low",
-            "label": "low"
-          },
-          {
-            "value": "medium",
-            "label": "medium"
-          },
-          {
-            "value": "high",
-            "label": "high"
-          }
-        ]
-      },
-      {
-        "key": "bars",
-        "label": "bar count",
+        "key": "intervalSec",
+        "label": "slide seconds",
         "type": "number",
-        "default": 24,
-        "min": 6,
-        "max": 64
+        "default": 5,
+        "min": 2,
+        "max": 20
+      },
+      {
+        "key": "fit",
+        "label": "image fit",
+        "type": "select",
+        "default": "cover",
+        "options": [
+          {
+            "value": "cover",
+            "label": "cover"
+          },
+          {
+            "value": "contain",
+            "label": "contain"
+          }
+        ]
+      },
+      {
+        "key": "showCaptions",
+        "label": "captions",
+        "type": "toggle",
+        "default": true
       }
     ]
   }
