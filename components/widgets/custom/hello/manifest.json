@@ -1,0 +1,47 @@
+{
+  "title": "hello",
+  "iconName": "MessageCircle",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "name",
+      "label": "name",
+      "type": "text",
+      "default": "friend",
+      "placeholder": "friend"
+    },
+    {
+      "key": "greeting",
+      "label": "greeting",
+      "type": "text",
+      "default": "hello",
+      "placeholder": "hello"
+    },
+    {
+      "key": "note",
+      "label": "note",
+      "type": "text",
+      "default": "welcome back to the hub",
+      "placeholder": "welcome back"
+    },
+    {
+      "key": "tone",
+      "label": "tone",
+      "type": "select",
+      "default": "warm",
+      "options": [
+        { "value": "warm", "label": "warm" },
+        { "value": "focus", "label": "focus" },
+        { "value": "bright", "label": "bright" }
+      ]
+    },
+    {
+      "key": "showDetails",
+      "label": "details",
+      "type": "toggle",
+      "default": true
+    }
+  ]
+}

@@ -2,13 +2,12 @@
 import "./NutBotFaceWidget.css";
 
 // NutBot, per size:
-//   S / M → the animated face plus a one-line status ticker
-//   L     → the full interactive terminal (NutBotTerminal)
-// Resize the widget up to reach the terminal; there's no overlay/expansion.
+//   S / M → animated SVG robot face + one-line status ticker
+//   L     → full interactive terminal (NutBotTerminal)
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { NutBotFace } from "@/components/widgets/default/nutbot/NutBotFace";
+import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { LOG_MESSAGES, NutBotTerminal } from "@/components/widgets/default/nutbot/NutBotTerminal";
 import { useWidget } from "@/components/framework/WidgetContext";
 
@@ -31,7 +30,9 @@ export function NutBotFaceWidget() {
 
   return (
     <div className="nutbot-mini">
-      <NutBotFace />
+      <div className={`nutbot-v2-scale nutbot-v2-scale-${size.toLowerCase()}`}>
+        <NutBotFaceV2 compact={size === "S"} />
+      </div>
       <div className="nutbot-mini-ticker" aria-live="off">
         <AnimatePresence mode="wait" initial={false}>
           <motion.span

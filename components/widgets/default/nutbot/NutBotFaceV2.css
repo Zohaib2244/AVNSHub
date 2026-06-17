@@ -1,0 +1,147 @@
+/* ─── NutBot v2.0 — SVG robot face ───────────────────────────────────── */
+
+/* ── Body + animations ───────────────────────────────────────────────── */
+.nutbot-v2-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  filter: drop-shadow(6px 6px 0 #070604);
+  animation: nutbot-v2-float 3.2s ease-in-out infinite;
+}
+@keyframes nutbot-v2-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+
+.nutbot-v2-body.bounce { animation: nutbot-v2-bounce .38s ease-in-out infinite; }
+@keyframes nutbot-v2-bounce { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-14px) rotate(2deg)} }
+
+.nutbot-v2-body.tilt   { animation: nutbot-v2-tilt 2.2s ease-in-out infinite; }
+@keyframes nutbot-v2-tilt   { 0%,100%{transform:rotate(-3deg) translateY(-3px)} 50%{transform:rotate(3deg) translateY(-3px)} }
+
+.nutbot-v2-body.shake  { animation: nutbot-v2-shake .1s linear infinite; }
+@keyframes nutbot-v2-shake  { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px) rotate(-1deg)} 75%{transform:translateX(6px) rotate(1deg)} }
+
+.nutbot-v2-body.pulse  { animation: nutbot-v2-pulse 1.4s ease-in-out infinite; }
+@keyframes nutbot-v2-pulse  { 0%,100%{transform:translateY(-4px) scale(1)} 50%{transform:translateY(-9px) scale(1.03)} }
+
+/* click boop — quick squish + tilt, overrides the idle float for 280ms */
+.nutbot-v2-body.boop  { animation: nutbot-v2-boop 0.26s ease-out forwards; }
+@keyframes nutbot-v2-boop {
+  0%   { transform: scale(1)    rotate(0deg); }
+  18%  { transform: scale(0.86) rotate(-5deg); }
+  52%  { transform: scale(1.07) rotate(4deg); }
+  78%  { transform: scale(0.97) rotate(-1deg); }
+  100% { transform: scale(1)    rotate(0deg); }
+}
+
+/* ── Monitor ─────────────────────────────────────────────────────────── */
+.nutbot-v2-monitor {
+  position: relative;
+  width: 200px;
+  background: linear-gradient(145deg, #eae4da 0%, #cdc7bb 55%, #bcb6aa 100%);
+  border: 3px solid #9c907e;
+  border-radius: 22px 22px 14px 14px;
+  padding: 12px 12px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+}
+.nutbot-v2-monitor::before {
+  content: '';
+  position: absolute; inset: 4px;
+  border-radius: 17px 17px 10px 10px;
+  border-top: 1.5px solid rgba(255,255,255,.32);
+  border-left: 1.5px solid rgba(255,255,255,.18);
+  pointer-events: none;
+}
+
+/* ── Side ears ───────────────────────────────────────────────────────── */
+.nutbot-v2-ear {
+  position: absolute; top: 46%; transform: translateY(-50%);
+  width: 10px; height: 26px;
+  background: linear-gradient(90deg, #b8b2a6, #ccc6ba);
+  border: 2px solid #9c907e; border-radius: 3px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+}
+.ear-l { left:  -11px; }
+.ear-r { right: -11px; }
+
+/* ── Screen ──────────────────────────────────────────────────────────── */
+.nutbot-v2-screen {
+  width: 100%; height: 122px;
+  background: #040302;
+  border-radius: 11px;
+  border: 2.5px solid #504840;
+  overflow: hidden;
+  position: relative;
+  box-shadow: inset 0 0 30px rgba(0,180,200,.05);
+  transition: box-shadow .35s;
+}
+.nutbot-v2-screen.gc { box-shadow: inset 0 0 30px rgba(0,180,200,.14); }
+.nutbot-v2-screen.go { box-shadow: inset 0 0 30px rgba(255,107,43,.18); }
+.nutbot-v2-screen.gr { box-shadow: inset 0 0 30px rgba(255,50,50,.24); }
+.nutbot-v2-screen.gp { box-shadow: inset 0 0 30px rgba(255,107,138,.18); }
+
+/* ── Monitor foot ────────────────────────────────────────────────────── */
+.nutbot-v2-mfoot {
+  width: 100%;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 4px;
+}
+.nutbot-v2-vents { display: flex; gap: 4px; }
+.nutbot-v2-vent  {
+  width: 13px; height: 4px;
+  background: #9c907e; border-radius: 2px;
+  box-shadow: inset 0 1px 0 rgba(0,0,0,.2);
+}
+.nutbot-v2-model-tag {
+  font-size: .5rem; letter-spacing: .18em; color: #9c907e;
+  text-transform: uppercase;
+  font-family: var(--font-dot-gothic), monospace;
+}
+.nutbot-v2-mled {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #00b4c8; box-shadow: 0 0 6px #00b4c8;
+  transition: background .3s, box-shadow .3s; flex-shrink: 0;
+}
+.nutbot-v2-mled.off   { background: #2a2418; box-shadow: none; }
+.nutbot-v2-mled.red   { background: #ff4040; box-shadow: 0 0 6px #ff4040; }
+.nutbot-v2-mled.amber { background: #ff8800; box-shadow: 0 0 6px #ff8800; }
+.nutbot-v2-mled.pink  { background: #ff6b8a; box-shadow: 0 0 6px #ff6b8a; }
+
+/* ── Neck ────────────────────────────────────────────────────────────── */
+.nutbot-v2-neck {
+  width: 48px; height: 14px;
+  background: linear-gradient(180deg, #ccc6ba, #b8b2a6);
+  border: 2.5px solid #9c907e; border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+/* ── Base unit ───────────────────────────────────────────────────────── */
+.nutbot-v2-base {
+  position: relative;
+  width: 182px; height: 56px;
+  background: linear-gradient(145deg, #d8d2c8 0%, #c0bab0 55%, #b6b0a4 100%);
+  border: 3px solid #9c907e; border-radius: 11px;
+  display: flex; align-items: center; padding: 0 14px; gap: 10px;
+}
+.nutbot-v2-base::before {
+  content: ''; position: absolute; inset: 4px; border-radius: 8px;
+  border-top: 1.5px solid rgba(255,255,255,.28);
+  border-left: 1.5px solid rgba(255,255,255,.14);
+  pointer-events: none;
+}
+.nutbot-v2-drive { display: flex; flex-direction: column; gap: 5px; }
+.nutbot-v2-drive-slot {
+  width: 58px; height: 5px; background: #706860; border-radius: 2.5px;
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.4);
+}
+.nutbot-v2-drive-label {
+  width: 42px; height: 16px;
+  background: #e2dcd0; border-radius: 2px; border: 1.5px solid #9c907e;
+}
+.nutbot-v2-bleds { margin-left: auto; display: flex; flex-direction: column; gap: 5px; }
+.nutbot-v2-bled  { width: 6px; height: 6px; border-radius: 50%; background: #2a2418; transition: background .3s, box-shadow .3s; }
+.nutbot-v2-bled.c { background: #00b4c8; box-shadow: 0 0 4px #00b4c8; }
+.nutbot-v2-bled.o { background: #ff6b2b; box-shadow: 0 0 4px #ff6b2b; }
+.nutbot-v2-bled.r { background: #ff4040; box-shadow: 0 0 4px #ff4040; }
+.nutbot-v2-bled.p { background: #ff6b8a; box-shadow: 0 0 4px #ff6b8a; }

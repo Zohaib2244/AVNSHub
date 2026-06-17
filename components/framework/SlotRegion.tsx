@@ -12,6 +12,7 @@ import type { SlotWidgetInstance } from "@/lib/slotLayout";
 import type { Direction, Rect } from "@/lib/grid/occupancy";
 import { buildOccupancy } from "@/lib/grid/occupancy";
 import { createHoverExpandPreview, type HoverExpandAxis, type HoverExpandPreview } from "@/lib/grid/hoverExpand";
+import { setHoeActive } from "@/lib/hoeSignal";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotWidgetCell } from "@/components/framework/SlotWidgetCell";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
@@ -64,6 +65,7 @@ export function SlotRegion({
     return () => {
       if (hoverIntentRef.current !== null) window.clearTimeout(hoverIntentRef.current);
       if (hoverExitRef.current !== null) window.clearTimeout(hoverExitRef.current);
+      setHoeActive(null);
     };
   }, []);
 
@@ -111,6 +113,21 @@ export function SlotRegion({
     if (!metrics) return false;
     const preview = createHoverExpandPreview(id, hoverItems, dims, preferredDirections, axis);
     if (!preview) return false;
+
+    // tell NutBot where the expanding widget is on screen
+    const regionEl = regionRef.current;
+    if (regionEl) {
+      const regionRect = regionEl.getBoundingClientRect();
+      const effect = preview.effects[id];
+      if (effect) {
+        const box = hoverVisualBox(effect.visualRect, metrics);
+        setHoeActive({
+          id,
+          centerX: regionRect.left + box.left + box.width / 2,
+          centerY: regionRect.top + box.top + box.height / 2,
+        });
+      }
+    }
 
     setHoverMetrics(metrics);
     setHoverPreview(preview);
@@ -180,6 +197,7 @@ export function SlotRegion({
   function clearHoverExpand() {
     clearHoverIntent();
     clearHoverExit();
+    setHoeActive(null);
     setHoverPreview(null);
     setHoverMetrics(null);
   }

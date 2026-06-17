@@ -1,6 +1,13 @@
 /* ─── nutbot terminal ─────────────────────────────────────────── */
 
 /* compact face-only nutbot card (S/M) — the terminal renders at L size */
+/* per-size zoom wrapper for the v2 SVG robot */
+.nutbot-v2-scale { display: flex; align-items: center; justify-content: center; }
+.nutbot-v2-scale-s    { zoom: 0.68; }
+.nutbot-v2-scale-m    { zoom: 0.60; }
+/* terminal header decoration — just the monitor head at a tiny size */
+.nutbot-v2-scale-nano { zoom: 0.28; }
+
 .nutbot-mini {
   display: flex;
   flex-direction: column;

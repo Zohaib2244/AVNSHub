@@ -9,7 +9,7 @@ import "./creator/WidgetCreatorPanel.css";
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X } from "lucide-react";
-import { NutBotFace } from "@/components/widgets/default/nutbot/NutBotFace";
+import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
@@ -168,7 +168,9 @@ export function NutBotTerminal() {
         </div>
 
         <HarnessPill />
-        <NutBotFace />
+        <div className="nutbot-v2-scale nutbot-v2-scale-nano">
+          <NutBotFaceV2 compact />
+        </div>
       </div>
 
       <div className={`term-body${activeTab === "real-shell" ? " term-body-real" : ""}${activeTab === "creator" ? " term-body-creator" : ""}`} ref={bodyRef}>

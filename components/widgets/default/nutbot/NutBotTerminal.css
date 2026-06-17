@@ -1,5 +1,8 @@
 /* ── fill-height layout (nutbot-block flag turns .block into flex col) ─── */
 
+/* terminal header uses the nano zoom for the v2 robot decoration */
+.nutbot-v2-scale-nano { zoom: 0.28; }
+
 .nutbot-block {
   display: flex;
   flex-direction: column;
