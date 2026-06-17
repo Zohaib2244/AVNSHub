@@ -1,27 +1,10 @@
 {
-  "title": "fifascore",
-  "iconName": "Database",
+  "title": "FIFA World Cup 2026",
+  "iconName": "Trophy",
   "sizes": ["S", "M", "L"],
   "orientations": ["h"],
   "defaults": { "size": "M", "orientation": "h" },
   "settings": [
-    {
-      "key": "competition",
-      "label": "competition",
-      "type": "select",
-      "default": "all",
-      "options": [
-        { "value": "all", "label": "all" },
-        { "value": "PL", "label": "premier league" },
-        { "value": "CL", "label": "champions league" },
-        { "value": "PD", "label": "la liga" },
-        { "value": "BL1", "label": "bundesliga" },
-        { "value": "SA", "label": "serie a" },
-        { "value": "FL1", "label": "ligue 1" },
-        { "value": "WC", "label": "world cup" },
-        { "value": "EC", "label": "euros" }
-      ]
-    },
     {
       "key": "showFinished",
       "label": "show finished",
@@ -33,6 +16,14 @@
       "label": "show upcoming",
       "type": "toggle",
       "default": true
+    },
+    {
+      "key": "daysAhead",
+      "label": "days ahead",
+      "type": "number",
+      "default": 2,
+      "min": 0,
+      "max": 7
     }
   ]
 }

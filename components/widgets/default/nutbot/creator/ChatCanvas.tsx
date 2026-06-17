@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Square, PlusCircle } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
-import { emitWidgetCreated } from "@/lib/nutbotSignal";
+import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
 import { getLayoutMode } from "@/lib/layoutMode";
 import { placeWidgetAuto } from "@/lib/slotLayout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -55,9 +55,19 @@ function StatusBar({ phase }: { phase: Phase }) {
   );
 }
 
+const MESSAGES_KEY = "nutmag-creator-messages";
+
 export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
   const { addWidget } = useLayout();
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = sessionStorage.getItem(MESSAGES_KEY);
+        return saved ? (JSON.parse(saved) as Message[]) : [];
+      } catch {}
+    }
+    return [];
+  });
   const [prompt, setPrompt] = useState("");
   // restore done state from sessionStorage so HMR doesn't lose it
   const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => {
@@ -80,6 +90,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
   // surface an error both in the status bar (short) and as a full, readable
   // chat message (wraps, scrolls — the status bar truncates long text)
   function fail(message: string) {
+    clearSignal();
     setPhase({ id: "error", message });
     setMessages((prev) => [...prev, { role: "error", text: message }]);
   }
@@ -87,6 +98,10 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [messages, phase]);
+
+  useEffect(() => {
+    try { sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(messages)); } catch {}
+  }, [messages]);
 
   async function generate() {
     // allow a new attempt from idle / done / error — only block while a run is
@@ -105,6 +120,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setPhase({ id: "connecting", harness: activeHarness });
+    emitWorking();
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -164,6 +180,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
                 }
                 return [...updated, { role: "ok", text: "[ok] widget written — click '+ add to layout' below" }];
               });
+              clearSignal();
               if (slug) {
                 setDoneWidgetId(slug);
                 setAdded(false);
@@ -193,11 +210,13 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
           } else if (event === "tsc_errors") {
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
           } else if (event === "error") {
+            clearSignal();
             fail(payload.message as string);
           }
         }
       }
     } catch (err) {
+      clearSignal();
       if ((err as Error).name === "AbortError") {
         setPhase({ id: "idle" });
       } else {
@@ -222,6 +241,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
 
   function stop() {
     abortRef.current?.abort();
+    clearSignal();
     setPhase({ id: "idle" });
   }
 
@@ -232,6 +252,7 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
     setDoneWidgetId(null);
     setAdded(false);
     try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
+    try { sessionStorage.removeItem(MESSAGES_KEY); } catch {}
   }
 
   function handleAddToLayout() {

@@ -1,7 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 // Requires: FOOTBALL_DATA_API_KEY — free tier at https://www.football-data.org/
-// Without a key, the route returns realistic mock data so the widget still renders.
+// Without a key, the route returns realistic WC 2026 mock data.
 
 const API_KEY = process.env.FOOTBALL_DATA_API_KEY;
 const BASE = "https://api.football-data.org/v4";
@@ -22,6 +22,9 @@ interface ScoreDetail {
 export interface FifaMatch {
   id: number;
   competition: { name: string; code: string };
+  stage: string;
+  group: string | null;
+  matchday: number | null;
   status: string;
   minute: number | null;
   homeTeam: Team;
@@ -36,102 +39,132 @@ function getMockMatches(): FifaMatch[] {
 
   return [
     {
-      id: 1,
-      competition: { name: "Premier League", code: "PL" },
-      status: "IN_PLAY",
-      minute: 67,
-      homeTeam: { name: "Arsenal FC", shortName: "Arsenal", tla: "ARS" },
-      awayTeam: { name: "Chelsea FC", shortName: "Chelsea", tla: "CHE" },
-      score: {
-        fullTime: { home: 2, away: 1 },
-        halfTime: { home: 1, away: 0 },
-      },
-      utcDate: iso(-67 * 60_000),
-    },
-    {
-      id: 2,
-      competition: { name: "Premier League", code: "PL" },
+      id: 2001,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_A",
+      matchday: 1,
       status: "FINISHED",
       minute: 90,
-      homeTeam: { name: "Liverpool FC", shortName: "Liverpool", tla: "LIV" },
-      awayTeam: {
-        name: "Manchester City FC",
-        shortName: "Man City",
-        tla: "MCI",
-      },
+      homeTeam: { name: "United States", shortName: "USA", tla: "USA" },
+      awayTeam: { name: "Panama", shortName: "Panama", tla: "PAN" },
       score: {
-        fullTime: { home: 3, away: 2 },
-        halfTime: { home: 2, away: 1 },
-      },
-      utcDate: iso(-180 * 60_000),
-    },
-    {
-      id: 3,
-      competition: { name: "La Liga", code: "PD" },
-      status: "IN_PLAY",
-      minute: 45,
-      homeTeam: { name: "FC Barcelona", shortName: "Barcelona", tla: "BAR" },
-      awayTeam: {
-        name: "Real Madrid CF",
-        shortName: "Real Madrid",
-        tla: "RMA",
-      },
-      score: {
-        fullTime: { home: 1, away: 1 },
+        fullTime: { home: 3, away: 0 },
         halfTime: { home: 1, away: 0 },
       },
-      utcDate: iso(-45 * 60_000),
+      utcDate: iso(-3 * 3_600_000),
     },
     {
-      id: 4,
-      competition: { name: "UEFA Champions League", code: "CL" },
-      status: "SCHEDULED",
-      minute: null,
-      homeTeam: { name: "Bayern München", shortName: "Bayern", tla: "BAY" },
-      awayTeam: {
-        name: "Paris Saint-Germain FC",
-        shortName: "PSG",
-        tla: "PSG",
-      },
+      id: 2002,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_B",
+      matchday: 1,
+      status: "IN_PLAY",
+      minute: 34,
+      homeTeam: { name: "Brazil", shortName: "Brazil", tla: "BRA" },
+      awayTeam: { name: "Japan", shortName: "Japan", tla: "JPN" },
       score: {
-        fullTime: { home: null, away: null },
+        fullTime: { home: 1, away: 0 },
         halfTime: { home: null, away: null },
       },
-      utcDate: iso(60 * 60_000),
+      utcDate: iso(-34 * 60_000),
     },
     {
-      id: 5,
-      competition: { name: "Serie A", code: "SA" },
+      id: 2003,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_C",
+      matchday: 1,
       status: "PAUSED",
       minute: null,
-      homeTeam: { name: "Juventus FC", shortName: "Juventus", tla: "JUV" },
-      awayTeam: { name: "AC Milan", shortName: "AC Milan", tla: "MIL" },
+      homeTeam: { name: "Argentina", shortName: "Argentina", tla: "ARG" },
+      awayTeam: { name: "Australia", shortName: "Australia", tla: "AUS" },
       score: {
-        fullTime: { home: 0, away: 0 },
-        halfTime: { home: 0, away: 0 },
+        fullTime: { home: 2, away: 1 },
+        halfTime: { home: 2, away: 1 },
       },
       utcDate: iso(-45 * 60_000),
     },
     {
-      id: 6,
-      competition: { name: "Bundesliga", code: "BL1" },
+      id: 2004,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_D",
+      matchday: 1,
       status: "SCHEDULED",
       minute: null,
-      homeTeam: {
-        name: "Borussia Dortmund",
-        shortName: "Dortmund",
-        tla: "BVB",
-      },
-      awayTeam: {
-        name: "Bayer 04 Leverkusen",
-        shortName: "Leverkusen",
-        tla: "B04",
-      },
+      homeTeam: { name: "France", shortName: "France", tla: "FRA" },
+      awayTeam: { name: "Morocco", shortName: "Morocco", tla: "MAR" },
       score: {
         fullTime: { home: null, away: null },
         halfTime: { home: null, away: null },
       },
-      utcDate: iso(90 * 60_000),
+      utcDate: iso(2 * 3_600_000),
+    },
+    {
+      id: 2005,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_E",
+      matchday: 1,
+      status: "SCHEDULED",
+      minute: null,
+      homeTeam: { name: "England", shortName: "England", tla: "ENG" },
+      awayTeam: { name: "Senegal", shortName: "Senegal", tla: "SEN" },
+      score: {
+        fullTime: { home: null, away: null },
+        halfTime: { home: null, away: null },
+      },
+      utcDate: iso(4 * 3_600_000),
+    },
+    {
+      id: 2006,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_F",
+      matchday: 1,
+      status: "SCHEDULED",
+      minute: null,
+      homeTeam: { name: "Spain", shortName: "Spain", tla: "ESP" },
+      awayTeam: { name: "Mexico", shortName: "Mexico", tla: "MEX" },
+      score: {
+        fullTime: { home: null, away: null },
+        halfTime: { home: null, away: null },
+      },
+      utcDate: iso(28 * 3_600_000),
+    },
+    {
+      id: 2007,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_G",
+      matchday: 1,
+      status: "SCHEDULED",
+      minute: null,
+      homeTeam: { name: "Germany", shortName: "Germany", tla: "GER" },
+      awayTeam: { name: "Saudi Arabia", shortName: "Saudi Arabia", tla: "KSA" },
+      score: {
+        fullTime: { home: null, away: null },
+        halfTime: { home: null, away: null },
+      },
+      utcDate: iso(30 * 3_600_000),
+    },
+    {
+      id: 2008,
+      competition: { name: "FIFA World Cup 2026", code: "WC" },
+      stage: "GROUP_STAGE",
+      group: "GROUP_H",
+      matchday: 1,
+      status: "SCHEDULED",
+      minute: null,
+      homeTeam: { name: "Portugal", shortName: "Portugal", tla: "POR" },
+      awayTeam: { name: "Canada", shortName: "Canada", tla: "CAN" },
+      score: {
+        fullTime: { home: null, away: null },
+        halfTime: { home: null, away: null },
+      },
+      utcDate: iso(52 * 3_600_000),
     },
   ];
 }
@@ -165,6 +198,9 @@ function parseMatch(raw: unknown): FifaMatch | null {
       name: String(comp?.name ?? ""),
       code: String(comp?.code ?? ""),
     },
+    stage: String(o.stage ?? "GROUP_STAGE"),
+    group: typeof o.group === "string" ? o.group : null,
+    matchday: typeof o.matchday === "number" ? o.matchday : null,
     status: String(o.status ?? ""),
     minute: typeof o.minute === "number" ? o.minute : null,
     homeTeam: parseTeam(o.homeTeam),
@@ -177,16 +213,23 @@ function parseMatch(raw: unknown): FifaMatch | null {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const rawDays = Number(req.nextUrl.searchParams.get("daysAhead") ?? "2");
+  const daysAhead = isNaN(rawDays) ? 2 : Math.max(0, Math.min(7, rawDays));
+
   if (!API_KEY) {
     return NextResponse.json({ matches: getMockMatches(), mock: true });
   }
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = new Date();
+  const dateFrom = today.toISOString().split("T")[0];
+  const dateTo = new Date(today.getTime() + daysAhead * 86_400_000)
+    .toISOString()
+    .split("T")[0];
 
   try {
     const res = await fetch(
-      `${BASE}/matches?dateFrom=${today}&dateTo=${today}`,
+      `${BASE}/competitions/WC/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,
       {
         headers: { "X-Auth-Token": API_KEY },
         next: { revalidate: 60 },

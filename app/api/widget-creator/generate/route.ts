@@ -11,6 +11,9 @@ import {
   mergeWidgetManifest,
   componentName,
   findComponentModule,
+  sanitizeComponentMap,
+  removeFromComponentMap,
+  removeRegistryEntry,
 } from "@/lib/widget-creator/customRegistry";
 
 const REPO_ROOT = process.cwd();
@@ -188,7 +191,16 @@ function runHarness(
     let buffer = "";
 
     function processLine(line: string) {
-      if (lineSignalsLimit(line)) {
+      // Skip limit detection on JSON content-delta frames — generated code can
+      // legitimately mention "rate limit", "overloaded", etc. as plain text, and
+      // checking the raw JSON-encoded line would fire a false positive switch.
+      let isContentDelta = false;
+      try {
+        const f = JSON.parse(line);
+        isContentDelta = f.type === "content_block_delta" && f.delta?.type === "text_delta";
+      } catch {}
+
+      if (!isContentDelta && lineSignalsLimit(line)) {
         hitLimit = true;
         return;
       }
@@ -228,13 +240,25 @@ function runHarness(
 }
 
 export async function POST(req: Request) {
-  const body = (await req.json()) as { settings: GenerateSettings; prompt: string };
-  const { settings, prompt: userPrompt } = body;
+  // Clean up any stale entries (files deleted since last registration) before
+  // doing anything else — this prevents a prior broken run from keeping the
+  // site in a compilation error state across requests.
+  sanitizeComponentMap();
+
+  const body = (await req.json()) as {
+    settings: GenerateSettings;
+    prompt: string;
+    harness?: HarnessId;
+    harnessChain?: HarnessId[];
+  };
+  const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain } = body;
 
   const fullPrompt = buildPrompt(settings, userPrompt);
 
-  const requestedHarness: HarnessId = settings.harness ?? "claude";
-  const chain: HarnessId[] = settings.harnessChain ?? HARNESS_CHAIN_DEFAULT;
+  // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
+  // settings.harness path — settings.harness was never reliably populated.
+  const requestedHarness: HarnessId = bodyHarness ?? settings.harness ?? "claude";
+  const chain: HarnessId[] = bodyChain ?? settings.harnessChain ?? HARNESS_CHAIN_DEFAULT;
 
   // build the ordered list starting from the requested harness
   const startIdx = chain.indexOf(requestedHarness);
@@ -295,6 +319,20 @@ export async function POST(req: Request) {
           const tscResult = await runTscCheck();
           if (tscResult.errors.length > 0) {
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
+            // For new widgets: roll back the registration so a broken component
+            // can't keep the build in a "Module not found" / type error state.
+            // The generated files are kept on disk — the user can ask to fix them.
+            // For edits: leave the registration intact (it existed before this run).
+            const isNew = !settings.editSlug;
+            if (isNew && settings.slug) {
+              removeFromComponentMap(settings.slug);
+              removeRegistryEntry(settings.slug);
+            }
+            sendEvent(write, "error", {
+              message: isNew
+                ? "TypeScript errors in generated code — registration rolled back. Fix the errors above, then re-submit to try again."
+                : "TypeScript errors in edited code — check the errors above and re-submit to fix.",
+            });
           } else {
             const doneSlug = settings.editSlug ?? settings.slug ?? null;
             sendEvent(write, "status", { type: "done", slug: doneSlug });

@@ -195,7 +195,36 @@ export function removeFromComponentMap(id: string): void {
   const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
   const v = localVar(id);
   const declPrefix = `const ${v} = `;
-  const entryLine = `  "${id}": ${v},`;
-  const kept = content.split("\n").filter((line) => !line.startsWith(declPrefix) && line !== entryLine);
+  // handle both quoted ("id": v) and bare (id: v) key formats
+  const kept = content
+    .split("\n")
+    .filter((line) => !line.startsWith(declPrefix) && line !== `  "${id}": ${v},` && line !== `  ${id}: ${v},`);
   writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
+}
+
+/** Scan customComponentMap.tsx for lazy imports pointing to files that no longer
+    exist and remove those entries (+ their registry entries). Returns the ids that
+    were cleaned up. Call this at the start of every generate request so a stale
+    entry from a prior bad run never keeps the site in a broken compile state. */
+export function sanitizeComponentMap(): string[] {
+  const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
+  const staleIds: string[] = [];
+
+  for (const line of content.split("\n")) {
+    // match: const _xxx = lazy(() => import("@/components/widgets/custom/<id>/<file>"...
+    const m = line.match(
+      /^const \w+ = lazy\(\(\) => import\("@\/components\/widgets\/custom\/([^/]+)\/([^"]+)"/,
+    );
+    if (!m) continue;
+    const [, id, file] = m;
+    const filePath = join(ROOT, "components/widgets/custom", id, `${file}.tsx`);
+    if (!existsSync(filePath)) staleIds.push(id);
+  }
+
+  for (const id of staleIds) {
+    removeFromComponentMap(id);
+    removeRegistryEntry(id);
+  }
+
+  return staleIds;
 }

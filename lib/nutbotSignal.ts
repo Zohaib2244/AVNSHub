@@ -28,7 +28,13 @@ function emit(s: Signal, durationMs = 3500) {
 export function emitWidgetCreated(id: string) { emit({ type: "widget_created", id }, 3500); }
 export function emitThinking()                { emit({ type: "thinking" }, 8000); }
 export function emitError(msg?: string)       { emit({ type: "error", msg }, 4000); }
-export function emitWorking()                 { emit({ type: "working" }, 6000); }
+// Long duration — caller is expected to call clearSignal() when work finishes
+export function emitWorking()                 { emit({ type: "working" }, 120_000); }
+
+export function clearSignal() {
+  signal = null;
+  notify();
+}
 
 export function getSignal(): Signal        { return signal; }
 export function getServerSignal(): Signal  { return null; }
