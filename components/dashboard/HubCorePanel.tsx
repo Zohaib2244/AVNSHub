@@ -2,15 +2,43 @@
 
 // AVN Hub Core Settings — a fixed top-right area with tab controls:
 // 1. A persistent edit-mode toggle (wrench/lock) — always visible, one click.
-// 2. A settings gear that opens layout mode + mode-specific config.
+// 2. A settings gear that opens canvas appearance, prefs, and layout controls.
 // 3. A widget manager tab that opens add/remove controls.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, Download, LayoutGrid, Lock, Minus, Plus, RotateCcw, Settings, Trash2, Upload, Wrench } from "lucide-react";
+import {
+  ChevronDown,
+  Download,
+  LayoutGrid,
+  Lock,
+  Minus,
+  Moon,
+  Plus,
+  RotateCcw,
+  Search,
+  Settings,
+  Sun,
+  SunMoon,
+  Trash2,
+  Upload,
+  Wrench,
+} from "lucide-react";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { DEFAULT_ORDER, WIDGETS, getManifest, type WidgetManifest } from "@/config/widgets";
+import { THEME_PACKS } from "@/config/themes";
+import {
+  getPalette,
+  getServerPalette,
+  getServerThemeMode,
+  getThemeMode,
+  setPalette,
+  setThemeMode,
+  subscribeTheme,
+  type ThemeMode,
+} from "@/lib/theme";
+import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
 import {
   exportSlotLayout,
   getRegionsThatFitWidget,
@@ -28,8 +56,14 @@ import { REGION_DIMS_BOUNDS, REGION_LABELS, type RegionDims, type SlotRegionId }
 
 const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
 type HubCoreTab = "settings" | "widgets";
-type HubSettingsSection = "avn" | "mode";
+type CanvasSettingsSection = "appearance" | "general" | "layout";
 type WidgetFilter = "all" | "system" | "custom";
+
+const THEME_OPTIONS: { mode: ThemeMode; Icon: typeof Sun }[] = [
+  { mode: "light", Icon: Sun },
+  { mode: "auto", Icon: SunMoon },
+  { mode: "dark", Icon: Moon },
+];
 
 const WIDGET_FILTER_OPTIONS: { filter: WidgetFilter; label: string }[] = [
   { filter: "all", label: "all" },
@@ -61,12 +95,27 @@ function widgetEmptyText(filter: WidgetFilter, allText: string, systemText: stri
   return allText;
 }
 
+function matchesWidgetSearch(id: string, query: string, meta?: string) {
+  if (!query) return true;
+  const manifest = getManifest(id);
+  const haystack = [id, manifest?.title, meta].filter(Boolean).join(" ").toLowerCase();
+  return haystack.includes(query);
+}
+
 export function HubCorePanel() {
   const [activeTab, setActiveTab] = useState<HubCoreTab | null>(null);
-  const [activeSettingsSection, setActiveSettingsSection] = useState<HubSettingsSection | null>("avn");
+  const [openSettingsSections, setOpenSettingsSections] = useState<Record<CanvasSettingsSection, boolean>>({
+    appearance: true,
+    general: true,
+    layout: true,
+  });
   const panelRef = useRef<HTMLDivElement>(null);
 
   const { editMode, startEdit, lockLayout } = useLayout();
+
+  function toggleSettingsSection(section: CanvasSettingsSection) {
+    setOpenSettingsSections((open) => ({ ...open, [section]: !open[section] }));
+  }
 
   useEffect(() => {
     if (!activeTab) return;
@@ -126,35 +175,25 @@ export function HubCorePanel() {
             {activeTab === "settings" ? (
               <>
                 <CoreSection
-                  title="avn hub"
-                  open={activeSettingsSection === "avn"}
-                  onToggle={() => setActiveSettingsSection((section) => (section === "avn" ? null : "avn"))}
+                  title="appearance"
+                  open={openSettingsSections.appearance}
+                  onToggle={() => toggleSettingsSection("appearance")}
                 >
-                  <div className="wset-row">
-                    <span>edit mode</span>
-                    <div className="seg-row">
-                      <button type="button" className={`seg-btn${!editMode ? " active" : ""}`} onClick={lockLayout}>
-                        <Lock size={14} strokeWidth={1.75} />
-                        locked
-                      </button>
-                      <button type="button" className={`seg-btn${editMode ? " active" : ""}`} onClick={startEdit}>
-                        <Wrench size={14} strokeWidth={1.75} />
-                        editing
-                      </button>
-                    </div>
-                  </div>
-                  {editMode && (
-                    <button type="button" className="wset-hide-btn hub-reset" onClick={resetSlotLayout}>
-                      <RotateCcw size={12} strokeWidth={1.75} />
-                      reset layout
-                    </button>
-                  )}
+                  <AppearanceSettings />
+                </CoreSection>
+
+                <CoreSection
+                  title="general"
+                  open={openSettingsSections.general}
+                  onToggle={() => toggleSettingsSection("general")}
+                >
+                  <GeneralSettings />
                 </CoreSection>
 
                 <CoreSection
                   title="layout"
-                  open={activeSettingsSection === "mode"}
-                  onToggle={() => setActiveSettingsSection((section) => (section === "mode" ? null : "mode"))}
+                  open={openSettingsSections.layout}
+                  onToggle={() => toggleSettingsSection("layout")}
                 >
                   <DefaultModeSettings />
                 </CoreSection>
@@ -169,8 +208,103 @@ export function HubCorePanel() {
   );
 }
 
+function ThemeModeRow() {
+  const mode = useSyncExternalStore(subscribeTheme, getThemeMode, getServerThemeMode);
+  return (
+    <div className="seg-row hub-theme-row">
+      {THEME_OPTIONS.map(({ mode: m, Icon }) => (
+        <button
+          key={m}
+          type="button"
+          className={`seg-btn${mode === m ? " active" : ""}`}
+          onClick={() => setThemeMode(m)}
+          aria-pressed={mode === m}
+        >
+          <Icon size={12} strokeWidth={1.75} />
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function PaletteRow() {
+  const palette = useSyncExternalStore(subscribeTheme, getPalette, getServerPalette);
+  return (
+    <div className="palette-row hub-palette-grid">
+      {THEME_PACKS.map((pack) => (
+        <button
+          key={pack.id}
+          type="button"
+          className={`palette-btn${palette === pack.id ? " active" : ""}`}
+          onClick={() => setPalette(pack.id)}
+          title={`${pack.label} palette`}
+          aria-pressed={palette === pack.id}
+        >
+          <span className="palette-swatch" style={{ background: pack.swatch[0] }}>
+            <span style={{ background: pack.swatch[1] }} />
+            <span style={{ background: pack.swatch[2] }} />
+          </span>
+          <span className="palette-label">{pack.label}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function AppearanceSettings() {
+  return (
+    <div className="hub-appearance-panel">
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">theme</span>
+        <ThemeModeRow />
+      </div>
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">palette</span>
+        <PaletteRow />
+      </div>
+    </div>
+  );
+}
+
+function GeneralSettings() {
+  const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
+  const { resetLayout } = useLayout();
+
+  function resetAll() {
+    resetLayout();
+    resetSlotLayout();
+  }
+
+  return (
+    <>
+      <label className="wset-row">
+        <span>live data polling</span>
+        <input
+          type="checkbox"
+          checked={prefs.pollingEnabled}
+          onChange={(e) => setPrefs({ pollingEnabled: e.target.checked })}
+        />
+      </label>
+      <label className="wset-row">
+        <span>boot sequence intro</span>
+        <input
+          type="checkbox"
+          checked={prefs.bootSequence}
+          onChange={(e) => setPrefs({ bootSequence: e.target.checked })}
+        />
+      </label>
+      <button type="button" className="wset-hide-btn hub-reset" onClick={resetAll}>
+        <RotateCcw size={12} strokeWidth={1.75} />
+        reset layout & widget config
+      </button>
+    </>
+  );
+}
+
 function WidgetManagerTab() {
   const [widgetFilter, setWidgetFilter] = useState<WidgetFilter>("all");
+  const [widgetSearch, setWidgetSearch] = useState("");
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const registeredIds = registryIds().filter((id) => getManifest(id));
   const counts = {
@@ -185,6 +319,16 @@ function WidgetManagerTab() {
         <span className="wset-title">widget manager</span>
       </div>
       <WidgetImportBar />
+      <label className="hub-widget-search">
+        <Search size={13} strokeWidth={1.75} />
+        <input
+          type="search"
+          value={widgetSearch}
+          onChange={(e) => setWidgetSearch(e.target.value)}
+          placeholder="search widgets"
+          aria-label="search widgets"
+        />
+      </label>
       <div className="hub-widget-filter-tabs" role="tablist" aria-label="widget category">
         {WIDGET_FILTER_OPTIONS.map(({ filter, label }) => (
           <button
@@ -201,7 +345,7 @@ function WidgetManagerTab() {
         ))}
       </div>
       <div className="hub-widget-scroll" role="region" aria-label="widget manager list">
-        <SlotWidgetControls filter={widgetFilter} />
+        <SlotWidgetControls filter={widgetFilter} search={widgetSearch} />
       </div>
     </div>
   );
@@ -333,22 +477,31 @@ function DefaultModeSettings() {
   );
 }
 
-function SlotWidgetControls({ filter }: { filter: WidgetFilter }) {
+function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: string }) {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
+  const query = search.trim().toLowerCase();
   const allPlacedRows = [
     ...slotLayout.widgets.map((w) => ({ id: w.id, location: regionShortLabel(w.region), terminal: false })),
     ...(slotLayout.terminalWidgetId
       ? [{ id: slotLayout.terminalWidgetId, location: "terminal", terminal: true }]
       : []),
   ].filter((row) => getManifest(row.id));
-  const placedRows = allPlacedRows.filter((row) => matchesWidgetFilter(row.id, filter, customIds));
+  const placedRows = allPlacedRows.filter(
+    (row) => matchesWidgetFilter(row.id, filter, customIds) && matchesWidgetSearch(row.id, query, row.location),
+  );
   const placedIds = new Set(allPlacedRows.map((row) => row.id));
   const availableIds = registryIds().filter(
-    (id) => !placedIds.has(id) && getManifest(id) && matchesWidgetFilter(id, filter, customIds),
+    (id) => !placedIds.has(id) && getManifest(id) && matchesWidgetFilter(id, filter, customIds) && matchesWidgetSearch(id, query),
   );
+  const placedEmpty = query
+    ? "no placed widgets match search"
+    : widgetEmptyText(filter, "no widgets placed", "no system widgets placed", "no custom widgets placed");
+  const availableEmpty = query
+    ? "no available widgets match search"
+    : widgetEmptyText(filter, "all widgets are placed", "all system widgets are placed", "no custom widgets available");
 
   async function deleteCustomWidget(id: string) {
     if (!customIds.has(id) || deletingId) return;
@@ -376,7 +529,7 @@ function SlotWidgetControls({ filter }: { filter: WidgetFilter }) {
         heading={`placed · ${placedRows.length}`}
         ids={placedRows.map((row) => row.id)}
         metaFor={(id) => placedRows.find((row) => row.id === id)?.location}
-        empty={widgetEmptyText(filter, "no widgets placed", "no system widgets placed", "no custom widgets placed")}
+        empty={placedEmpty}
         actionFor={(id) => (
           <HubWidgetActions
             id={id}
@@ -397,7 +550,7 @@ function SlotWidgetControls({ filter }: { filter: WidgetFilter }) {
       <HubWidgetList
         heading={`available · ${availableIds.length}`}
         ids={availableIds}
-        empty={widgetEmptyText(filter, "all widgets are placed", "all system widgets are placed", "no custom widgets available")}
+        empty={availableEmpty}
         actionFor={(id) => {
           const fitRegions = getRegionsThatFitWidget(id, slotLayout);
           const open = addingId === id;

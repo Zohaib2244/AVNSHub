@@ -9,40 +9,29 @@ immediately â€” no save button, no page reload.
 
 ---
 
-## Two access points
+## Hub Core
 
-### 1. Hub Core tabs (top-right corner)
+### Tabs
 
 A fixed control strip reachable from every screen regardless of which widget
 is where. In Slot Layout it sits as right-edge tabs on the main frame. Click
 the gear icon (settings) or grid icon (widget manager) to open that tab, click
 again, press `Escape`, or click anywhere outside to close.
 
-Contains two independently collapsible sections:
+The wrench/lock tab toggles edit mode in one click.
 
-**AVN Hub** â€” global controls:
-- **Edit mode** â€” toggle between `locked` (layout is frozen) and `editing`
-  (drag handles, gear icons, and resize handles appear on every widget).
-  In editing mode a **reset** button also appears to wipe the current
-  layout back to defaults.
-- **Layout** â€” switch between the two layout modes (see below).
+The settings tab contains independently collapsible sections. More than one
+section can stay open at the same time:
 
-**Default mode / Graph mode** â€” mode-specific settings for whichever layout is
-currently active. In Default mode this is the per-region grid-dims editor
-(see [Default Mode](#default-mode-slot-layout)).
+**Appearance** â€” theme mode and colour palette.
 
-**Widget Manager tab** â€” add, remove, or permanently delete custom widgets.
+**General** â€” live-data polling, boot-sequence intro, and reset layout/widget
+configuration.
 
-### 2. Hub Settings widget (`#hub-settings`, "AVN Hub")
+**Layout** â€” per-region grid dimensions plus layout import/export controls.
 
-A widget you can place on the dashboard like any other. It exposes the same
-theme and palette controls at different levels of detail depending on its size:
-
-| Size | What you get |
-|------|-------------|
-| S | Theme mode toggle only (light / auto / dark) |
-| M | Theme mode + colour palette picker |
-| L | Theme mode + palette + general prefs + reset button |
+The Widget Manager tab searches, filters, adds, removes, imports, exports, or
+permanently deletes custom widgets.
 
 ---
 
@@ -63,7 +52,7 @@ Each region is an independent CSS grid. You place widgets into cells of that
 grid manually (in edit mode). Widgets occupy a rectangle of cells
 (`colSpan Ã— rowSpan`), which you can resize by dragging the edge handles.
 
-**Configuring region grid size** â€” open Hub Core â†’ Default Mode section. Each
+**Configuring region grid size** â€” open Hub Core â†’ Layout section. Each
 region shows a `rows Ã— columns` input pair. Changing these re-tiles the grid;
 any placed widgets stay in their stored cell positions (clamped to the new
 bounds automatically).
@@ -108,15 +97,13 @@ and add/remove controls live in the Hub Core Widget Manager tab.
 
 ## Edit mode
 
-Toggle edit mode from Hub Core â†’ AVN Hub â†’ edit mode or from any widget's gear
-menu. While editing:
+Toggle edit mode from the Hub Core wrench/lock tab. While editing:
 
 - Every widget card shows a **move handle** (top-left), **Ã— remove** (top-right),
   and **gear** (settings) button.
 - In Default mode, four edge **resize handles** also appear.
 - In Graph mode, you can drag cards to rearrange them.
-- A **reset** button appears in Hub Core to wipe the current mode's layout back
-  to its default arrangement.
+- Reset controls remain in Hub Core settings.
 
 Lock the layout when done to prevent accidental moves.
 
@@ -128,7 +115,8 @@ The Widget Manager is its own Hub Core tab, separate from the AVN Hub canvas
 settings.
 
 In Slot Layout it lists placed widgets and available widgets. Available widgets
-open a region chooser, and only regions with enough free cells are shown.
+open a region chooser, and only regions with enough free cells are shown. Use
+the search field to narrow placed and available widgets by title or id.
 
 In Graph Layout, on-screen widgets have a `âˆ’` button to hide them
 (`hidden: true`). Available widgets have a `+` button to add them back
@@ -140,7 +128,7 @@ In Graph Layout, on-screen widgets have a `âˆ’` button to hide them
 
 ### Mode
 
-Three options, set from Hub Settings or Hub Core:
+Three options, set from Hub Core settings:
 
 | Mode | Behaviour |
 |------|-----------|
@@ -153,7 +141,7 @@ script in the root layout so there is never a flash of the wrong theme on load.
 
 ### Colour palettes
 
-Four palettes, each fully designed for both dark and light modes:
+Eight palettes, each fully designed for both dark and light modes:
 
 | Palette | Accent colours | Mood |
 |---------|---------------|------|
@@ -161,8 +149,12 @@ Four palettes, each fully designed for both dark and light modes:
 | **slate** | Blue `#4da3ff` + Teal `#00c8a0` | Cool, monochromatic |
 | **moss** | Green `#8fc63c` + Amber `#d89a28` | Earthy, natural |
 | **plum** | Pink `#e84a8a` + Gold `#d8a830` | Vivid, expressive |
+| **reef** | Coral + mint | Aquatic, warm-cool |
+| **raspberry** | Berry + cyan | Bright, playful |
+| **circuit** | Yellow + teal | Technical, punchy |
+| **graphite** | Orange + green | Neutral, industrial |
 
-Switch palette from the Hub Settings widget (M or L size) or Hub Core. The
+Switch palette from Hub Core settings. The
 picker shows a three-swatch preview (card bg + two accents) for each option.
 
 Persisted to the legacy `localStorage["nutmag-palette"]` key.
@@ -171,7 +163,7 @@ Persisted to the legacy `localStorage["nutmag-palette"]` key.
 
 ## General preferences
 
-Available in Hub Settings at L size, or via the `lib/prefs.ts` store:
+Available in Hub Core settings, or via the `lib/prefs.ts` store:
 
 | Preference | Default | What it does |
 |------------|---------|-------------|
@@ -188,9 +180,7 @@ Resets are destructive and cannot be undone:
 
 | Reset | Where | What it clears |
 |-------|-------|---------------|
-| Reset graph layout | Hub Core (edit mode, graph active) | Graph mode widget order, sizes, orientations, and settings |
-| Reset default layout | Hub Core (edit mode, default active) | Slot placements and region dims |
-| Reset layout & widget config | Hub Settings (L size) | Both layout modes + resets layout mode to Default |
+| Reset layout & widget config | Hub Core settings â†’ General | Graph widget config plus Slot placements and region dims |
 
 None of the resets touch theme, palette, or global prefs.
 
@@ -207,7 +197,7 @@ layouts and preferences.
 | `nutmag-slot-layout` | Default mode: region dims + per-region widget placements |
 | `nutmag-layout-mode` | Active layout mode (`graph` or `slots`) |
 | `nutmag-theme` | Theme mode (`light`, `auto`, `dark`) |
-| `nutmag-palette` | Active colour palette (`ember`, `slate`, `moss`, `plum`) |
+| `nutmag-palette` | Active colour palette (`ember`, `slate`, `moss`, `plum`, `reef`, `raspberry`, `circuit`, `graphite`) |
 | `nutmag-prefs` | Global prefs (polling, boot sequence) |
 | `nutmag-sessions` | Session tracker (uptime stats) |
 

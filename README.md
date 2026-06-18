@@ -1,20 +1,22 @@
 # AVN Hub
 
-> A configurable personal OS for your dashboard — drag, resize, and create widgets with AI.
+> A self-hosted widget playground for building, placing, and remixing AI-generated dashboard cards.
 
-AVN Hub is a self-hosted living dashboard. It shows what you're listening to, what game you're playing, whether your homelab is alive, your latest commits — all on one page, running on your own hardware, private by default.
+AVN Hub is a living personal card that treats the dashboard as a canvas. Start with the bundled example widgets, ask NutBot to generate new ones, write your own when you want finer control, and arrange everything through a resizable slot grid. The point is not one fixed dashboard. The point is an environment you can keep reshaping into whatever you want it to be.
 
 ---
 
-![AVN Hub dark mode](docs/screenshots/hero-dark.png)
+![AVN Hub dark mode canvas with the slot grid, NutBot terminal, live widgets, and side control tabs](<docs/screenshots/display dark mode.png>)
 
-![AVN Hub light mode](docs/screenshots/hero-light.png)
+![AVN Hub light mode canvas showing the same widget layout with a different palette](<docs/screenshots/display light mode.png>)
 
 ---
 
 ## What it is
 
-Not a portfolio. Not a status page. A personal control surface that reflects your digital life in real time — music, games, homelab, code — laid out exactly how you want it, with widgets you can build yourself just by describing them.
+Not a portfolio. Not a status page. AVN Hub is a customizable widget system for making a personal interface out of whatever matters to you: live data, tiny tools, generated experiments, identity cards, control panels, toys, utilities, or anything else an LLM or developer can express as a React widget.
+
+The included live-data and identity widgets are examples of what the framework can do. They are not the limit of the project. The main loop is: create a widget, place it on the grid, resize it, reposition it, optionally enable Hover On Expand, and keep iterating until the hub feels like yours.
 
 **Built with:** Next.js · Tailwind CSS · Framer Motion · TypeScript  
 **Deployed on:** Self-hosted Docker, accessed privately over Tailscale (no public domain needed)
@@ -23,76 +25,122 @@ Not a portfolio. Not a status page. A personal control surface that reflects you
 
 ## Features
 
-### Live data widgets out of the box
+### A canvas for custom widgets
 
-| Widget | What it shows |
-| --- | --- |
-| **Now Playing** | Spotify track, artist, album art, playback controls, animated EQ bars |
-| **Currently Playing** | Steam game, session hours, total hours |
-| **Homelab Status** | Per-service uptime dots (immich, jellyfin, sonarr, radarr…) + average uptime % |
-| **GitHub Activity** | Most recent commit, repo, relative timestamp |
-| **Clock & Date** | Live clock with sunrise/dusk/sunset bar |
-| **NutBot v2.0** | SVG robot mascot with idle eye-tracking, expressions, and a full AI widget creator terminal |
+AVN Hub is built around widgets as the primary unit of expression. A widget can be a live integration, a personal stat, a generated mini-app, a dashboard control, a visual experiment, or a completely custom interface. Once registered, every widget gets the same framework behavior automatically:
+
+- Placement in the Slot Layout grid
+- Drag-to-reposition in edit mode
+- Edge-handle resizing
+- Per-size layouts for small, medium, and large views
+- Per-widget settings
+- Optional Hover On Expand previews
+- Persistence in local storage
+
+The bundled widgets are included to make the card useful on day one and to show patterns for future widgets. They are examples, not the center of gravity.
+
+---
+
+### Themeable dashboard canvas
+
+The main view is a living canvas: left and right widget regions, a base strip, and a fixed center terminal slot for NutBot. The dark and light screenshots above show the same widget system under different theme modes, and palettes can shift the same layout from warm graphite to bright berry or pale sticker-card surfaces without changing widget code.
+
+Theme mode and palette are controlled from Hub Core settings and persisted in `localStorage`, so the card comes back exactly how you left it.
+
+![AVN Hub sea green palette](<docs/screenshots/display with sea green color.png>)
+
+![AVN Hub berry palette](<docs/screenshots/display with berry color.png>)
+
+![Hub Core appearance settings with all palette options](<docs/screenshots/all the color options.png>)
 
 ---
 
 ### NutBot Widget Creator — build widgets by describing them
 
-![Widget creator](docs/screenshots/widget-creator.png)
+![NutBot Widget Creator close-up](<docs/screenshots/Widget Creator.png>)
 
-NutBot's `CREATOR` tab is an in-dashboard AI terminal. Describe a widget, pick sizes and layout options, and NutBot generates the full React component and wires it into the dashboard — no file editing required.
+NutBot's `CREATOR` tab is an in-dashboard AI terminal for expanding the hub from inside the hub. Describe the widget you want, choose its size and layout options, and NutBot generates the React component and wires it into the dashboard without manual file editing.
 
 - Powered by your choice of CLI backend: **Claude Code**, **OpenCode**, or **Codex**
 - Auto-fallback chain: if one hits a rate limit it hands off to the next
 - TypeScript-checked before registration; rolls back automatically on failure
-- Created widgets are drag-placeable, resizable, and configurable like any built-in widget
+- Create and edit modes for generated widgets
+- Identity fields for name, icon, and slug
+- Size and orientation options (`S`, `M`, `L`, horizontal, vertical)
+- Optional Hover On Expand setting at creation time
+- Per-size content prompts so small, medium, and large layouts can each do something different
+- Created widgets are drag-placeable, resizable, and configurable like any bundled widget
 
 ---
 
-### Configurable layout
+### Slot grid layout and edit mode
 
-![Edit mode](docs/screenshots/edit-mode.png)
+![Edit mode with resize handles, move handles, widget settings buttons, and empty add slots](<docs/screenshots/edit mode.png>)
 
-The dashboard is a three-region slot grid — left column, right column, and a base strip — with NutBot fixed in the center terminal slot. In **edit mode**:
+The dashboard is a three-region slot grid: left column, right column, and a base strip, with NutBot living in the center terminal slot. The grid is the main editing surface. In **edit mode**:
 
 - **Drag** any widget to a new cell with the move handle
 - **Resize** by dragging any of the four edge handles
+- **Configure** a widget with its gear menu, including widget-specific settings and Hover On Expand
 - **Add** widgets from the widget manager into any region that has space
+- **Add directly** from empty `+` cells when edit mode exposes open slots
 - **Remove** widgets back to the available pool (never deleted)
 
-Lock the layout when done to prevent accidental changes.
+Lock the layout when done to prevent accidental changes. Custom widgets and bundled widgets use the same placement system, so generated widgets can be mixed freely with anything already on the card.
+
+![Edit mode with many empty add slots](<docs/screenshots/display with nowidgets in edit mode.png>)
 
 ---
 
-### Widget Manager
+### Resizable, expressive widgets
 
-![Widget manager](docs/screenshots/widget-manager.png)
+Widgets are not just scaled copies of themselves. They can render different interfaces at small, medium, and large sizes. A compact widget might show one value, a medium widget might add controls, and a large widget might become a full panel with richer detail.
 
-The Widget Manager tab lists every placed widget (with its region) and every available widget waiting to be placed. Custom widgets created by NutBot appear here automatically alongside built-in ones. You can also import a widget exported as a `.zip` from another card.
+Each widget declares which sizes and orientations it supports, and the framework handles the rest: chrome, settings, layout persistence, resize constraints, and edit-mode controls. The Slot Layout regions can also change their grid counts from Hub Core, so a tight 2-column sidebar can become a larger placement grid when you want more empty cells and finer control.
 
----
-
-### Hub Core — settings without leaving the page
-
-![Hub Core settings](docs/screenshots/hub-core.png)
-
-A fixed control strip in the top-right corner. Always reachable regardless of layout. Three tabs:
-
-- **Wrench/Lock** — toggle edit mode in one click
-- **Settings** — edit mode toggle, layout reset, region grid-size controls (rows × cols per region), layout export/import
-- **Widget Manager** — add, remove, export, delete custom widgets
-
----
-
-### Two fully-designed themes, eight palettes
-
-Both dark and light modes are first-class — not an afterthought. Eight colour palettes (ember, slate, moss, plum, reef, raspberry, circuit, graphite) each have complete dark and light variants. Switch from the Hub Settings widget or Hub Core. Persisted to `localStorage`, applied pre-paint so there's never a flash of the wrong theme.
+![Customized grid counts with more placement cells](<docs/screenshots/display showing how grid can be customized.png>)
 
 ---
 
 ### Hover On Expand (HOE)
 
-Enable per-widget via its gear menu. Hover over a widget to see a real-time preview of its expanded content — neighbours contract slightly to make room. Reverts the moment you move away. No layout is saved. Requires a fine-pointer device.
+Enable HOE per widget from its gear menu or while creating a widget in NutBot. Hover over a widget to preview a larger version in place while nearby edge-touching widgets temporarily contract to make room. The preview is transient: no layout is saved, no widget is permanently resized, and it only runs on fine-pointer devices outside edit mode.
+
+![Hover On Expand preview showing a widget temporarily expanded in place](<docs/screenshots/expandable widgets.png>)
+
+---
+
+### Widget Manager
+
+![Widget manager with search, import, filters, placed widgets, and available widgets](<docs/screenshots/widget manager.png>)
+
+The Widget Manager tab lists every placed widget with its region and every available widget waiting to be placed. Search by widget name or id, filter by bundled/custom widgets, import a widget exported as a `.zip`, remove placed widgets, and add available widgets back into open regions. Custom widgets created by NutBot appear here automatically alongside bundled examples.
+
+---
+
+### Hub Core — settings without leaving the page
+
+![AVN Hub Canvas Settings menu with appearance, general, and layout controls](<docs/screenshots/AVN Hub Canvas Settings.png>)
+
+A fixed control strip on the edge of the canvas. Always reachable regardless of layout. Three tabs:
+
+- **Wrench/Lock** — toggle edit mode in one click
+- **Settings** — theme, palette, global prefs, layout reset, region grid-size controls (rows × cols per region), layout export/import
+- **Widget Manager** — add, remove, export, delete custom widgets
+
+The settings panel is not exclusive-collapse: Appearance, General, and Layout can stay open together while you adjust theme, palette, boot/polling preferences, grid counts, and layout files.
+
+---
+
+### Bundled example widgets
+
+AVN Hub ships with a working set of widgets so the playground has real texture immediately: identity, music, games, homelab status, GitHub activity, clock/date, quicklinks, and NutBot itself. Use them as-is, delete the ones that do not fit, or treat them as reference implementations for your own generated or hand-written widgets.
+
+---
+
+### Two fully-designed themes, eight palettes
+
+Both dark and light modes are first-class — not an afterthought. Eight colour palettes (ember, slate, moss, plum, reef, raspberry, circuit, graphite) each have complete dark and light variants. Switch from Hub Core settings. Persisted to `localStorage`, applied pre-paint so there's never a flash of the wrong theme.
 
 ---
 
@@ -113,6 +161,8 @@ cp .env.local.example .env.local   # fill in your API keys
 ```
 
 ### 2. Environment variables
+
+The bundled example widgets use these integrations when configured. Custom widgets can add their own API routes and settings as needed.
 
 ```env
 # Spotify (Authorization Code flow)
@@ -153,7 +203,9 @@ That's it. No reverse proxy, no Let's Encrypt setup, no public DNS.
 
 ## Adding custom widgets
 
-NutBot's `CREATOR` tab is the intended path. But you can also follow [`docs/CREATING_WIDGETS.md`](docs/CREATING_WIDGETS.md) to write one by hand — the authoring guide is written so any developer (or LLM) can follow it literally.
+Adding widgets is the main extension path for AVN Hub. NutBot's `CREATOR` tab is the intended path for quick iteration: describe what you want, let it generate the widget, then place and resize it like anything else on the grid.
+
+You can also follow [`docs/CREATING_WIDGETS.md`](docs/CREATING_WIDGETS.md) to write one by hand. The authoring guide is written so any developer or LLM can follow it literally.
 
 Every widget is:
 
@@ -163,7 +215,7 @@ components/widgets/custom/<slug>/
   manifest.json      ← metadata (title, icon, sizes, settings schema)
 ```
 
-Registration into the dashboard happens automatically after the files are written.
+After a custom widget is registered, it appears in the Widget Manager and gets the same placement, resizing, settings, persistence, and optional HOE behavior as every bundled widget.
 
 ---
 

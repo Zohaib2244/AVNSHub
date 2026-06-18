@@ -13,7 +13,6 @@ import {
   Music,
   Network,
   Server,
-  SlidersHorizontal,
   SquareTerminal,
   Trophy,
   Tv,
@@ -34,7 +33,6 @@ import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
 import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
 import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
 import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
-import { HubSettings } from "@/components/widgets/default/system/HubSettings";
 import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
 
 /* ─── widget framework contracts ─────────────────────────────────────
@@ -311,16 +309,6 @@ export const WIDGETS = {
     settings: [{ key: "flyoutCommits", label: "commits shown", type: "number", default: 5, min: 1, max: 15 }],
     flags: { customHeader: true, accent: true },
   },
-  "hub-settings": {
-    id: "hub-settings",
-    title: "avn hub settings",
-    icon: SlidersHorizontal,
-    component: HubSettings,
-    // component renders quick controls at S/M and the full panel at L
-    sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "h" },
-  },
   tracker: {
     id: "tracker",
     title: "session tracker",
@@ -359,6 +347,5 @@ export const DEFAULT_ORDER: string[] = [
   "quicklinks",
   "milestones",
   "tracker",
-  "hub-settings",
   ...CUSTOM_DEFAULT_ORDER,
 ];

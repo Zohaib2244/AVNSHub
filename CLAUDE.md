@@ -31,12 +31,12 @@ A living personal dashboard for what I'm listening to, what game I'm playing, wh
 | Orange accent | `#ff6b2b` | `#e05a18` |
 | Cyan/teal accent | `#00b4c8` | `#00768a` |
 
-- **Layout**: A configurable dashboard grid inside the `.frame` bezel â€” every block (including the namecard, NutBot, and the hub settings) is a widget placed by the widget framework (below). No hardcoded composition; `DEFAULT_ORDER` in `config/widgets.tsx` is just the starting arrangement
+- **Layout**: A configurable dashboard grid inside the `.frame` bezel â€” every block (including the namecard and NutBot) is a widget placed by the widget framework (below). Global canvas settings live in Hub Core, outside the widget registry. No hardcoded composition; `DEFAULT_ORDER` in `config/widgets.tsx` is just the starting arrangement
 - **Card treatment ("sticker/stamp")**: `border-radius: 12â€“16px`, `border: 1.5px solid` (border token), hard offset `box-shadow: 3-5px 3-5px 0` (shadow token, **no blur**)
 - **Typography**: `DotGothic16` for the logo (`1.7rem`), section/field labels (`0.62rem`, uppercase, `letter-spacing: 0.14em`), and headline stat numbers (`2.2rem`, `line-height: 1` â€” the largest text on the page). `JetBrains Mono` for primary data values (`1.25rem`, `font-weight: 500`), sub text (`0.75rem`), and chips/pills/badges (`0.6â€“0.65rem`, uppercase)
 - **Icons**: Lucide, 14Ã—14px, `stroke-width: 1.75`, prefixed to section labels, links, and badges
 - **Motion**: Subtle data transitions and per-size content swaps. No scanlines, no grain, no phosphor glow.
-- **Theme packs**: the token table above is the default **ember** palette. Alternate packs (slate, moss, plum, reef, raspberry, circuit, graphite â€” each with dark+light variants) live as `[data-palette="â€¦"]` blocks in `globals.css` with metadata in `config/themes.ts`; picked from the hub settings widget, persisted to `localStorage["nutmag-palette"]`, applied pre-paint by the inline script in `app/layout.tsx` and re-applied at runtime by `ThemeRuntimeSync`. New packs must define the full 14-token set for both modes and respect every other rule in this section
+- **Theme packs**: the token table above is the default **ember** palette. Alternate packs (slate, moss, plum, reef, raspberry, circuit, graphite â€” each with dark+light variants) live as `[data-palette="â€¦"]` blocks in `globals.css` with metadata in `config/themes.ts`; picked from Hub Core settings, persisted to `localStorage["nutmag-palette"]`, applied pre-paint by the inline script in `app/layout.tsx` and re-applied at runtime by `ThemeRuntimeSync`. New packs must define the full 14-token set for both modes and respect every other rule in this section
 - **Never use**: Inter, Roboto, Arial, system fonts, purple gradients, centered portfolio layouts, pure black/white, neon glow, CRT scanlines/grain, blurred shadows
 
 ---
@@ -68,7 +68,7 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 
 **Widget controls** (Hub Core Widget Manager tab): the single surface for adding/removing widgets, opened from its own Hub Core tab rather than inside the AVN Hub canvas settings. In Graph Layout it lists on-screen widgets (removable â†’ `hidden: true`) and available/hidden ones (add-able â†’ `hidden: false`). In Slot Layout it lists placed/unplaced widgets and the add action expands into only the regions (`left`, `right`, `base`) that currently have room for that widget's footprint. Any registered widget appears automatically.
 
-**Hub settings widget** (`hub-settings`, "AVN Hub"): theme + palette + global prefs + layout reset, rendered per size (S = theme toggle, M = + palette, L = + prefs/reset). Visibility management lives in Hub Core, not here.
+**Hub Core canvas settings**: theme, palette, global prefs, layout reset, region grid-size controls, and layout import/export live in the Hub Core settings tab. Settings sections are independently collapsible; multiple sections may remain open at once. Edit mode is controlled only by the persistent wrench/lock tab, not by duplicated controls inside the settings panel.
 
 ---
 
@@ -135,7 +135,6 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”‚   â”‚   â”œâ”€â”€ WidgetContext.tsx # useWidget() â€” { id, size, orientation, settings }
 â”‚   â”‚   â””â”€â”€ WidgetSettingsPopover.tsx  # gear popover (placement + schema form)
 â”‚   â”œâ”€â”€ widgets/
-â”‚   â”‚   â”œâ”€â”€ HubSettings.tsx       # "AVN Hub" â€” theme/palette/prefs/reset (per size)
 â”‚   â”‚   â””â”€â”€ NutBotFaceWidget.tsx  # face at S/M, terminal at L
 â”‚   â”œâ”€â”€ Dashboard.tsx         # grid + dnd-kit drag/drop + edit mode
 â”‚   â”œâ”€â”€ LayoutProvider.tsx    # layout store context (instances, editMode)
@@ -191,7 +190,7 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > - Ripped out all widget expansion (hover/grow/overlay): deleted `gridCascade.ts`, `WidgetFlyout`/`WidgetOverlay`/`MicroView`, the cascade/override/view-transition machinery, and the `expand`/`expandDirection`/`expandModes`/`expandedComponent` fields. (The hover system caused a reflow-oscillation loop.)
 > - Widgets are **resize + rearrange** at the layout level; "more when bigger" is per-size markup (`useWidget().size`) or a manifest `detail` component rendered at L
 > - Slot Layout has an opt-in visual-only **Hover On Expand** preview driven by `lib/grid/hoverExpand.ts`, `SlotRegion`, and `SlotWidgetCell`: real transient preview boxes, no persisted hover mutation, no overlays, no neighbor cascade
-> - Widget add/remove moved into the Hub Core Widget Manager tab; NutBot renders its terminal at L; Hub Settings renders its full panel at L
+> - Widget add/remove moved into the Hub Core Widget Manager tab; NutBot renders its terminal at L; canvas appearance/prefs/reset controls live in Hub Core settings
 > - Authoring guide written: [`docs/CREATING_WIDGETS.md`](./docs/CREATING_WIDGETS.md)
 
 > **Next â€” widget-creator chat (planned)**
