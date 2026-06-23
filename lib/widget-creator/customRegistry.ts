@@ -6,12 +6,13 @@
 // CRUD mechanics live in one place: JSON parse→mutate→stringify for data, and
 // marker-anchored string replacement for the two code lines. No regex, no
 // brace-counting — the fragile part of the old single-file approach.
-import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, statSync } from "fs";
 import { join } from "path";
 
 const ROOT = process.cwd();
 export const REGISTRY_PATH = join(ROOT, "config/customRegistry.json");
 export const COMPONENT_MAP_PATH = join(ROOT, "config/customComponentMap.tsx");
+export const CUSTOM_WIDGETS_DIR = join(ROOT, "components/widgets/custom");
 
 export type RegistryEntry = {
   title: string;
@@ -24,6 +25,10 @@ export type RegistryEntry = {
 };
 
 export type CustomRegistry = Record<string, RegistryEntry>;
+
+export function isValidCustomWidgetId(id: string): boolean {
+  return /^[a-z0-9-]+$/.test(id);
+}
 
 /** slug → PascalCase (e.g. "my-thing" → "MyThing") */
 export function pascalCase(slug: string): string {
@@ -65,6 +70,36 @@ export function removeRegistryEntry(id: string): void {
     delete registry[id];
     writeRegistry(registry);
   }
+}
+
+export function removeCustomWidgetFiles(id: string): boolean {
+  if (!isValidCustomWidgetId(id)) return false;
+  const widgetDir = join(CUSTOM_WIDGETS_DIR, id);
+  if (!existsSync(widgetDir)) return false;
+  rmSync(widgetDir, { recursive: true, force: true });
+  return true;
+}
+
+export function pruneOrphanCustomWidgetFiles(): string[] {
+  if (!existsSync(CUSTOM_WIDGETS_DIR)) return [];
+  const registry = readRegistry();
+  const keepIds = new Set(Object.keys(registry));
+  const removed: string[] = [];
+
+  for (const name of readdirSync(CUSTOM_WIDGETS_DIR)) {
+    if (!isValidCustomWidgetId(name) || keepIds.has(name)) continue;
+
+    const widgetDir = join(CUSTOM_WIDGETS_DIR, name);
+    try {
+      if (!statSync(widgetDir).isDirectory()) continue;
+      rmSync(widgetDir, { recursive: true, force: true });
+      removed.push(name);
+    } catch {
+      // Leave folders we cannot stat/remove; the delete route reports exact-id failures.
+    }
+  }
+
+  return removed;
 }
 
 /** valid size/orientation tokens — used to sanitize LLM/UI-supplied values */
@@ -141,7 +176,7 @@ export type ComponentModule = { file: string; exportName: string | null };
     the LLM toward that name, but it doesn't always comply (and imported widgets
     may be named differently), so detect the real file + export. */
 export function findComponentModule(id: string): ComponentModule | null {
-  const dir = join(ROOT, "components/widgets/custom", id);
+  const dir = join(CUSTOM_WIDGETS_DIR, id);
   if (!existsSync(dir)) return null;
   const tsxFiles = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
   if (tsxFiles.length === 0) return null;
@@ -196,9 +231,10 @@ export function removeFromComponentMap(id: string): void {
   const v = localVar(id);
   const declPrefix = `const ${v} = `;
   // handle both quoted ("id": v) and bare (id: v) key formats
-  const kept = content
-    .split("\n")
+  const lines = content.split("\n");
+  const kept = lines
     .filter((line) => !line.startsWith(declPrefix) && line !== `  "${id}": ${v},` && line !== `  ${id}: ${v},`);
+  if (kept.length === lines.length) return;
   writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
 }
 
@@ -217,7 +253,7 @@ export function sanitizeComponentMap(): string[] {
     );
     if (!m) continue;
     const [, id, file] = m;
-    const filePath = join(ROOT, "components/widgets/custom", id, `${file}.tsx`);
+    const filePath = join(CUSTOM_WIDGETS_DIR, id, `${file}.tsx`);
     if (!existsSync(filePath)) staleIds.push(id);
   }
 

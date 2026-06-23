@@ -6,6 +6,7 @@ import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
 import { placeWidgetAuto } from "@/lib/slotLayout";
+import { isValidSlug } from "@/lib/widget-creator/slug";
 
 type Phase =
   | { id: "idle" }
@@ -51,6 +52,17 @@ function StatusBar({ phase }: { phase: Phase }) {
       </span>
     </div>
   );
+}
+
+// Mirrors the registration check in writeWidgetConfig() (generate/route.ts) —
+// catch a missing/invalid slug here, before spawning a harness, instead of
+// after a full generation run completes.
+function validateSettings(settings: GenerateSettings): string | null {
+  if (settings.editSlug) return null; // edit mode always has a valid editSlug from the picker
+  const slug = (settings.slug ?? "").trim();
+  if (!slug) return "enter a widget name or slug in the settings panel before generating — registration needs an id";
+  if (!isValidSlug(slug)) return `invalid slug "${slug}" — use only lowercase letters, numbers, and hyphens`;
+  return null;
 }
 
 const MESSAGES_KEY = "nutmag-creator-messages";
@@ -105,6 +117,12 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
     // actually in flight (otherwise an error would strand the chat)
     const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
     if (!prompt.trim() || inFlight) return;
+
+    const validationError = validateSettings(settings);
+    if (validationError) {
+      fail(validationError);
+      return;
+    }
 
     const userText = prompt.trim();
     setPrompt("");

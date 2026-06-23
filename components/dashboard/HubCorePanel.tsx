@@ -481,6 +481,7 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const query = search.trim().toLowerCase();
   const allPlacedRows = [
@@ -506,14 +507,19 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
   async function deleteCustomWidget(id: string) {
     if (!customIds.has(id) || deletingId) return;
     setDeletingId(id);
+    setDeleteError(null);
     removeSlotWidget(id);
     if (slotLayout.terminalWidgetId === id) setTerminalWidget(null);
     try {
-      await fetch("/api/widget-creator/delete", {
+      const res = await fetch("/api/widget-creator/delete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null) as { error?: string } | null;
+        setDeleteError(payload?.error ?? `failed to delete ${id}`);
+      }
     } finally {
       setDeletingId(null);
     }
@@ -525,6 +531,7 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
 
   return (
     <div className="hub-widget-panel">
+      {deleteError && <div className="hub-core-io-error">{deleteError}</div>}
       <HubWidgetList
         heading={`placed · ${placedRows.length}`}
         ids={placedRows.map((row) => row.id)}

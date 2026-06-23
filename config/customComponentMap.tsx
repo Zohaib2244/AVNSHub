@@ -10,13 +10,9 @@ import { lazy } from "react";
 import type { ComponentType } from "react";
 
 // --- custom-components start ---
-const _weather = lazy(() => import("@/components/widgets/custom/weather/WeatherWidget").then((m) => ({ default: m.WeatherWidget })));
-const _slideshow = lazy(() => import("@/components/widgets/custom/slideshow/SlideshowWidget").then((m) => ({ default: m.SlideshowWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
 // --- custom-map start ---
-  weather: _weather,
-  "slideshow": _slideshow,
 // --- custom-map end ---
 };

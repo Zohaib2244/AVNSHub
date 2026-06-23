@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
+import { slugify } from "@/lib/widget-creator/slug";
 
 type Props = {
   settings: GenerateSettings;
@@ -107,8 +108,7 @@ export function SettingsPane({ settings, onChange }: Props) {
                 value={settings.name ?? ""}
                 onChange={(e) => {
                   const name = e.target.value;
-                  const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-                  onChange({ name, slug });
+                  onChange({ name, slug: slugify(name) });
                 }}
               />
             </div>

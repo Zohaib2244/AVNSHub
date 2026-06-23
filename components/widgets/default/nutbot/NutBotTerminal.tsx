@@ -58,11 +58,21 @@ function runCommand(raw: string): string | null {
 
 type ShellState = { history: { cmd: string; output: string }[]; input: string };
 type LogLine = { id: number; text: string };
+type TerminalTab = { id: string; title: string };
+
+const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
+const DEFAULT_TABS: TerminalTab[] = [
+  { id: "log", title: "log" },
+  { id: "shell-1", title: "shell 1" },
+  ...(SHELL_WS_URL ? [{ id: "real-shell", title: "real shell" }] : []),
+  { id: "creator", title: "creator" },
+];
 
 export function NutBotTerminal() {
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
+  const skipTabWrite = useRef(true);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -76,24 +86,35 @@ export function NutBotTerminal() {
     return () => clearInterval(id);
   }, []);
 
-  const [tabs, setTabs] = useState(() => [
-    { id: "log", title: "log" },
-    { id: "shell-1", title: "shell 1" },
-    ...(SHELL_WS_URL ? [{ id: "real-shell", title: "real shell" }] : []),
-    { id: "creator", title: "creator" },
-  ]);
-  const [activeTab, setActiveTab] = useState(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("nutmag-nutbot-tab") ?? "log";
-    }
-    return "log";
-  });
+  const [tabs, setTabs] = useState<TerminalTab[]>(() => DEFAULT_TABS);
+  const [activeTab, setActiveTab] = useState("log");
   const [shells, setShells] = useState<Record<string, ShellState>>({ "shell-1": { history: [], input: "" } });
   const shellCount = useRef(1);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try { sessionStorage.setItem("nutmag-nutbot-tab", activeTab); } catch {}
+    let restoreTimer: number | undefined;
+    try {
+      const stored = sessionStorage.getItem(NUTBOT_TAB_KEY);
+      if (stored && DEFAULT_TABS.some((tab) => tab.id === stored)) {
+        restoreTimer = window.setTimeout(() => {
+          skipTabWrite.current = false;
+          setActiveTab(stored);
+        }, 0);
+      } else {
+        skipTabWrite.current = false;
+      }
+    } catch {
+      skipTabWrite.current = false;
+    }
+    return () => {
+      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (skipTabWrite.current) return;
+    try { sessionStorage.setItem(NUTBOT_TAB_KEY, activeTab); } catch {}
   }, [activeTab]);
 
   useEffect(() => {

@@ -174,7 +174,11 @@ function runHarness(
 
     sendEvent(write, "status", { type: "harness_start", harness: adapter.id });
 
-    const child = spawn(adapter.command, adapter.args, {
+    // opencode's `run` subcommand has no stdin-reading mode — the prompt must
+    // be a trailing positional arg there, vs. stdin for claude/codex
+    const args = adapter.promptViaArg ? [...adapter.args, fullPrompt] : adapter.args;
+
+    const child = spawn(adapter.command, args, {
       cwd: REPO_ROOT,
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
@@ -183,24 +187,29 @@ function runHarness(
       shell: process.platform === "win32",
     });
 
-    // write prompt to stdin
-    child.stdin.write(fullPrompt);
-    child.stdin.end();
+    if (adapter.promptViaArg) {
+      child.stdin.end();
+    } else {
+      child.stdin.write(fullPrompt);
+      child.stdin.end();
+    }
 
     let hitLimit = false;
     let buffer = "";
 
     function processLine(line: string) {
-      // Skip limit detection on JSON content-delta frames — generated code can
-      // legitimately mention "rate limit", "overloaded", etc. as plain text, and
-      // checking the raw JSON-encoded line would fire a false positive switch.
-      let isContentDelta = false;
+      // Skip limit detection on frames carrying actual model/tool content —
+      // generated code can legitimately mention "rate limit", "overloaded",
+      // etc. as plain text, and checking the raw JSON-encoded line would fire
+      // a false positive switch. Covers all three adapters' content frames:
+      // claude (message.content), codex (item), opencode (part).
+      let isGeneratedContent = false;
       try {
         const f = JSON.parse(line);
-        isContentDelta = f.type === "content_block_delta" && f.delta?.type === "text_delta";
+        isGeneratedContent = Boolean(f.message?.content) || Boolean(f.item) || Boolean(f.part);
       } catch {}
 
-      if (!isContentDelta && lineSignalsLimit(line)) {
+      if (!isGeneratedContent && lineSignalsLimit(line)) {
         hitLimit = true;
         return;
       }
