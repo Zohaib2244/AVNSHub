@@ -1,0 +1,33 @@
+{
+  "title": "atom bomb",
+  "iconName": "Bomb",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "cityName",
+      "label": "city name",
+      "type": "text",
+      "default": "Nova City",
+      "placeholder": "fictional city"
+    },
+    {
+      "key": "yield",
+      "label": "yield",
+      "type": "select",
+      "default": "medium",
+      "options": [
+        { "value": "small", "label": "small" },
+        { "value": "medium", "label": "medium" },
+        { "value": "maximum", "label": "maximum" }
+      ]
+    },
+    {
+      "key": "showTelemetry",
+      "label": "show telemetry",
+      "type": "toggle",
+      "default": true
+    }
+  ]
+}

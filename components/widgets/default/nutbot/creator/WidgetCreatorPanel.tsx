@@ -29,6 +29,7 @@ export function WidgetCreatorPanel() {
       <div className="wc-right">
         <ChatCanvas
           settings={settings}
+          onSettingsChange={patchSettings}
           activeHarness={prefs.activeHarness}
           harnessChain={prefs.harnessChain}
         />

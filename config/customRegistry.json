@@ -1,4 +1,42 @@
 {
+  "cube-timer": {
+    "title": "cube timer",
+    "iconName": "Box",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "showScramble",
+        "label": "show scramble",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "showStats",
+        "label": "show stats",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "scrambleLength",
+        "label": "scramble length",
+        "type": "number",
+        "default": 20,
+        "min": 10,
+        "max": 30
+      }
+    ]
+  },
   "dictionary": {
     "title": "dictionary",
     "iconName": "BookOpen",
@@ -37,6 +75,241 @@
       {
         "key": "showPronunciation",
         "label": "pronunciation",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  },
+  "monkey-type": {
+    "title": "monkey type",
+    "iconName": "Activity",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "wordCount",
+        "label": "word count",
+        "type": "select",
+        "default": "25",
+        "options": [
+          {
+            "value": "10",
+            "label": "10 words"
+          },
+          {
+            "value": "25",
+            "label": "25 words"
+          },
+          {
+            "value": "50",
+            "label": "50 words"
+          },
+          {
+            "value": "100",
+            "label": "100 words"
+          }
+        ]
+      },
+      {
+        "key": "showLiveWpm",
+        "label": "show live wpm",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "showAccuracy",
+        "label": "show accuracy",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  },
+  "glyph-matrix": {
+    "title": "glyph matrix",
+    "iconName": "Box",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "animation",
+        "label": "animation",
+        "type": "select",
+        "default": "glyph",
+        "options": [
+          {
+            "value": "glyph",
+            "label": "glyph idle"
+          },
+          {
+            "value": "pulse",
+            "label": "pulse"
+          },
+          {
+            "value": "wave",
+            "label": "wave"
+          },
+          {
+            "value": "ripple",
+            "label": "ripple"
+          },
+          {
+            "value": "rain",
+            "label": "rain"
+          },
+          {
+            "value": "snake",
+            "label": "snake"
+          },
+          {
+            "value": "charging",
+            "label": "charging"
+          },
+          {
+            "value": "scan",
+            "label": "scan"
+          },
+          {
+            "value": "binary",
+            "label": "binary"
+          },
+          {
+            "value": "spiral",
+            "label": "spiral"
+          }
+        ]
+      },
+      {
+        "key": "speed",
+        "label": "speed",
+        "type": "select",
+        "default": "normal",
+        "options": [
+          {
+            "value": "slow",
+            "label": "slow"
+          },
+          {
+            "value": "normal",
+            "label": "normal"
+          },
+          {
+            "value": "fast",
+            "label": "fast"
+          }
+        ]
+      },
+      {
+        "key": "color",
+        "label": "dot color",
+        "type": "select",
+        "default": "orange",
+        "options": [
+          {
+            "value": "orange",
+            "label": "orange"
+          },
+          {
+            "value": "cyan",
+            "label": "cyan"
+          },
+          {
+            "value": "white",
+            "label": "white"
+          },
+          {
+            "value": "mixed",
+            "label": "mixed"
+          }
+        ]
+      },
+      {
+        "key": "dotSize",
+        "label": "dot size",
+        "type": "select",
+        "default": "medium",
+        "options": [
+          {
+            "value": "small",
+            "label": "small"
+          },
+          {
+            "value": "medium",
+            "label": "medium"
+          },
+          {
+            "value": "large",
+            "label": "large"
+          }
+        ]
+      }
+    ]
+  },
+  "atom-bomb": {
+    "title": "atom bomb",
+    "iconName": "Bomb",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "cityName",
+        "label": "city name",
+        "type": "text",
+        "default": "Nova City",
+        "placeholder": "fictional city"
+      },
+      {
+        "key": "yield",
+        "label": "yield",
+        "type": "select",
+        "default": "medium",
+        "options": [
+          {
+            "value": "small",
+            "label": "small"
+          },
+          {
+            "value": "medium",
+            "label": "medium"
+          },
+          {
+            "value": "maximum",
+            "label": "maximum"
+          }
+        ]
+      },
+      {
+        "key": "showTelemetry",
+        "label": "show telemetry",
         "type": "toggle",
         "default": true
       }

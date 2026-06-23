@@ -1,0 +1,23 @@
+{
+  "title": "monkey type",
+  "iconName": "Activity",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "wordCount",
+      "label": "word count",
+      "type": "select",
+      "default": "25",
+      "options": [
+        { "value": "10", "label": "10 words" },
+        { "value": "25", "label": "25 words" },
+        { "value": "50", "label": "50 words" },
+        { "value": "100", "label": "100 words" }
+      ]
+    },
+    { "key": "showLiveWpm", "label": "show live wpm", "type": "toggle", "default": true },
+    { "key": "showAccuracy", "label": "show accuracy", "type": "toggle", "default": true }
+  ]
+}

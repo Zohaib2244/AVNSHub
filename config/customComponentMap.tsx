@@ -11,10 +11,18 @@ import type { ComponentType } from "react";
 
 // --- custom-components start ---
 const _dictionary = lazy(() => import("@/components/widgets/custom/dictionary/DictionaryWidget").then((m) => ({ default: m.DictionaryWidget })));
+const _cube_timer = lazy(() => import("@/components/widgets/custom/cube-timer/CubeTimerWidget").then((m) => ({ default: m.CubeTimerWidget })));
+const _monkey_type = lazy(() => import("@/components/widgets/custom/monkey-type/MonkeyTypeWidget").then((m) => ({ default: m.MonkeyTypeWidget })));
+const _glyph_matrix = lazy(() => import("@/components/widgets/custom/glyph-matrix/GlyphMatrixWidget").then((m) => ({ default: m.GlyphMatrixWidget })));
+const _atom_bomb = lazy(() => import("@/components/widgets/custom/atom-bomb/AtomBombWidget").then((m) => ({ default: m.AtomBombWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
 // --- custom-map start ---
   "dictionary": _dictionary,
+  "cube-timer": _cube_timer,
+  "monkey-type": _monkey_type,
+  "glyph-matrix": _glyph_matrix,
+  "atom-bomb": _atom_bomb,
 // --- custom-map end ---
 };

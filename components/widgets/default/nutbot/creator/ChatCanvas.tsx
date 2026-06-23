@@ -26,6 +26,7 @@ type Message =
 
 type Props = {
   settings: GenerateSettings;
+  onSettingsChange: (patch: Partial<GenerateSettings>) => void;
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
 };
@@ -67,7 +68,7 @@ function validateSettings(settings: GenerateSettings): string | null {
 
 const MESSAGES_KEY = "nutmag-creator-messages";
 
-export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
+export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessChain }: Props) {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -126,6 +127,14 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
 
     const userText = prompt.trim();
     setPrompt("");
+
+    // the slug this run is targeting — known up front for edits, derived from
+    // the create-mode slug field otherwise; used to auto-switch into edit mode
+    // once we know the widget exists on disk (whether the run succeeds or
+    // leaves fixable tsc errors behind), so a same-session follow-up message
+    // edits/debugs it instead of failing validation or re-creating from scratch
+    const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
+    let hadTscErrors = false;
 
     // clear any prior run's result so retrying after done/error starts clean
     setDoneWidgetId(null);
@@ -193,7 +202,10 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
                 if (idx >= 0 && updated[idx]?.role === "assistant") {
                   updated[idx] = { ...(updated[idx] as { role: "assistant"; text: string }), streaming: false };
                 }
-                return [...updated, { role: "ok", text: "[ok] widget written — click '+ add to layout' below" }];
+                return [
+                  ...updated,
+                  { role: "ok", text: "[ok] widget written — click '+ add to layout' below. keep chatting here to iterate on it." },
+                ];
               });
               clearSignal();
               if (slug) {
@@ -201,6 +213,10 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
                 setAdded(false);
                 emitWidgetCreated(slug);
                 try { sessionStorage.setItem("nutmag-creator-done", slug); } catch {}
+                // switch this session into edit mode targeting the widget we just
+                // wrote, so a follow-up message in the same chat naturally edits
+                // it instead of erroring out or trying to recreate it
+                onSettingsChange({ editSlug: slug });
               }
             }
           } else if (event === "chunk") {
@@ -223,10 +239,22 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
             setPhase({ id: "connecting", harness: to });
             assistantIdxRef.current = -1;
           } else if (event === "tsc_errors") {
+            hadTscErrors = true;
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
           } else if (event === "error") {
             clearSignal();
             fail(payload.message as string);
+            // a new widget's registration was rolled back for tsc errors, but the
+            // files are still on disk — switch to edit mode on the same slug so
+            // the next message in this chat asks the harness to fix those files
+            // instead of failing slug validation or attempting a fresh create
+            if (hadTscErrors && attemptedSlug) {
+              onSettingsChange({ editSlug: attemptedSlug });
+              setMessages((prev) => [
+                ...prev,
+                { role: "ok", text: `[info] switched to edit mode for "${attemptedSlug}" — describe the fix and resubmit` },
+              ]);
+            }
           }
         }
       }
@@ -266,6 +294,9 @@ export function ChatCanvas({ settings, activeHarness, harnessChain }: Props) {
     setPhase({ id: "idle" });
     setDoneWidgetId(null);
     setAdded(false);
+    // a finished session may have auto-switched into edit mode (see "done"/tsc_errors
+    // handling above) — starting a new chat should start fresh in create mode
+    onSettingsChange({ editSlug: undefined });
     try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
     try { sessionStorage.removeItem(MESSAGES_KEY); } catch {}
   }

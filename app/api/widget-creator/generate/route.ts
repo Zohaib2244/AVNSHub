@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync, existsSync } from "fs";
 import { join } from "path";
 import { HARNESS_ADAPTERS, HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
-import { lineSignalsLimit } from "@/lib/widget-creator/limitDetection";
+import { lineSignalsLimit, describeLimitReason, type LimitReason } from "@/lib/widget-creator/limitDetection";
 import {
   readRegistry,
   upsertRegistryEntry,
@@ -65,27 +65,29 @@ function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
     .join("\n");
 
   const taskSection = isEdit
-    ? `## Your task â€” EDITING an existing widget
+    ? `## Your task - EDITING an existing widget
 
 You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT create a new widget.
 - Overwrite \`components/widgets/custom/${settings.editSlug}/${comp}.tsx\` with the updated component (keep the named export \`export function ${comp}() { ... }\`)
 - If sizes / icon / settings-schema change, also overwrite \`components/widgets/custom/${settings.editSlug}/manifest.json\` to match
-- DO NOT touch any file under \`config/\` â€” the registration is managed automatically. The slug must stay the same.
+- DO NOT touch any file under \`config/\` - the registration is managed automatically. The slug must stay the same.
 
 ## Current implementation (modify this)
 
 \`\`\`tsx
-${existingCode || "(could not read existing file â€” write a corrected version)"}
+${existingCode || "(could not read existing file - write a corrected version)"}
 \`\`\``
-    : `## Your task â€” creating a new widget
+    : `## Your task - creating a new widget
 
 Write a new widget following the rules in the authoring guide below. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
-- \`${comp}.tsx\` â€” the component, with a named export \`export function ${comp}() { ... }\`
-- \`manifest.json\` â€” the widget's manifest data (see "Required output" below)
+- \`${comp}.tsx\` - the component, with a named export \`export function ${comp}() { ... }\`
+- \`manifest.json\` - the widget's manifest data (see "Required output" below)
 
-Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file â€” the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.`;
+Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file - the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.
 
-  return `You are generating a widget for the AVN Hub project â€” a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
+The authoring guide below (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - write directly from the guide and the spec in this prompt.`;
+
+  return `You are generating a widget for the AVN Hub project - a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
 
 ${taskSection}
 
@@ -95,7 +97,7 @@ ${creatingWidgetsDoc}
 
 ## Widget spec from the user
 
-${settingsSummary || "(No structured settings provided â€” infer from the prompt below.)"}
+${settingsSummary || "(No structured settings provided - infer from the prompt below.)"}
 
 ## User prompt
 
@@ -103,9 +105,9 @@ ${userPrompt}
 
 ## Required output
 
-1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export â€” the file basename and export name must both be \`${comp}\`).
+1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export - the file basename and export name must both be \`${comp}\`).
 
-2. Write \`components/widgets/custom/${slug || "<slug>"}/manifest.json\` describing the widget. This is pure data â€” DO NOT write any config/*.ts(x) file; the build picks this manifest up automatically. Shape:
+2. Write \`components/widgets/custom/${slug || "<slug>"}/manifest.json\` describing the widget. This is pure data - DO NOT write any config/*.ts(x) file; the build picks this manifest up automatically. Shape:
 \`\`\`json
 {
   "title": "${settings.name ?? (slug || "widget name")}",
@@ -118,7 +120,7 @@ ${userPrompt}
   ]
 }
 \`\`\`
-\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) â€” use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
+\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) - use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
 
 3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/${slug || "<slug>"}/route.ts\`.
 
@@ -129,7 +131,7 @@ Design rules to follow:
 - Never hard-code hex values or use Inter/Roboto/Arial
 - Use \`block-value\`, \`block-sub\`, \`block-label\`, \`more-head\`, \`more-row\` classes for consistent styling
 - DotGothic16 for labels/stats, JetBrains Mono for data values
-- Border radius 12â€“16px, hard offset box-shadow (no blur), 1.5px solid border
+- Border radius 12-16px, hard offset box-shadow (no blur), 1.5px solid border
 - Use \`usePolling\` from \`@/lib/usePolling\` for any data fetching, never bare setInterval
 
 Start writing the files now.`;
@@ -170,7 +172,7 @@ function runHarness(
   write: SSEWriter,
   signal: AbortSignal,
   continuationNote?: string,
-): Promise<"done" | "limit" | "error"> {
+): Promise<{ status: "done" | "limit" | "error"; limitReason?: LimitReason }> {
   return new Promise((resolve) => {
     const fullPrompt = continuationNote ? `${continuationNote}\n\n${prompt}` : prompt;
 
@@ -196,7 +198,7 @@ function runHarness(
       child.stdin.end();
     }
 
-    let hitLimit = false;
+    let limitReason: LimitReason = null;
     let buffer = "";
 
     function processLine(line: string) {
@@ -211,9 +213,10 @@ function runHarness(
         isGeneratedContent = Boolean(f.message?.content) || Boolean(f.item) || Boolean(f.part);
       } catch {}
 
-      if (!isGeneratedContent && lineSignalsLimit(line)) {
-        hitLimit = true;
-        return;
+      if (!isGeneratedContent) {
+        const reason = lineSignalsLimit(line);
+        if (reason && !limitReason) limitReason = reason;
+        if (reason) return;
       }
       const text = adapter.parseChunk(line);
       if (text) sendEvent(write, "chunk", { text });
@@ -228,12 +231,13 @@ function runHarness(
 
     child.stderr.on("data", (data: Buffer) => {
       const text = data.toString();
-      if (lineSignalsLimit(text)) hitLimit = true;
+      const reason = lineSignalsLimit(text);
+      if (reason && !limitReason) limitReason = reason;
     });
 
     child.on("close", () => {
       if (buffer) processLine(buffer);
-      resolve(hitLimit ? "limit" : "done");
+      resolve(limitReason ? { status: "limit", limitReason } : { status: "done" });
     });
 
     child.on("error", (err) => {
@@ -241,7 +245,7 @@ function runHarness(
         ? ` — is the "${adapter.command}" CLI installed and on PATH?`
         : "";
       sendEvent(write, "error", { message: `Failed to start ${adapter.id}: ${err.message}${hint}` });
-      resolve("error");
+      resolve({ status: "error" });
     });
 
     signal.addEventListener("abort", () => {
@@ -296,29 +300,29 @@ export async function POST(req: Request) {
 
         if (!adapter) continue;
 
-        const result = await runHarness(adapter, fullPrompt, write, abortController.signal, continuationNote);
+        const { status, limitReason } = await runHarness(adapter, fullPrompt, write, abortController.signal, continuationNote);
 
-        if (result === "limit" || result === "error") {
-          // rate-limited or failed to start — fall back to the next harness
+        if (status === "limit" || status === "error") {
+          // hit a limit/overload or failed to start — fall back to the next harness
           const nextId = orderedChain[i + 1];
           if (nextId) {
-            const reason = result === "limit" ? "rate limit" : "failed to start";
+            const reason = status === "limit" ? describeLimitReason(limitReason ?? null) : "failed to start";
             sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-            // only a rate-limited run left partial work worth continuing
+            // only a limited/overloaded run left partial work worth continuing
             continuationNote =
-              result === "limit"
-                ? `The previous harness (${harnessId}) started but hit its rate limit. ` +
+              status === "limit"
+                ? `The previous harness (${harnessId}) started but hit: ${describeLimitReason(limitReason ?? null)}. ` +
                   `Inspect the partial output already written to disk and CONTINUE from where it stopped.`
                 : undefined;
             continue;
           }
           // no fallback left — for a limit, say so; an error already emitted its message
-          if (result === "limit") {
-            sendEvent(write, "error", { message: "All harnesses hit their rate limit. Try again later." });
+          if (status === "limit") {
+            sendEvent(write, "error", { message: `All harnesses hit a limit (${describeLimitReason(limitReason ?? null)}). Try again later.` });
           }
           break;
         } else {
-          // done cleanly â€” wire the new/edited widget into the registry
+          // done cleanly - wire the new/edited widget into the registry
           // deterministically (JSON entry + one lazy line), THEN type-check the
           // wired-up state. The harness only wrote the component + manifest.json.
           const wired = writeWidgetConfig(settings);
@@ -422,9 +426,14 @@ async function runTscCheck(): Promise<{ errors: string[] }> {
       if (code === 0) {
         resolve({ errors: [] });
       } else {
-        // only surface errors in the custom widget directory
+        // Only surface errors that actually point at the custom widget tree —
+        // a non-zero exit can come from pre-existing/unrelated project errors
+        // (e.g. a stale .next/types/validator.ts referencing a route deleted by
+        // a previous widget). Those must NOT count against this widget, or a
+        // perfectly valid generation gets its registration rolled back for an
+        // error it didn't cause.
         const lines = output.split("\n").filter((l) => l.includes("components/widgets/custom") || l.includes("config/custom"));
-        resolve({ errors: lines.length > 0 ? lines : output.split("\n").filter(Boolean).slice(0, 10) });
+        resolve({ errors: lines });
       }
     });
 

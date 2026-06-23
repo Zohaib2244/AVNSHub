@@ -1,0 +1,61 @@
+{
+  "title": "glyph matrix",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "animation",
+      "label": "animation",
+      "type": "select",
+      "default": "glyph",
+      "options": [
+        { "value": "glyph", "label": "glyph idle" },
+        { "value": "pulse", "label": "pulse" },
+        { "value": "wave", "label": "wave" },
+        { "value": "ripple", "label": "ripple" },
+        { "value": "rain", "label": "rain" },
+        { "value": "snake", "label": "snake" },
+        { "value": "charging", "label": "charging" },
+        { "value": "scan", "label": "scan" },
+        { "value": "binary", "label": "binary" },
+        { "value": "spiral", "label": "spiral" }
+      ]
+    },
+    {
+      "key": "speed",
+      "label": "speed",
+      "type": "select",
+      "default": "normal",
+      "options": [
+        { "value": "slow", "label": "slow" },
+        { "value": "normal", "label": "normal" },
+        { "value": "fast", "label": "fast" }
+      ]
+    },
+    {
+      "key": "color",
+      "label": "dot color",
+      "type": "select",
+      "default": "orange",
+      "options": [
+        { "value": "orange", "label": "orange" },
+        { "value": "cyan", "label": "cyan" },
+        { "value": "white", "label": "white" },
+        { "value": "mixed", "label": "mixed" }
+      ]
+    },
+    {
+      "key": "dotSize",
+      "label": "dot size",
+      "type": "select",
+      "default": "medium",
+      "options": [
+        { "value": "small", "label": "small" },
+        { "value": "medium", "label": "medium" },
+        { "value": "large", "label": "large" }
+      ]
+    }
+  ]
+}

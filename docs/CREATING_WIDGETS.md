@@ -312,6 +312,177 @@ Slot Layout uses `placeWidget(id, region)` / `removeWidget(id)` from
 
 ---
 
+## Custom widgets (split registry — what the in-app Widget Creator generates)
+
+This is a **separate, simpler path** from the `config/widgets.tsx` pattern above
+— used by the in-app NutBot Widget Creator (and anyone hand-adding a widget
+without editing core config). A custom widget is **two files in their own
+folder**, nothing else:
+
+```text
+components/widgets/custom/<slug>/<Pascal>Widget.tsx   ← the component
+components/widgets/custom/<slug>/manifest.json         ← the manifest, as data
+```
+
+`<slug>` is kebab-case (e.g. `cube-timer`). `<Pascal>Widget` is the PascalCase
+slug + `Widget` (e.g. `cube-timer` → `CubeTimerWidget`), exported as a **named
+export** matching the file basename: `export function CubeTimerWidget() { ... }`.
+
+Registration into `config/customRegistry.json` (data) and
+`config/customComponentMap.tsx` (the one `React.lazy` line + map entry) happens
+**automatically** after these two files are written — never hand-edit those two
+files or any file under `config/`, `lib/`, `app/`, `components/framework/`, or
+`components/widgets/default/` when authoring a custom widget. Touching them can
+break the core hub or get overwritten by the next registration pass.
+
+Two real examples already in the repo to copy conventions from:
+[`components/widgets/custom/dictionary/`](../components/widgets/custom/dictionary/)
+and
+[`components/widgets/custom/cube-timer/`](../components/widgets/custom/cube-timer/).
+
+### `manifest.json` shape
+
+```json
+{
+  "title": "cube timer",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "showStats", "label": "show stats", "type": "toggle", "default": true }
+  ]
+}
+```
+
+- `iconName` — a `lucide-react` icon name as a **string**, PascalCase (not the
+  imported component itself — there's no import in this file).
+- `settings` — same field shapes as the `config/widgets.tsx` settings schema
+  (`toggle` / `select` / `text` / `number`); use `[]` if there are none.
+- Everything else matches the manifest fields described earlier in this guide.
+
+### Styling: no sibling CSS file — use inline styles + CSS variables
+
+Custom widgets don't get a `.css` import wired up automatically, so style with
+`CSSProperties` objects (or inline `style={{ ... }}`) reading the same design
+tokens as the rest of the app — **never hard-code hex or font names**. The two
+font variables, exactly as defined in `app/layout.tsx`:
+
+```tsx
+const monoStyle: CSSProperties = { fontFamily: "var(--font-jetbrains-mono), monospace" };
+const labelStyle: CSSProperties = {
+  fontFamily: "var(--font-dot-gothic), monospace",
+  fontSize: "0.62rem",
+  textTransform: "uppercase",
+};
+```
+
+You can still use the shared class vocabulary (`block-value`, `block-sub`,
+`more-head`, `more-row`, …) from `styles/globals.css` alongside inline styles —
+they work the same as in any other widget.
+
+### `useWidget()` in a custom widget
+
+Same hook, same shape as elsewhere: `{ id, size, orientation, settings }`.
+`settings` is an untyped bag — `Record<string, string | number | boolean>` —
+resolved from your manifest's `settings` schema. Narrow before use:
+
+```tsx
+const { size, settings } = useWidget();
+const showStats = settings.showStats !== false;                 // toggle, default true
+const length = typeof settings.scrambleLength === "number" ? settings.scrambleLength : 20; // number
+```
+
+### Minimal complete example
+
+This is the whole spec in one copy-pasteable shape — a tiny tally-counter
+widget. Nothing here needs inferring from other files:
+
+```tsx
+// components/widgets/custom/tally-counter/TallyCounterWidget.tsx
+"use client";
+
+import { type CSSProperties, useState } from "react";
+import { useWidget } from "@/components/framework/WidgetContext";
+
+const monoStyle: CSSProperties = { fontFamily: "var(--font-jetbrains-mono), monospace" };
+const labelStyle: CSSProperties = {
+  color: "var(--text-muted)",
+  fontFamily: "var(--font-dot-gothic), monospace",
+  fontSize: "0.62rem",
+  textTransform: "uppercase",
+};
+const buttonStyle: CSSProperties = {
+  background: "var(--bg-nested)",
+  border: "1.5px solid var(--border)",
+  borderRadius: 12,
+  boxShadow: "2px 2px 0 var(--shadow)",
+  color: "var(--text-primary)",
+  cursor: "pointer",
+  fontFamily: "var(--font-dot-gothic), monospace",
+  padding: "4px 10px",
+};
+
+export function TallyCounterWidget() {
+  const { size, settings } = useWidget();
+  const step = typeof settings.step === "number" ? settings.step : 1;
+  const [count, setCount] = useState(0);
+
+  return (
+    <div style={{ alignItems: "center", display: "flex", flexDirection: "column", gap: 8, height: "100%", justifyContent: "center" }}>
+      <div style={labelStyle}>tally</div>
+      <div className="block-value" style={{ ...monoStyle, fontSize: size === "S" ? "1.6rem" : "2.2rem" }}>
+        {count}
+      </div>
+      {size !== "S" && (
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => setCount((c) => c - step)} style={buttonStyle} type="button">-{step}</button>
+          <button onClick={() => setCount((c) => c + step)} style={buttonStyle} type="button">+{step}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+```json
+// components/widgets/custom/tally-counter/manifest.json
+{
+  "title": "tally counter",
+  "iconName": "Plus",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "step", "label": "step size", "type": "number", "default": 1, "min": 1, "max": 100 }
+  ]
+}
+```
+
+That's the full pattern — component + manifest, styled with CSS variables and
+the two font tokens, settings narrowed from the untyped bag, branching on
+`size`. **You don't need to open files under other `components/widgets/custom/*`
+folders to figure out conventions — this guide is the complete spec.** (The
+dictionary and cube-timer widgets are real shipped examples if you want extra
+reference, not required reading.)
+
+### Write plain ASCII — no smart punctuation
+
+Generated files are written by an LLM piping output through a subprocess shell.
+Smart quotes (`’ ‘ “ ”`), em/en dashes (`— –`), and other non-ASCII punctuation
+in comments or strings have corrupted output before and forced a full file
+rewrite. Use straight quotes (`'`/`"`), a plain hyphen (`-`), and `->`/`=>`
+instead of arrow glyphs, in both code and comments.
+
+### Optional API route
+
+If the widget needs server-side data fetching (to hide a key or call an
+external API), also write `app/api/<slug>/route.ts` following the same
+proxy pattern as the rest of `app/api/` — never call third-party APIs with
+secrets directly from the client component.
+
+---
+
 ## Iframe widgets (LLM / no-rebuild path)
 
 Iframe widgets let you add content without touching any React or TypeScript code.

@@ -1,0 +1,19 @@
+{
+  "title": "cube timer",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "showScramble", "label": "show scramble", "type": "toggle", "default": true },
+    { "key": "showStats", "label": "show stats", "type": "toggle", "default": true },
+    {
+      "key": "scrambleLength",
+      "label": "scramble length",
+      "type": "number",
+      "default": 20,
+      "min": 10,
+      "max": 30
+    }
+  ]
+}
