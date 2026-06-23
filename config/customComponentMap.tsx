@@ -10,9 +10,11 @@ import { lazy } from "react";
 import type { ComponentType } from "react";
 
 // --- custom-components start ---
+const _dictionary = lazy(() => import("@/components/widgets/custom/dictionary/DictionaryWidget").then((m) => ({ default: m.DictionaryWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
 // --- custom-map start ---
+  "dictionary": _dictionary,
 // --- custom-map end ---
 };

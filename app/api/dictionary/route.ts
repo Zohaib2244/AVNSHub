@@ -14,15 +14,20 @@ type Meaning = {
 };
 
 type DictionaryPayload = {
+  query: string;
   word: string;
+  correctedWord?: string;
   phonetic?: string;
   meanings: Meaning[];
   synonyms: string[];
+  suggestions: string[];
   sourceUrl?: string;
   error?: string;
+  status: "exact" | "corrected" | "missing" | "error";
 };
 
 const DEFAULT_WORD = "serendipity";
+const MAX_SUGGESTIONS = 6;
 
 function cleanWord(value: string | null) {
   const word = (value ?? DEFAULT_WORD).trim().replace(/\s+/g, " ");
@@ -57,6 +62,10 @@ function unique(values: string[], limit: number) {
   }
 
   return result;
+}
+
+function sameWord(a: string, b: string) {
+  return a.toLocaleLowerCase() === b.toLocaleLowerCase();
 }
 
 function parseDefinitions(value: unknown) {
@@ -133,51 +142,122 @@ function collectSynonyms(meanings: Meaning[]) {
   );
 }
 
-function errorPayload(word: string, error: string): DictionaryPayload {
+function parseSuggestions(value: unknown, query: string) {
+  if (!Array.isArray(value)) return [];
+
+  return unique(
+    value
+      .filter(isRecord)
+      .map((suggestion) => stringValue(suggestion.word))
+      .filter((word): word is string => Boolean(word))
+      .filter((word) => word.length <= 64),
+    MAX_SUGGESTIONS,
+  ).sort((a, b) => {
+    if (sameWord(a, query)) return -1;
+    if (sameWord(b, query)) return 1;
+    return 0;
+  });
+}
+
+async function fetchSuggestions(word: string) {
+  try {
+    const suggestUrl = new URL("https://api.datamuse.com/sug");
+    suggestUrl.searchParams.set("s", word);
+    suggestUrl.searchParams.set("max", String(MAX_SUGGESTIONS));
+
+    const suggestRes = await fetch(suggestUrl, { next: { revalidate: 3600 } });
+    if (!suggestRes.ok) return [];
+
+    return parseSuggestions(await suggestRes.json(), word);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchEntry(word: string) {
+  const dictionaryRes = await fetch(
+    `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
+    { next: { revalidate: 86_400 } },
+  );
+
+  if (dictionaryRes.status === 404) return null;
+
+  if (!dictionaryRes.ok) {
+    throw new Error(`Dictionary request failed: ${dictionaryRes.status}`);
+  }
+
+  const body: unknown = await dictionaryRes.json();
+  const entries = Array.isArray(body) ? body.filter(isRecord) : [];
+  const meanings = parseMeanings(entries);
+
+  if (meanings.length === 0) return null;
+
   return {
+    word: stringValue(entries[0]?.word) ?? word,
+    phonetic: parsePhonetic(entries),
+    meanings,
+    synonyms: collectSynonyms(meanings),
+    sourceUrl: parseSourceUrl(entries),
+  };
+}
+
+function errorPayload(
+  query: string,
+  word: string,
+  suggestions: string[],
+  status: "missing" | "error",
+  error: string,
+): DictionaryPayload {
+  return {
+    query,
     word,
     meanings: [],
     synonyms: [],
+    suggestions,
+    status,
     error,
   };
 }
 
 export async function GET(req: NextRequest) {
-  const word = cleanWord(req.nextUrl.searchParams.get("word"));
+  const query = cleanWord(req.nextUrl.searchParams.get("word"));
 
   try {
-    const dictionaryRes = await fetch(
-      `https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`,
-      { next: { revalidate: 86_400 } },
+    const suggestions = await fetchSuggestions(query);
+    const exact = await fetchEntry(query);
+
+    if (exact) {
+      const payload: DictionaryPayload = {
+        query,
+        status: "exact",
+        suggestions,
+        ...exact,
+      };
+
+      return NextResponse.json(payload);
+    }
+
+    const correction = suggestions.find((suggestion) => !sameWord(suggestion, query));
+    if (correction) {
+      const corrected = await fetchEntry(correction);
+      if (corrected) {
+        const payload: DictionaryPayload = {
+          query,
+          correctedWord: corrected.word,
+          status: "corrected",
+          suggestions,
+          ...corrected,
+        };
+
+        return NextResponse.json(payload);
+      }
+    }
+
+    return NextResponse.json(
+      errorPayload(query, query, suggestions, "missing", `no entry found for ${query}`),
     );
-
-    if (dictionaryRes.status === 404) {
-      return NextResponse.json(errorPayload(word, `no entry found for ${word}`));
-    }
-
-    if (!dictionaryRes.ok) {
-      throw new Error(`Dictionary request failed: ${dictionaryRes.status}`);
-    }
-
-    const body: unknown = await dictionaryRes.json();
-    const entries = Array.isArray(body) ? body.filter(isRecord) : [];
-    const meanings = parseMeanings(entries);
-
-    if (meanings.length === 0) {
-      return NextResponse.json(errorPayload(word, `no definitions returned for ${word}`));
-    }
-
-    const payload: DictionaryPayload = {
-      word: stringValue(entries[0]?.word) ?? word,
-      phonetic: parsePhonetic(entries),
-      meanings,
-      synonyms: collectSynonyms(meanings),
-      sourceUrl: parseSourceUrl(entries),
-    };
-
-    return NextResponse.json(payload);
   } catch (error) {
     console.error("dictionary route error:", error);
-    return NextResponse.json(errorPayload(word, "dictionary lookup failed"));
+    return NextResponse.json(errorPayload(query, query, [], "error", "dictionary lookup failed"));
   }
 }

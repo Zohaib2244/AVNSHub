@@ -1,1 +1,33 @@
-{}
+{
+  "dictionary": {
+    "title": "dictionary",
+    "iconName": "BookOpen",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "defaultWord",
+        "label": "default word",
+        "type": "text",
+        "default": "serendipity",
+        "placeholder": "serendipity"
+      },
+      {
+        "key": "showSuggestions",
+        "label": "spelling hints",
+        "type": "toggle",
+        "default": true
+      }
+    ]
+  }
+}
