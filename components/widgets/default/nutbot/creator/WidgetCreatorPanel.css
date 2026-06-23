@@ -70,6 +70,54 @@
   transform: rotate(180deg);
 }
 
+/* ── widget picker combobox (fuzzy search, used for "edit" mode target) ── */
+
+.wc-combo {
+  position: relative;
+  width: 100%;
+}
+
+.wc-combo-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 4px 6px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.65rem;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.wc-combo-trigger:hover,
+.wc-combo-trigger:focus-visible {
+  border-color: var(--accent-orange);
+}
+
+.wc-combo-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-combo-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 60;
+  padding: 8px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
 .wc-section-body {
   display: flex;
   flex-direction: column;

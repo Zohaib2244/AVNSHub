@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
+import { WidgetPicker } from "./WidgetPicker";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { slugify } from "@/lib/widget-creator/slug";
 
@@ -63,7 +64,7 @@ export function SettingsPane({ settings, onChange }: Props) {
   return (
     <div className="wc-settings">
       <Section title="mode">
-        <div className="wc-row wc-row-spread">
+        <div className="wc-row">
           <div className="wc-toggle-group">
             <button
               type="button"
@@ -81,21 +82,18 @@ export function SettingsPane({ settings, onChange }: Props) {
               title={customIds.length === 0 ? "no custom widgets yet" : "edit an existing widget"}
             >edit</button>
           </div>
-          {isEditMode && customIds.length > 0 && (
-            <select
-              className="wc-select"
-              value={settings.editSlug ?? ""}
-              onChange={(e) => onChange({ editSlug: e.target.value })}
-            >
-              {customIds.map((id) => (
-                <option key={id} value={id}>
-                  {CUSTOM_WIDGETS[id]?.title ?? id} (#{id})
-                </option>
-              ))}
-            </select>
-          )}
         </div>
       </Section>
+
+      {isEditMode && customIds.length > 0 && (
+        <Section title="target widget">
+          <WidgetPicker
+            value={settings.editSlug ?? ""}
+            options={customIds.map((id) => ({ id, label: `${CUSTOM_WIDGETS[id]?.title ?? id} (#${id})` }))}
+            onChange={(id) => onChange({ editSlug: id })}
+          />
+        </Section>
+      )}
 
       {!isEditMode && (
         <Section title="identity">
