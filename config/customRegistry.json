@@ -27,6 +27,18 @@
         "label": "spelling hints",
         "type": "toggle",
         "default": true
+      },
+      {
+        "key": "showSentence",
+        "label": "example sentence",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "showPronunciation",
+        "label": "pronunciation",
+        "type": "toggle",
+        "default": true
       }
     ]
   }

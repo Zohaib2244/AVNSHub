@@ -337,7 +337,6 @@ export function SlotWidgetCell({
                 key="slot-settings"
                 manifest={manifest}
                 instance={settingsInstance}
-                hideWidgetSettings={editMode}
                 onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
                 onHide={() => removeWidget(instance.id)}
                 onClose={() => setActivePopover(null)}

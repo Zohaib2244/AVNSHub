@@ -212,6 +212,8 @@ export function DictionaryWidget() {
   const { settings, size } = useWidget();
   const defaultWord = cleanInput(settingText(settings.defaultWord, FALLBACK_WORD)) || FALLBACK_WORD;
   const showSuggestions = settings.showSuggestions !== false;
+  const showSentence = settings.showSentence !== false;
+  const showPronunciation = settings.showPronunciation !== false;
   const [draft, setDraft] = useState(defaultWord);
   const [lookup, setLookup] = useState(defaultWord);
   const url = useMemo(() => `/api/dictionary?word=${encodeURIComponent(lookup)}`, [lookup]);
@@ -316,7 +318,7 @@ export function DictionaryWidget() {
             {displayWord}
           </div>
           <CorrectionLine data={data} />
-          {data?.phonetic && <div className="block-sub">{data.phonetic}</div>}
+          {showPronunciation && data?.phonetic && <div className="block-sub">{data.phonetic}</div>}
         </div>
         {definition ? (
           <DefinitionLine definition={definition.definition} />
@@ -360,13 +362,15 @@ export function DictionaryWidget() {
           </div>
           <CorrectionLine data={data} />
         </div>
-        <div style={{ ...panelStyle, flex: "1 1 130px", minWidth: 0 }}>
-          <div style={labelStyle}>sound</div>
-          <div className="block-value" style={{ fontSize: "1rem", whiteSpace: "normal" }}>
-            {data?.phonetic ?? "no phonetic"}
+        {showPronunciation && (
+          <div style={{ ...panelStyle, flex: "1 1 130px", minWidth: 0 }}>
+            <div style={labelStyle}>sound</div>
+            <div className="block-value" style={{ fontSize: "1rem", whiteSpace: "normal" }}>
+              {data?.phonetic ?? "no phonetic"}
+            </div>
+            <div className="block-sub">{definition?.partOfSpeech ?? data?.status ?? "loading"}</div>
           </div>
-          <div className="block-sub">{definition?.partOfSpeech ?? data?.status ?? "loading"}</div>
-        </div>
+        )}
       </div>
 
       <div className="size-l-more" style={{ maxHeight: 190 }}>
@@ -376,7 +380,7 @@ export function DictionaryWidget() {
             <div className="more-row" key={`${item.partOfSpeech}-${index}`} style={{ alignItems: "flex-start" }}>
               <span style={{ overflowWrap: "anywhere" }}>{item.definition}</span>
               <span className="more-meta">{item.partOfSpeech}</span>
-              {item.example && <span className="more-meta">{`"${item.example}"`}</span>}
+              {showSentence && item.example && <span className="more-meta">{`"${item.example}"`}</span>}
             </div>
           ))
         ) : (
