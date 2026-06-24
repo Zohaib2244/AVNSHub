@@ -47,6 +47,9 @@ export type SlotLayoutState = {
   /** order is insignificant — placement is purely positional (region + rect) */
   widgets: SlotWidgetInstance[];
   terminalWidgetId: string | null;
+  /** settings for the terminal occupant, stored separately because the
+      terminal is a single fixed slot rather than a SlotWidgetInstance */
+  terminalSettings: SettingsValues;
   /** per-region grid dims, editable via AVN Hub Core Settings; defaults to
       REGION_GRID */
   regionDims: Record<SlotRegionId, RegionDims>;
@@ -117,6 +120,9 @@ function buildDefaultState(): SlotLayoutState {
         entry("github",         "base",  0, 1, 3, 1, { hoverExpand: true,  hoverExpandAxis: "height", flyoutCommits: 5 }),
       ].filter((w): w is SlotWidgetInstance => w !== null),
       terminalWidgetId: TERMINAL_REGION.defaultWidget,
+      terminalSettings: TERMINAL_REGION.defaultWidget
+        ? resolveSettings(getManifest(TERMINAL_REGION.defaultWidget)!)
+        : {},
     };
   }
   return defaultState;
@@ -136,6 +142,7 @@ function buildEmptyState(): SlotLayoutState {
       },
       widgets: [],
       terminalWidgetId: null,
+      terminalSettings: {},
     };
   }
   return emptyState;
@@ -256,8 +263,17 @@ function sanitize(raw: unknown): SlotLayoutState | null {
     typeof terminal === "string" && (terminal in WIDGETS || terminal in CUSTOM_WIDGETS) && !seen.has(terminal)
       ? terminal
       : null;
+  const terminalManifest = terminalWidgetId ? getManifest(terminalWidgetId) : null;
+  const terminalSettings = terminalManifest
+    ? resolveSettings(
+        terminalManifest,
+        stored.terminalSettings && typeof stored.terminalSettings === "object"
+          ? (stored.terminalSettings as SettingsValues)
+          : undefined,
+      )
+    : {};
 
-  return { version: 3, widgets, terminalWidgetId, regionDims, frameRatios };
+  return { version: 3, widgets, terminalWidgetId, terminalSettings, regionDims, frameRatios };
 }
 
 function loadForCanvas(canvasId: string): SlotLayoutState {
@@ -398,15 +414,33 @@ export function updateWidgetSettings(id: string, settings: SettingsValues) {
   });
 }
 
+/** update settings for the widget occupying the fixed terminal slot */
+export function updateTerminalWidgetSettings(settings: SettingsValues) {
+  const current = getSlotLayout();
+  const id = current.terminalWidgetId;
+  if (!id) return;
+
+  const manifest = getManifest(id);
+  if (!manifest) return;
+
+  commit({
+    ...current,
+    terminalSettings: resolveSettings(manifest, { ...current.terminalSettings, ...settings }),
+  });
+}
+
 /** set/clear the terminal slot's occupant; if `id` was placed in a region
     it's removed from there first */
 export function setTerminalWidget(id: string | null) {
   const current = getSlotLayout();
   if (current.terminalWidgetId === id) return;
+  const placedInstance = id ? current.widgets.find((w) => w.id === id) : undefined;
+  const manifest = id ? getManifest(id) : null;
   commit({
     ...current,
     widgets: id ? current.widgets.filter((w) => w.id !== id) : current.widgets,
     terminalWidgetId: id,
+    terminalSettings: manifest ? resolveSettings(manifest, placedInstance?.settings) : {},
   });
 }
 
@@ -504,7 +538,7 @@ export function importSlotLayout(raw: unknown): boolean {
 
 export type PlacementSnapshot =
   | { kind: "region"; region: SlotRegionId; col: number; row: number; colSpan: number; rowSpan: number; settings: SettingsValues }
-  | { kind: "terminal" }
+  | { kind: "terminal"; settings: SettingsValues }
   | { kind: "none" };
 
 /** read a widget's current placement without mutating anything */
@@ -522,7 +556,7 @@ export function getPlacementSnapshot(id: string): PlacementSnapshot {
       settings: instance.settings,
     };
   }
-  if (current.terminalWidgetId === id) return { kind: "terminal" };
+  if (current.terminalWidgetId === id) return { kind: "terminal", settings: current.terminalSettings };
   return { kind: "none" };
 }
 
@@ -549,6 +583,7 @@ export function restorePlacementSnapshot(id: string, snapshot: PlacementSnapshot
 
   if (snapshot.kind === "terminal") {
     setTerminalWidget(id);
+    updateTerminalWidgetSettings(snapshot.settings);
     return true;
   }
 

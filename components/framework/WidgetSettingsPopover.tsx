@@ -110,7 +110,7 @@ export function WidgetSettingsPopover({
     function onDown(e: PointerEvent) {
       const target = e.target as Element;
       // the gear button toggles on click — closing here too would reopen it
-      if (target.closest(".gear-btn")) return;
+      if (target.closest(".gear-btn, .slot-settings-btn")) return;
       if (panelRef.current && !panelRef.current.contains(target)) onClose();
     }
     function onKey(e: KeyboardEvent) {

@@ -14,16 +14,25 @@
 
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { Settings2, X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
 import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
-import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios, setTerminalWidget } from "@/lib/slotLayout";
+import {
+  getSlotLayout,
+  getServerSlotLayout,
+  subscribeSlotLayout,
+  setFrameRatios,
+  setTerminalWidget,
+  updateTerminalWidgetSettings,
+} from "@/lib/slotLayout";
+import type { WidgetInstance } from "@/lib/layout";
 import { getCanvases, getServerCanvases, subscribeCanvases } from "@/lib/canvases";
 import { terminalSizeClass } from "@/lib/grid/sizeClass";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
+import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
 import { WidgetShell } from "@/components/framework/WidgetShell";
 
 /* canvas-switch entrance cascade — NutBot/terminal goes first (STAGGER_BASE,
@@ -74,6 +83,8 @@ export function SlotDashboard() {
   const terminalPickerKey = "place:terminal";
   const terminalPickerOpen = activePopover === terminalPickerKey;
   const toggleTerminalPicker = () => setActivePopover(terminalPickerOpen ? null : terminalPickerKey);
+  const terminalSettingsKey = slotLayout.terminalWidgetId ? `settings:${slotLayout.terminalWidgetId}` : null;
+  const terminalSettingsOpen = terminalSettingsKey !== null && activePopover === terminalSettingsKey;
 
   const frameRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
@@ -86,6 +97,16 @@ export function SlotDashboard() {
 
   const terminalManifest = slotLayout.terminalWidgetId ? (getManifest(slotLayout.terminalWidgetId) ?? null) : null;
   const terminalConfig = terminalManifest ? terminalSizeClass(terminalManifest.sizes, terminalManifest.orientations) : null;
+  const terminalSettingsInstance: WidgetInstance | null =
+    terminalManifest && terminalConfig
+      ? {
+          id: terminalManifest.id,
+          size: terminalConfig.size,
+          orientation: terminalConfig.orientation,
+          hidden: false,
+          settings: slotLayout.terminalSettings,
+        }
+      : null;
 
   // NutBot/terminal is always first in the cascade; every other widget
   // follows in slotLayout.widgets order at increasing delays
@@ -218,16 +239,42 @@ export function SlotDashboard() {
                 {terminalManifest && terminalConfig ? (
                   <>
                     {editMode && (
-                      <button
-                        type="button"
-                        className="slot-remove-btn"
-                        aria-label={`remove ${terminalManifest.id} from terminal`}
-                        onClick={() => setTerminalWidget(null)}
-                      >
-                        <X size={12} strokeWidth={1.75} />
-                      </button>
+                      <>
+                        <button
+                          type="button"
+                          className="slot-remove-btn"
+                          aria-label={`remove ${terminalManifest.id} from terminal`}
+                          onClick={() => setTerminalWidget(null)}
+                        >
+                          <X size={12} strokeWidth={1.75} />
+                        </button>
+                        <button
+                          type="button"
+                          className="slot-settings-btn"
+                          aria-label={`configure ${terminalManifest.id} widget`}
+                          onClick={() => setActivePopover(terminalSettingsOpen ? null : terminalSettingsKey)}
+                        >
+                          <Settings2 size={12} strokeWidth={1.75} />
+                        </button>
+                        <AnimatePresence>
+                          {terminalSettingsOpen && terminalSettingsInstance && (
+                            <WidgetSettingsPopover
+                              key="terminal-settings"
+                              manifest={terminalManifest}
+                              instance={terminalSettingsInstance}
+                              onUpdateSettings={updateTerminalWidgetSettings}
+                              onHide={() => setTerminalWidget(null)}
+                              onClose={() => setActivePopover(null)}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </>
                     )}
-                    <WidgetShell manifest={terminalManifest} config={terminalConfig} entranceDelay={STAGGER_BASE} />
+                    <WidgetShell
+                      manifest={terminalManifest}
+                      config={{ ...terminalConfig, settings: slotLayout.terminalSettings }}
+                      entranceDelay={STAGGER_BASE}
+                    />
                   </>
                 ) : (
                   <div

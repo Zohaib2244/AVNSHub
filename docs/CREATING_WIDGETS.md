@@ -295,7 +295,9 @@ up — any registered widget appears there automatically. To programmatically to
 `updateInstance(id, { hidden: true | false })` from `useLayout()`.
 
 Slot Layout uses `placeWidget(id, region)` / `removeWidget(id)` from
-`lib/slotLayout.ts`; Graph Layout uses the `hidden` flag above.
+`lib/slotLayout.ts`; Graph Layout uses the `hidden` flag above. Widgets placed
+in Slot Layout's terminal slot keep their own persisted settings and expose
+the same settings gear while edit mode is active.
 
 ---
 
