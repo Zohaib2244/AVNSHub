@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DotGothic16, JetBrains_Mono } from "next/font/google";
 import "../styles/globals.css";
@@ -18,6 +18,14 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "AVN Hub",
   description: "A living personal dashboard for what I'm listening to, playing, building, and running.",
+};
+
+// explicit so mobile browsers lay out at device width instead of a zoomed-out
+// desktop viewport (the Slot Layout's mobile collapse in globals.css depends
+// on real device-width media queries matching)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({

@@ -870,6 +870,69 @@ html[data-backdrop="transparent"] .frame {
   }
 }
 
+/* ─── narrow / mobile: collapse Slot Layout to a single stacked flow ──────
+   The Slot Layout is spatial — a 3-column frame (Left | Center | Right),
+   each region a fixed cols×rows grid holding absolutely-placed cells at
+   persisted col/row/span rects — and it assumes a ~16:9 desktop. Below the
+   1024px breakpoint (exactly where .frame/.slot-frame/.slot-region stop
+   getting height:100%) that 3-wide model crushes every widget into an
+   unreadable sliver. Here we drop the spatial model entirely: stack
+   everything into one content-flowed column — Center first (primary
+   content), then Left, then Right — with each cell ignoring its rect and
+   taking a full-width, content-height row. Desktop (≥1024px) is untouched. */
+@media (max-width: 1023px) {
+  /* the Hub Core edge dock sits translateX(100%) past the frame's right edge
+     (28px wide). Reserve a right gutter wide enough for it so it doesn't hang
+     off-screen and trigger horizontal scroll; trim the now-unneeded left
+     gutter to keep the frame roughly centred. */
+  .slot-page {
+    padding-left: 12px;
+    padding-right: 38px;
+  }
+
+  .slot-frame {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  /* Center (terminal + base) reads first on a phone, then Left, then Right */
+  .slot-center {
+    order: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .slot-region-left { order: 2; }
+  .slot-region-right { order: 3; }
+
+  /* regions stop being fixed cols×rows grids — cards flow top to bottom.
+     !important overrides the inline gridTemplate* SlotRegion sets per region. */
+  .slot-region {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: none !important;
+    grid-auto-rows: minmax(128px, auto);
+    grid-auto-flow: row dense;
+  }
+
+  /* ignore each cell's persisted col/row/span rect (set inline) — every
+     widget becomes one full-width, content-height row in DOM order. The
+     spatial-position tween is meaningless once cells flow (and would fire
+     noisily as rects collapse when crossing the breakpoint). */
+  .slot-cell {
+    grid-column: 1 / -1 !important;
+    grid-row: auto !important;
+    transition: none;
+  }
+
+  /* spatial editing affordances don't map to a stacked flow: hide the
+     frame-ratio / cell resize handles and the empty-cell placement targets */
+  .resize-handle,
+  .slot-cell-empty {
+    display: none !important;
+  }
+}
+
 /* ─── blocks ("sticker" cards) ──────────────────────────────────── */
 
 /* shell wrapper around every widget card — fills the grid slot.
