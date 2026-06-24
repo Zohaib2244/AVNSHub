@@ -16,6 +16,7 @@ const _monkey_type = lazy(() => import("@/components/widgets/custom/monkey-type/
 const _glyph_matrix = lazy(() => import("@/components/widgets/custom/glyph-matrix/GlyphMatrixWidget").then((m) => ({ default: m.GlyphMatrixWidget })));
 const _atom_bomb = lazy(() => import("@/components/widgets/custom/atom-bomb/AtomBombWidget").then((m) => ({ default: m.AtomBombWidget })));
 const _diss_glade = lazy(() => import("@/components/widgets/custom/diss-glade/DissGladeWidget").then((m) => ({ default: m.DissGladeWidget })));
+const _dot_matrix = lazy(() => import("@/components/widgets/custom/dot-matrix/DotMatrixWidget").then((m) => ({ default: m.DotMatrixWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -26,5 +27,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "glyph-matrix": _glyph_matrix,
   "atom-bomb": _atom_bomb,
   "diss-glade": _diss_glade,
+  "dot-matrix": _dot_matrix,
 // --- custom-map end ---
 };

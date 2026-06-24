@@ -34,6 +34,7 @@ import { WidgetShell } from "@/components/framework/WidgetShell";
 const STAGGER_BASE = 0.15;
 const STAGGER_STEP = 0.045;
 const STAGGER_MAX_STEPS = 10;
+const WIDGET_OUTRO_DURATION = 0.24;
 
 type RatioAxis = "col-w" | "col-e" | "row-s";
 
@@ -207,8 +208,8 @@ export function SlotDashboard() {
             style={frameStyle}
             initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: STAGGER_BASE, ease: "easeOut" }}
+            exit={{ opacity: 0.999 }}
+            transition={{ duration: WIDGET_OUTRO_DURATION, ease: "linear" }}
           >
             <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} entranceDelays={entranceDelays} />
 

@@ -23,6 +23,8 @@ import {
 import type { RegionId } from "@/config/slotLayout";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 
+const CANVAS_OUTRO_DURATION = 0.24;
+
 // Catches render errors inside a single widget so a broken custom component
 // never crashes the entire dashboard — critical for the agent-generated
 // widget playground, where a freshly-written widget can throw at runtime even
@@ -152,7 +154,18 @@ export function WidgetShell({
       data-size={size}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" }}
+      exit="exit"
+      transition={{
+        opacity: { duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" },
+        scale: { duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" },
+      }}
+      variants={{
+        exit: {
+          opacity: 0,
+          scale: 0.97,
+          transition: { duration: CANVAS_OUTRO_DURATION, delay: 0, ease: "easeIn" },
+        },
+      }}
     >
       <WidgetContext.Provider value={ctx}>
         {flags.plainChrome ? body : (
