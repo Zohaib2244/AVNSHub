@@ -87,12 +87,15 @@ export function SlotWidgetCell({
   hoverMetrics,
   onHoverIntent,
   onHoverExit,
+  entranceDelay,
 }: {
   instance: SlotWidgetInstance;
   hoverEffect?: HoverExpandEffect;
   hoverMetrics?: HoverGridMetrics;
   onHoverIntent?: (id: string, preferredDirections: Direction[]) => void;
   onHoverExit?: () => void;
+  /** forwarded straight to WidgetShell — see its prop comment */
+  entranceDelay?: number;
 }) {
   const { editMode, activePopover, setActivePopover } = useLayout();
   const manifest = getManifest(instance.id);
@@ -364,6 +367,7 @@ export function SlotWidgetCell({
           hoverExpanded: activeHoverEffect?.state === "expanded",
           slot: { region: instance.region, colSpan: rect.colSpan, rowSpan: rect.rowSpan },
         }}
+        entranceDelay={entranceDelay}
       />
     </div>
   );

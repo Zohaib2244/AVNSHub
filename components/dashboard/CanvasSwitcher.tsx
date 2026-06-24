@@ -18,15 +18,25 @@ import {
   getCanvases,
   getServerCanvases,
   renameCanvas,
+  setCanvasIcon,
   subscribeCanvases,
   switchCanvas,
   type Canvas,
 } from "@/lib/canvases";
+import { CANVAS_ICONS } from "@/config/canvasIcons";
+import { CanvasIconPicker } from "@/components/dashboard/CanvasIconPicker";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 function abbreviate(name: string): string {
   const trimmed = name.trim();
   return trimmed ? trimmed[0].toUpperCase() : "?";
+}
+
+/** the canvas's chosen icon, or its first-letter-of-name fallback */
+export function CanvasGlyph({ canvas }: { canvas: Canvas }) {
+  const Icon = canvas.icon ? CANVAS_ICONS[canvas.icon] : undefined;
+  if (Icon) return <Icon size={14} strokeWidth={1.75} className="canvas-pill-icon" />;
+  return <span className="canvas-pill-glyph">{abbreviate(canvas.name)}</span>;
 }
 
 export function CanvasSwitcher() {
@@ -140,7 +150,7 @@ function CanvasPill({
         aria-label={`switch to ${canvas.name} canvas`}
         title={`${canvas.name} — double-click to rename`}
       >
-        <span className="canvas-pill-glyph">{abbreviate(canvas.name)}</span>
+        <CanvasGlyph canvas={canvas} />
         <span className="edge-btn-label">{canvas.name}</span>
       </button>
 
@@ -164,6 +174,7 @@ function CanvasPill({
               }}
               aria-label={`rename ${canvas.name} canvas`}
             />
+            <CanvasIconPicker value={canvas.icon} onChange={(icon) => setCanvasIcon(canvas.id, icon)} />
             <div className="canvas-manage-actions">
               <button type="button" className="hub-core-io-btn" onClick={save}>
                 save

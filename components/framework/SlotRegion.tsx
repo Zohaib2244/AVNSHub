@@ -41,10 +41,14 @@ export function SlotRegion({
   region,
   instances,
   dims,
+  entranceDelays,
 }: {
   region: SlotRegionId;
   instances: SlotWidgetInstance[];
   dims: RegionDims;
+  /** widget id -> seconds before its mount fade+scale-in plays, forwarded to
+      each SlotWidgetCell — see WidgetShell's entranceDelay prop comment */
+  entranceDelays?: Record<string, number>;
 }) {
   const { editMode } = useLayout();
   const regionRef = useRef<HTMLDivElement>(null);
@@ -301,6 +305,7 @@ export function SlotRegion({
           hoverMetrics={activeHoverMetrics ?? undefined}
           onHoverIntent={requestHoverExpand}
           onHoverExit={clearHoverExpand}
+          entranceDelay={entranceDelays?.[instance.id]}
         />
       ))}
       {emptyCells.map((cell) => (

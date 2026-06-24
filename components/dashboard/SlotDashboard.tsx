@@ -13,16 +13,27 @@
 // SlotWidgetCell's per-widget resize handles.
 
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
 import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
 import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios, setTerminalWidget } from "@/lib/slotLayout";
+import { getCanvases, getServerCanvases, subscribeCanvases } from "@/lib/canvases";
 import { terminalSizeClass } from "@/lib/grid/sizeClass";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
 import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
 import { WidgetShell } from "@/components/framework/WidgetShell";
+
+/* canvas-switch entrance cascade — NutBot/terminal goes first (STAGGER_BASE,
+   which matches the outer .slot-frame's exit-fade duration below so the new
+   canvas only starts revealing itself once the old one has fully faded),
+   then every other widget follows at increasing delays. Capped so a canvas
+   with a lot of widgets doesn't take forever to finish cascading in. */
+const STAGGER_BASE = 0.15;
+const STAGGER_STEP = 0.045;
+const STAGGER_MAX_STEPS = 10;
 
 type RatioAxis = "col-w" | "col-e" | "row-s";
 
@@ -52,6 +63,11 @@ function clampPairDelta(deltaFr: number, gain: number, lose: number) {
 
 export function SlotDashboard() {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
+  const activeCanvasId = useSyncExternalStore(
+    subscribeCanvases,
+    () => getCanvases().activeId,
+    () => getServerCanvases().activeId,
+  );
   const { editMode, activePopover, setActivePopover } = useLayout();
   // shared so it can't stay open alongside another add menu / settings popover
   const terminalPickerKey = "place:terminal";
@@ -69,6 +85,13 @@ export function SlotDashboard() {
 
   const terminalManifest = slotLayout.terminalWidgetId ? (getManifest(slotLayout.terminalWidgetId) ?? null) : null;
   const terminalConfig = terminalManifest ? terminalSizeClass(terminalManifest.sizes, terminalManifest.orientations) : null;
+
+  // NutBot/terminal is always first in the cascade; every other widget
+  // follows in slotLayout.widgets order at increasing delays
+  const entranceDelays: Record<string, number> = {};
+  slotLayout.widgets.forEach((w, i) => {
+    entranceDelays[w.id] = STAGGER_BASE + Math.min(i + 1, STAGGER_MAX_STEPS) * STAGGER_STEP;
+  });
 
   const ratios = previewRatios ?? slotLayout.frameRatios;
   const frameStyle = {
@@ -170,8 +193,24 @@ export function SlotDashboard() {
       <div className="frame frame-with-tabs">
         <HubCorePanel />
         <div className="frame-inner">
-          <div ref={frameRef} className="slot-frame" style={frameStyle}>
-            <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} />
+          {/* keyed by canvas so switching canvases fully unmounts the old
+              widget tree (fade out) and mounts the new one (cascade in) —
+              even when a widget id happens to exist in both canvases. Only
+              opacity is tweened here (no `layout` prop, no measuring), so
+              this can't trip the dense-grid reflow loop CLAUDE.md warns
+              about; the per-widget scale+stagger lives in WidgetShell. */}
+          <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeCanvasId}
+            ref={frameRef}
+            className="slot-frame"
+            style={frameStyle}
+            initial={{ opacity: 1 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: STAGGER_BASE, ease: "easeOut" }}
+          >
+            <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} entranceDelays={entranceDelays} />
 
             <div ref={centerRef} className="slot-center" style={centerStyle}>
               <div className={`slot-terminal${editMode ? " editing" : ""}`}>
@@ -187,7 +226,7 @@ export function SlotDashboard() {
                         <X size={12} strokeWidth={1.75} />
                       </button>
                     )}
-                    <WidgetShell manifest={terminalManifest} config={terminalConfig} />
+                    <WidgetShell manifest={terminalManifest} config={terminalConfig} entranceDelay={STAGGER_BASE} />
                   </>
                 ) : (
                   <div
@@ -238,11 +277,12 @@ export function SlotDashboard() {
                   </>
                 )}
               </div>
-              <SlotRegion region="base" instances={base} dims={slotLayout.regionDims.base} />
+              <SlotRegion region="base" instances={base} dims={slotLayout.regionDims.base} entranceDelays={entranceDelays} />
             </div>
 
-            <SlotRegion region="right" instances={right} dims={slotLayout.regionDims.right} />
-          </div>
+            <SlotRegion region="right" instances={right} dims={slotLayout.regionDims.right} entranceDelays={entranceDelays} />
+          </motion.div>
+          </AnimatePresence>
         </div>
       </div>
     </div>

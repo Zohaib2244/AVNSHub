@@ -1,11 +1,14 @@
 // Canvases store — Arc-spaces-style named layouts. Mirrors the lib/theme.ts /
 // lib/prefs.ts external-store pattern: module-level cache, listener set,
 // persist-on-commit to localStorage["nutmag-canvases"]. Each canvas only
-// tracks identity (id/name) here; the widget arrangement itself still lives
-// in lib/slotLayout.ts, namespaced per canvas via slotLayoutKey() so this
-// module never needs to know about widgets.
+// tracks identity (id/name/icon) here; the widget arrangement and theme/
+// palette live in lib/slotLayout.ts / lib/theme.ts, each namespaced per
+// canvas via canvasScopedKey() so neither of those modules needs to know
+// canvases exist beyond reacting to subscribeCanvases().
 
-export type Canvas = { id: string; name: string };
+import { isCanvasIconName } from "@/config/canvasIcons";
+
+export type Canvas = { id: string; name: string; icon?: string };
 
 export type CanvasesState = {
   canvases: Canvas[];
@@ -31,10 +34,19 @@ function buildDefaultState(): CanvasesState {
   return defaultState;
 }
 
+/** namespace any base localStorage key by canvas — the DEFAULT_CANVAS_ID
+    canvas keeps the bare key (existing users keep their current data with
+    no migration); every other canvas gets a `::<id>` suffixed key. Used by
+    lib/slotLayout.ts (slotLayoutKey) and lib/theme.ts so each canvas can
+    have its own layout, theme mode, and palette. */
+export function canvasScopedKey(baseKey: string, canvasId: string): string {
+  return canvasId === DEFAULT_CANVAS_ID ? baseKey : `${baseKey}::${canvasId}`;
+}
+
 /** the lib/slotLayout.ts storage key for a given canvas — kept here so
     deleteCanvas() can clean up after itself without importing slotLayout.ts */
 export function slotLayoutKey(canvasId: string): string {
-  return canvasId === DEFAULT_CANVAS_ID ? "nutmag-slot-layout" : `nutmag-slot-layout::${canvasId}`;
+  return canvasScopedKey("nutmag-slot-layout", canvasId);
 }
 
 function sanitize(raw: unknown): CanvasesState | null {
@@ -46,10 +58,10 @@ function sanitize(raw: unknown): CanvasesState | null {
   const canvases: Canvas[] = [];
   for (const item of stored.canvases) {
     if (!item || typeof item !== "object") continue;
-    const { id, name } = item as Record<string, unknown>;
+    const { id, name, icon } = item as Record<string, unknown>;
     if (typeof id !== "string" || !id || typeof name !== "string" || !name.trim() || seen.has(id)) continue;
     seen.add(id);
-    canvases.push({ id, name });
+    canvases.push(isCanvasIconName(icon) ? { id, name, icon } : { id, name });
   }
   if (canvases.length === 0) return null;
 
@@ -130,9 +142,28 @@ export function renameCanvas(id: string, name: string) {
   commit({ ...current, canvases: current.canvases.map((c) => (c.id === id ? { ...c, name: trimmed } : c)) });
 }
 
-/** drop a canvas and its slot-layout data; always keeps at least one canvas
-    around, and falls back to the first remaining one if the active canvas
-    was deleted */
+/** set a canvas's icon to one of CANVAS_ICONS' keys, or clear it (null) to
+    fall back to the first-letter-of-name glyph */
+export function setCanvasIcon(id: string, icon: string | null) {
+  const current = getCanvases();
+  if (icon !== null && !isCanvasIconName(icon)) return;
+  commit({
+    ...current,
+    canvases: current.canvases.map((c) => {
+      if (c.id !== id) return c;
+      if (icon === null) {
+        const rest = { ...c };
+        delete rest.icon;
+        return rest;
+      }
+      return { ...c, icon };
+    }),
+  });
+}
+
+/** drop a canvas and all its namespaced data (layout, theme, palette);
+    always keeps at least one canvas around, and falls back to the first
+    remaining one if the active canvas was deleted */
 export function deleteCanvas(id: string) {
   const current = getCanvases();
   if (current.canvases.length <= 1) return;
@@ -142,6 +173,8 @@ export function deleteCanvas(id: string) {
   commit({ canvases, activeId });
   try {
     localStorage.removeItem(slotLayoutKey(id));
+    localStorage.removeItem(canvasScopedKey("nutmag-theme", id));
+    localStorage.removeItem(canvasScopedKey("nutmag-palette", id));
   } catch {
     // ignore
   }

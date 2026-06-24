@@ -25,7 +25,18 @@ import {
   Wrench,
 } from "lucide-react";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
-import { CanvasSwitcher } from "@/components/dashboard/CanvasSwitcher";
+import { CanvasGlyph, CanvasSwitcher } from "@/components/dashboard/CanvasSwitcher";
+import { CanvasIconPicker } from "@/components/dashboard/CanvasIconPicker";
+import {
+  createCanvas,
+  deleteCanvas,
+  getCanvases,
+  getServerCanvases,
+  renameCanvas,
+  setCanvasIcon,
+  subscribeCanvases,
+  type Canvas,
+} from "@/lib/canvases";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { DEFAULT_ORDER, WIDGETS, getManifest, type WidgetManifest } from "@/config/widgets";
 import { THEME_PACKS } from "@/config/themes";
@@ -57,7 +68,7 @@ import { REGION_DIMS_BOUNDS, REGION_LABELS, type RegionDims, type SlotRegionId }
 
 const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
 type HubCoreTab = "settings" | "widgets";
-type CanvasSettingsSection = "appearance" | "general" | "layout";
+type CanvasSettingsSection = "appearance" | "general" | "layout" | "canvases";
 type WidgetFilter = "all" | "system" | "custom";
 
 const THEME_OPTIONS: { mode: ThemeMode; Icon: typeof Sun }[] = [
@@ -105,17 +116,14 @@ function matchesWidgetSearch(id: string, query: string, meta?: string) {
 
 export function HubCorePanel() {
   const [activeTab, setActiveTab] = useState<HubCoreTab | null>(null);
-  const [openSettingsSections, setOpenSettingsSections] = useState<Record<CanvasSettingsSection, boolean>>({
-    appearance: true,
-    general: true,
-    layout: true,
-  });
+  // accordion: only one settings section open at a time
+  const [openSection, setOpenSection] = useState<CanvasSettingsSection | null>("appearance");
   const panelRef = useRef<HTMLDivElement>(null);
 
   const { editMode, startEdit, lockLayout } = useLayout();
 
   function toggleSettingsSection(section: CanvasSettingsSection) {
-    setOpenSettingsSections((open) => ({ ...open, [section]: !open[section] }));
+    setOpenSection((open) => (open === section ? null : section));
   }
 
   useEffect(() => {
@@ -183,7 +191,7 @@ export function HubCorePanel() {
               <>
                 <CoreSection
                   title="appearance"
-                  open={openSettingsSections.appearance}
+                  open={openSection === "appearance"}
                   onToggle={() => toggleSettingsSection("appearance")}
                 >
                   <AppearanceSettings />
@@ -191,7 +199,7 @@ export function HubCorePanel() {
 
                 <CoreSection
                   title="general"
-                  open={openSettingsSections.general}
+                  open={openSection === "general"}
                   onToggle={() => toggleSettingsSection("general")}
                 >
                   <GeneralSettings />
@@ -199,10 +207,18 @@ export function HubCorePanel() {
 
                 <CoreSection
                   title="layout"
-                  open={openSettingsSections.layout}
+                  open={openSection === "layout"}
                   onToggle={() => toggleSettingsSection("layout")}
                 >
                   <DefaultModeSettings />
+                </CoreSection>
+
+                <CoreSection
+                  title="canvases"
+                  open={openSection === "canvases"}
+                  onToggle={() => toggleSettingsSection("canvases")}
+                >
+                  <CanvasesSettings />
                 </CoreSection>
               </>
             ) : (
@@ -260,6 +276,8 @@ function PaletteRow() {
 }
 
 function AppearanceSettings() {
+  const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+  const activeName = canvases.find((c) => c.id === activeId)?.name ?? "this canvas";
   return (
     <div className="hub-appearance-panel">
       <div className="hub-setting-stack">
@@ -270,6 +288,92 @@ function AppearanceSettings() {
         <span className="hub-setting-label">palette</span>
         <PaletteRow />
       </div>
+      {canvases.length > 1 && <div className="hub-core-fixed-note">applies to &ldquo;{activeName}&rdquo; only — each canvas has its own theme</div>}
+    </div>
+  );
+}
+
+function CanvasesSettings() {
+  const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+
+  return (
+    <div className="hub-canvases-panel">
+      {canvases.map((canvas) => (
+        <CanvasSettingsRow key={canvas.id} canvas={canvas} active={canvas.id === activeId} deletable={canvases.length > 1} />
+      ))}
+      <button
+        type="button"
+        className="wset-hide-btn"
+        onClick={() => createCanvas(`canvas ${canvases.length + 1}`)}
+      >
+        <Plus size={12} strokeWidth={1.75} />
+        add canvas
+      </button>
+    </div>
+  );
+}
+
+function CanvasSettingsRow({ canvas, active, deletable }: { canvas: Canvas; active: boolean; deletable: boolean }) {
+  const [name, setName] = useState(canvas.name);
+  const [pickingIcon, setPickingIcon] = useState(false);
+
+  // stay in sync if this canvas is renamed elsewhere (e.g. the edge pill's
+  // own rename flyout) while this row is mounted — adjusted during render
+  // (React's documented pattern for deriving state from a changed prop),
+  // not in an effect, so it can't cascade an extra render
+  const [prevCanvasName, setPrevCanvasName] = useState(canvas.name);
+  if (canvas.name !== prevCanvasName) {
+    setPrevCanvasName(canvas.name);
+    setName(canvas.name);
+  }
+
+  function commitName() {
+    const trimmed = name.trim();
+    if (trimmed && trimmed !== canvas.name) renameCanvas(canvas.id, trimmed);
+    else setName(canvas.name);
+  }
+
+  function handleDelete() {
+    if (!deletable) return;
+    if (!window.confirm(`Delete canvas "${canvas.name}"? Its layout can't be recovered.`)) return;
+    deleteCanvas(canvas.id);
+  }
+
+  return (
+    <div className="hub-canvas-row">
+      <div className="hub-canvas-row-main">
+        <button
+          type="button"
+          className={`hub-canvas-glyph-btn${pickingIcon ? " active" : ""}`}
+          onClick={() => setPickingIcon((p) => !p)}
+          title="change icon"
+          aria-label={`change icon for ${canvas.name}`}
+        >
+          <CanvasGlyph canvas={canvas} />
+        </button>
+        <input
+          className="canvas-manage-input hub-canvas-name-input"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commitName();
+          }}
+          aria-label={`rename ${canvas.name} canvas`}
+        />
+        {active && <span className="hub-canvas-active-badge">active</span>}
+        <button
+          type="button"
+          className="hub-widget-btn danger"
+          disabled={!deletable}
+          onClick={handleDelete}
+          aria-label={`delete ${canvas.name} canvas`}
+          title={deletable ? "delete canvas" : "can't delete the last canvas"}
+        >
+          <Trash2 size={11} strokeWidth={1.75} />
+        </button>
+      </div>
+      {pickingIcon && <CanvasIconPicker value={canvas.icon} onChange={(icon) => setCanvasIcon(canvas.id, icon)} />}
     </div>
   );
 }

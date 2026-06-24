@@ -1361,8 +1361,17 @@ body {
     background-color 0.15s ease;
 }
 
+/* the icon itself must never shrink/get squeezed by the label below it —
+   without this, the label's intrinsic vertical-text height (taller than the
+   collapsed 32px box) can pressure flex-shrink on BOTH children at once and
+   the icon ends up rendered at ~0px, which read as "icons aren't showing" */
+.hub-core.hub-core-slot .hub-core-btn.edge-btn > svg {
+  flex-shrink: 0;
+}
+
 .hub-core.hub-core-slot .hub-core-btn.edge-btn:hover,
-.hub-core.hub-core-slot .hub-core-btn.edge-btn:focus-visible {
+.hub-core.hub-core-slot .hub-core-btn.edge-btn:focus-visible,
+.hub-core.hub-core-slot .hub-core-btn.edge-btn.active {
   height: 76px;
 }
 
@@ -1376,12 +1385,20 @@ body {
   white-space: nowrap;
   color: inherit;
   opacity: 0;
-  transition: opacity 0.15s ease;
+  /* explicit clamp (not just opacity) so the label deterministically takes
+     ~0 space at rest regardless of its intrinsic vertical-text height —
+     see the flex-shrink note above */
+  max-height: 0;
+  overflow: hidden;
+  flex-shrink: 0;
+  transition: opacity 0.15s ease, max-height 0.22s ease;
 }
 
 .hub-core-btn.edge-btn:hover .edge-btn-label,
-.hub-core-btn.edge-btn:focus-visible .edge-btn-label {
+.hub-core-btn.edge-btn:focus-visible .edge-btn-label,
+.hub-core-btn.edge-btn.active .edge-btn-label {
   opacity: 1;
+  max-height: 44px;
 }
 
 .hub-core-divider {
@@ -1418,10 +1435,18 @@ body {
 
 .canvas-pill-glyph {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: 0.72rem;
+  font-weight: 700;
   line-height: 1;
+  color: var(--text-primary);
   flex-shrink: 0;
+}
+
+/* active canvas pill already gets the accent-orange border/color from
+   .hub-core-btn.active — let the glyph inherit that instead of staying
+   text-primary so the active pill's letter matches its border */
+.hub-core-btn.canvas-pill.active .canvas-pill-glyph {
+  color: inherit;
 }
 
 .canvas-manage-panel {
@@ -1429,7 +1454,7 @@ body {
   top: 0;
   right: calc(100% + 8px);
   z-index: 5;
-  width: 160px;
+  width: 196px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1461,6 +1486,107 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 6px;
+}
+
+.canvas-pill-icon {
+  flex-shrink: 0;
+}
+
+.canvas-icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.canvas-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.58rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.canvas-icon-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-orange);
+}
+
+.canvas-icon-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+/* ─── "canvases" Hub Core settings section ──────────────────────── */
+
+.hub-canvases-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hub-canvas-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 7px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-nested);
+}
+
+.hub-canvas-row-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hub-canvas-glyph-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.hub-canvas-glyph-btn:hover,
+.hub-canvas-glyph-btn.active {
+  border-color: var(--accent-orange);
+}
+
+.hub-canvas-glyph-btn .canvas-pill-glyph {
+  font-size: 0.6rem;
+}
+
+.hub-canvas-name-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.hub-canvas-active-badge {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-orange);
+  color: var(--badge-text);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.54rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .hub-core-panel {

@@ -1,0 +1,187 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e9]:
+      - generic [ref=e10]:
+        - button "enter edit mode" [ref=e11] [cursor=pointer]:
+          - img [ref=e12]
+          - generic: edit
+        - button "open avn hub core settings" [ref=e14] [cursor=pointer]:
+          - img [ref=e15]
+          - generic: settings
+        - button "open widget manager" [ref=e18] [cursor=pointer]:
+          - img [ref=e19]
+          - generic: widgets
+        - generic [ref=e25]:
+          - button "hide canvases" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - generic: canvases
+          - generic [ref=e29]:
+            - button "switch to Home canvas" [ref=e31] [cursor=pointer]:
+              - generic [ref=e32]: H
+              - generic [ref=e33]: Home
+            - button "add canvas" [ref=e34] [cursor=pointer]:
+              - img [ref=e35]
+              - generic: new
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e41]:
+            - generic [ref=e42]:
+              - img [ref=e43]
+              - text: clock & date
+            - generic [ref=e46]: "--:--:--"
+            - generic [ref=e47]: —
+            - generic [ref=e49]:
+              - generic [ref=e50]: sunrise 05:12
+              - generic [ref=e51]: —
+              - generic [ref=e52]: sunset 19:48
+            - generic [ref=e53]:
+              - button "Play lofi radio" [ref=e54] [cursor=pointer]:
+                - img [ref=e55]
+              - generic [ref=e63]: lofi hip-hop radio
+            - generic [ref=e64]:
+              - button "light" [ref=e65] [cursor=pointer]:
+                - img [ref=e66]
+                - text: light
+              - button "auto" [ref=e72] [cursor=pointer]:
+                - img [ref=e73]
+                - text: auto
+              - button "dark" [ref=e77] [cursor=pointer]:
+                - img [ref=e78]
+                - text: dark
+          - generic [ref=e83]:
+            - img [ref=e85]
+            - generic [ref=e89]: —
+          - generic [ref=e92]:
+            - generic [ref=e93]:
+              - img [ref=e94]
+              - text: disk storage
+            - generic [ref=e96]: —
+            - generic [ref=e97]: no data
+            - generic [ref=e99]: no drive data
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - img [ref=e104]
+              - text: server stats
+            - generic [ref=e107]:
+              - generic [ref=e108]:
+                - generic [ref=e109]:
+                  - img [ref=e110]
+                  - text: cpu
+                - generic [ref=e113]: —
+              - generic [ref=e114]:
+                - generic [ref=e115]:
+                  - img [ref=e116]
+                  - text: memory
+                - generic [ref=e118]: —
+              - generic [ref=e119]:
+                - generic [ref=e120]:
+                  - img [ref=e121]
+                  - text: storage
+                - generic [ref=e123]: —
+              - generic [ref=e124]:
+                - generic [ref=e125]:
+                  - img [ref=e126]
+                  - text: network
+                - generic [ref=e131]: —
+            - generic [ref=e133]: no host data
+          - generic [ref=e136]:
+            - generic [ref=e137]:
+              - img [ref=e138]
+              - text: storage apps
+            - generic [ref=e142]: —
+          - generic [ref=e145]:
+            - generic [ref=e146]:
+              - img [ref=e147]
+              - text: network stats
+            - generic [ref=e152]: —
+            - generic [ref=e153]: combined rx + tx
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - img [ref=e158]
+              - text: arr stack
+            - generic [ref=e161]: —
+            - generic [ref=e163]: no queue data
+        - generic [ref=e164]:
+          - generic [ref=e167]:
+            - generic [ref=e168]:
+              - img [ref=e169]
+              - text: nutbot v2.0
+            - generic [ref=e173]:
+              - generic [ref=e174]:
+                - button "log" [ref=e175] [cursor=pointer]
+                - button "shell 1" [ref=e176] [cursor=pointer]:
+                  - text: shell 1
+                  - img [ref=e177]
+                - button "creator" [ref=e180] [cursor=pointer]
+                - button "new shell tab" [ref=e181] [cursor=pointer]:
+                  - img [ref=e182]
+              - button "select harness" [ref=e184] [cursor=pointer]:
+                - text: ⚡ claude
+                - img [ref=e186]
+              - button "NutBot" [ref=e189] [cursor=pointer]:
+                - generic [ref=e190]:
+                  - img [ref=e194]
+                  - generic [ref=e201]: NUT-B0T
+          - generic [ref=e204]:
+            - generic [ref=e206]:
+              - generic [ref=e207]:
+                - img [ref=e208]
+                - text: identity
+              - generic [ref=e212]:
+                - generic [ref=e213]:
+                  - generic [ref=e214]:
+                    - img [ref=e215]
+                    - generic [ref=e219]: AVN
+                  - generic [ref=e220]:
+                    - generic [ref=e221]: AVN Hub
+                    - generic [ref=e222]: front page to your life
+                  - generic [ref=e223]:
+                    - link "github" [ref=e224] [cursor=pointer]:
+                      - /url: https://github.com/Zohaib2244
+                      - img [ref=e225]
+                      - text: github
+                    - generic [ref=e228]: ·
+                    - link "homelab" [ref=e229] [cursor=pointer]:
+                      - /url: "#homelab"
+                      - img [ref=e230]
+                      - text: homelab
+                    - generic [ref=e233]: ·
+                    - generic [ref=e234]: — uptime
+                - generic [ref=e236]:
+                  - 'button "Theme: dark — switch to light" [ref=e237] [cursor=pointer]':
+                    - img [ref=e238]
+                  - generic [ref=e240]: live
+            - generic [ref=e244]:
+              - generic [ref=e246]:
+                - generic [ref=e247]:
+                  - img [ref=e248]
+                  - text: github activity
+                - generic [ref=e250]: —
+              - generic [ref=e251]: —
+              - generic [ref=e252]:
+                - generic [ref=e253]:
+                  - button "commits" [ref=e254] [cursor=pointer]
+                  - button "repos" [ref=e255] [cursor=pointer]
+                - generic [ref=e256]: no recent commits
+        - generic [ref=e257]:
+          - generic [ref=e260]:
+            - generic [ref=e261]:
+              - generic [ref=e262]:
+                - generic [ref=e263]: Last played
+                - generic [ref=e264]:
+                  - generic [ref=e265]: —
+                  - generic [ref=e266]: —
+              - generic [ref=e267]:
+                - generic [ref=e269]: Online Status
+                - generic [ref=e270]:
+                  - generic [ref=e271]: pfp
+                  - generic [ref=e272]: User name
+            - generic [ref=e274]: nothing played recently
+          - generic [ref=e277]:
+            - generic [ref=e278]:
+              - img [ref=e279]
+              - text: a very nutty home server
+            - generic [ref=e282]: —
+            - generic [ref=e284]: no service data
+  - button "Open Next.js Dev Tools" [ref=e290] [cursor=pointer]:
+    - img [ref=e291]

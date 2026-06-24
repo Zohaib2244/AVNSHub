@@ -2,8 +2,19 @@
 // plus the color palette pack. Backed by the same "nutmag-theme" /
 // "nutmag-palette" localStorage keys the pre-paint script in app/layout.tsx
 // reads, so there's no flash on load. Client-side only.
+//
+// Per-canvas (lib/canvases.ts): each canvas can have its own theme mode and
+// palette, namespaced via canvasScopedKey() exactly like lib/slotLayout.ts's
+// widget arrangement — the DEFAULT_CANVAS_ID canvas keeps the bare keys (no
+// migration for existing users), every other canvas gets `::<id>` suffixed
+// keys. Unlike slotLayout.ts there's no module-level cache to invalidate on
+// canvas switch (every getter reads localStorage fresh each call) — the only
+// thing a canvas switch needs to do is re-apply the DOM (data-theme/palette
+// attributes) and notify this store's own listeners, both handled by the
+// subscribeCanvases() callback below.
 
 import { DEFAULT_PALETTE, isPaletteId, type PaletteId } from "@/config/themes";
+import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
 
 export type ThemeMode = "light" | "dark" | "auto";
 
@@ -11,8 +22,16 @@ const STORAGE_KEY = "nutmag-theme";
 const PALETTE_KEY = "nutmag-palette";
 const listeners = new Set<() => void>();
 
+function themeKey(): string {
+  return canvasScopedKey(STORAGE_KEY, getActiveCanvasId());
+}
+
+function paletteKey(): string {
+  return canvasScopedKey(PALETTE_KEY, getActiveCanvasId());
+}
+
 export function getThemeMode(): ThemeMode {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem(themeKey());
   return stored === "light" || stored === "auto" ? stored : "dark";
 }
 
@@ -54,13 +73,13 @@ export function applyThemeSettings() {
 }
 
 export function setThemeMode(mode: ThemeMode) {
-  localStorage.setItem(STORAGE_KEY, mode);
+  localStorage.setItem(themeKey(), mode);
   applyTheme();
   listeners.forEach((listener) => listener());
 }
 
 export function getPalette(): PaletteId {
-  const stored = localStorage.getItem(PALETTE_KEY);
+  const stored = localStorage.getItem(paletteKey());
   return isPaletteId(stored) ? stored : DEFAULT_PALETTE;
 }
 
@@ -69,7 +88,7 @@ export function getServerPalette(): PaletteId {
 }
 
 export function setPalette(id: PaletteId) {
-  localStorage.setItem(PALETTE_KEY, id);
+  localStorage.setItem(paletteKey(), id);
   applyPalette();
   listeners.forEach((listener) => listener());
 }
@@ -80,3 +99,17 @@ export function subscribeTheme(listener: () => void) {
     listeners.delete(listener);
   };
 }
+
+// re-skin the page whenever the active canvas changes — each canvas's theme
+// mode/palette is independent (see themeKey/paletteKey above), so switching
+// canvases must re-read localStorage under the new canvas's keys and notify
+// this store's own listeners so subscribed UI (theme toggle, AppearanceSettings)
+// re-renders with the new canvas's values
+let lastCanvasId: string | null = null;
+subscribeCanvases(() => {
+  const id = getActiveCanvasId();
+  if (lastCanvasId !== null && id === lastCanvasId) return;
+  lastCanvasId = id;
+  applyThemeSettings();
+  listeners.forEach((listener) => listener());
+});

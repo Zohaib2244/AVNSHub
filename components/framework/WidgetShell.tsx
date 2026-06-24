@@ -12,6 +12,7 @@
 // receives a boolean so existing detail UI can reveal while expanded.
 
 import { Component, Suspense, type ReactNode } from "react";
+import { motion } from "framer-motion";
 import {
   resolveSettings,
   type Orientation,
@@ -57,7 +58,20 @@ export type ShellConfig = {
   slot?: { region: RegionId; colSpan: number; rowSpan: number };
 };
 
-export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; config?: ShellConfig }) {
+export function WidgetShell({
+  manifest,
+  config,
+  entranceDelay,
+}: {
+  manifest: WidgetManifest;
+  config?: ShellConfig;
+  /** seconds to wait before this widget's mount fade+scale-in plays — lets a
+      canvas switch cascade widgets in one after another (NutBot first, see
+      SlotDashboard) instead of every widget popping in at once. Only affects
+      a true mount; resize/hover/settings re-renders don't replay it since
+      the animate target ({opacity:1,scale:1}) never changes after that. */
+  entranceDelay?: number;
+}) {
   const size = config?.size ?? manifest.defaults.size;
   const orientation = config?.orientation ?? manifest.defaults.orientation;
   const settings = resolveSettings(manifest, config?.settings);
@@ -103,10 +117,19 @@ export function WidgetShell({ manifest, config }: { manifest: WidgetManifest; co
   );
 
   return (
-    <div id={manifest.id} className="capsule" data-size={size}>
+    // no `layout` prop — see CLAUDE.md's grid reflow-loop warning. This only
+    // tweens opacity/scale on mount, never measures position.
+    <motion.div
+      id={manifest.id}
+      className="capsule"
+      data-size={size}
+      initial={{ opacity: 0, scale: 0.92 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" }}
+    >
       <WidgetContext.Provider value={ctx}>
         {flags.plainChrome ? body : <div className={blockClasses}>{body}</div>}
       </WidgetContext.Provider>
-    </div>
+    </motion.div>
   );
 }
