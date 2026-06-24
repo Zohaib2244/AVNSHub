@@ -4,20 +4,24 @@ import "./GameLibrary.css";
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Library, Search, X } from "lucide-react";
-import type { GameLibrary as GameLibraryData } from "@/lib/steam";
+import type { GameLibrary as GameLibraryData, SteamCreds } from "@/lib/steam";
 
-export function GameLibrary({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function GameLibrary({ open, onClose, creds }: { open: boolean; onClose: () => void; creds?: SteamCreds }) {
   const [lib, setLib] = useState<GameLibraryData | null>(null);
   const [query, setQuery] = useState("");
 
-  // Fetch once, the first time the drawer opens
+  // Fetch once, the first time the drawer opens. POST the per-widget creds when
+  // set (else GET, which falls back to STEAM_* env vars server-side).
   useEffect(() => {
     if (!open || lib) return;
-    fetch("/api/steam-library")
+    const init: RequestInit | undefined = creds
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(creds) }
+      : undefined;
+    fetch("/api/steam-library", init)
       .then((r) => r.json())
       .then(setLib)
       .catch(() => {});
-  }, [open, lib]);
+  }, [open, lib, creds]);
 
   useEffect(() => {
     if (!open) return;

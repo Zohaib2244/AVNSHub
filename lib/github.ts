@@ -1,7 +1,26 @@
 const CACHE_TTL_MS = 60_000;
 const REPOS_CACHE_TTL_MS = 600_000; // repo list changes rarely
-const GITHUB_USERNAME = "Zohaib2244";
+const DEFAULT_GITHUB_USERNAME = "Zohaib2244";
 const MAX_COMMITS = 6;
+
+/** Config passed in from the widget's settings. Blank fields fall back to the
+    GITHUB_TOKEN env var + the default username, so existing setups keep working. */
+export type GitHubConfig = {
+  username?: string;
+  token?: string;
+};
+
+function resolveConfig(config?: GitHubConfig): { username: string; token: string } {
+  const username = config?.username?.trim() || process.env.GITHUB_USERNAME || DEFAULT_GITHUB_USERNAME;
+  const token = config?.token?.trim() || process.env.GITHUB_TOKEN || "";
+  return { username, token };
+}
+
+function authHeaders(token: string): Record<string, string> {
+  const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+}
 
 export type GitHubUser = {
   login: string;
@@ -71,24 +90,24 @@ async function fetchCommitMessage(
   return data.commit.message.split("\n")[0];
 }
 
-let cache: { data: GitHubActivity; expiresAt: number } | null = null;
+// caches keyed by username+token so changing the configured account refetches
+let cache: { data: GitHubActivity; expiresAt: number; key: string } | null = null;
 
-export async function getGitHubActivity(): Promise<GitHubActivity> {
-  if (cache && cache.expiresAt > Date.now()) {
+export async function getGitHubActivity(config?: GitHubConfig): Promise<GitHubActivity> {
+  const { username, token } = resolveConfig(config);
+  const key = `${username}:${token}`;
+  if (cache && cache.key === key && cache.expiresAt > Date.now()) {
     return cache.data;
   }
 
   let data: GitHubActivity = null;
 
   try {
-    const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-    if (process.env.GITHUB_TOKEN) {
-      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
+    const headers = authHeaders(token);
 
     const [eventsRes, userRes] = await Promise.all([
-      fetch(`https://api.github.com/users/${GITHUB_USERNAME}/events/public`, { headers, cache: "no-store" }),
-      fetch(`https://api.github.com/users/${GITHUB_USERNAME}`, { headers, cache: "no-store" }),
+      fetch(`https://api.github.com/users/${username}/events/public`, { headers, cache: "no-store" }),
+      fetch(`https://api.github.com/users/${username}`, { headers, cache: "no-store" }),
     ]);
 
     const user: GitHubUser | null = userRes.ok
@@ -134,26 +153,25 @@ export async function getGitHubActivity(): Promise<GitHubActivity> {
     if (cache) return cache.data;
   }
 
-  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS, key };
   return data;
 }
 
-let reposCache: { data: GitHubRepos; expiresAt: number } | null = null;
+let reposCache: { data: GitHubRepos; expiresAt: number; key: string } | null = null;
 
-export async function getGitHubRepos(): Promise<GitHubRepos> {
-  if (reposCache && reposCache.expiresAt > Date.now()) {
+export async function getGitHubRepos(config?: GitHubConfig): Promise<GitHubRepos> {
+  const { username, token } = resolveConfig(config);
+  const key = `${username}:${token}`;
+  if (reposCache && reposCache.key === key && reposCache.expiresAt > Date.now()) {
     return reposCache.data;
   }
 
   let data: GitHubRepos = null;
 
   try {
-    const headers: Record<string, string> = { Accept: "application/vnd.github+json" };
-    if (process.env.GITHUB_TOKEN) {
-      headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-    }
+    const headers = authHeaders(token);
 
-    const response = await fetch(`https://api.github.com/users/${GITHUB_USERNAME}/repos?per_page=100&sort=pushed`, {
+    const response = await fetch(`https://api.github.com/users/${username}/repos?per_page=100&sort=pushed`, {
       headers,
       cache: "no-store",
     });
@@ -166,6 +184,6 @@ export async function getGitHubRepos(): Promise<GitHubRepos> {
     if (reposCache) return reposCache.data;
   }
 
-  reposCache = { data, expiresAt: Date.now() + REPOS_CACHE_TTL_MS };
+  reposCache = { data, expiresAt: Date.now() + REPOS_CACHE_TTL_MS, key };
   return data;
 }

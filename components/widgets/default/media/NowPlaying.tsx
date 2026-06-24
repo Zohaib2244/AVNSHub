@@ -7,18 +7,28 @@ import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
 import { timeAgo } from "@/lib/format";
 import { useWidget } from "@/components/framework/WidgetContext";
-import type { NowPlaying as NowPlayingData, PlayerAction } from "@/lib/spotify";
+import type { NowPlaying as NowPlayingData, PlayerAction, SpotifyCreds } from "@/lib/spotify";
 
 const POLL_URL = "/api/now-playing";
 const POLL_MS = 30_000;
 
+/** Build a creds object from this widget's settings, or undefined when every
+    field is blank (so the request stays a GET that uses the server env vars). */
+function spotifyCredsFrom(settings: Record<string, string | number | boolean>): SpotifyCreds | undefined {
+  const clientId = String(settings.spotifyClientId ?? "").trim();
+  const clientSecret = String(settings.spotifyClientSecret ?? "").trim();
+  const refreshToken = String(settings.spotifyRefreshToken ?? "").trim();
+  if (!clientId && !clientSecret && !refreshToken) return undefined;
+  return { clientId, clientSecret, refreshToken };
+}
+
 /** returns an error message, or null on success */
-async function spotifyControl(action: PlayerAction, uri: string | undefined, refresh: () => void) {
+async function spotifyControl(action: PlayerAction, uri: string | undefined, refresh: () => void, creds?: SpotifyCreds) {
   try {
     const res = await fetch("/api/spotify-control", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, uri }),
+      body: JSON.stringify({ action, uri, creds }),
     });
     const result = (await res.json()) as { ok: boolean; error?: string };
     if (!result.ok) return result.error ?? "control failed";
@@ -70,18 +80,19 @@ function RecentTracks({ data, onPlayTrack }: { data: NowPlayingData | undefined;
 }
 
 export function NowPlaying() {
-  const { size, hoverExpanded } = useWidget();
-  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS);
+  const { size, hoverExpanded, settings } = useWidget();
+  const creds = spotifyCredsFrom(settings);
+  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS, creds);
   const [controlError, setControlError] = useState<string | null>(null);
 
   async function control(action: PlayerAction) {
     setControlError(null);
-    setControlError(await spotifyControl(action, undefined, refresh));
+    setControlError(await spotifyControl(action, undefined, refresh, creds));
   }
 
   async function playTrack(uri: string) {
     setControlError(null);
-    setControlError(await spotifyControl("play-track", uri, refresh));
+    setControlError(await spotifyControl("play-track", uri, refresh, creds));
   }
 
   if (size === "S") {

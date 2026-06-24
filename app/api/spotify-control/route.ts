@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { controlPlayback, type PlayerAction } from "@/lib/spotify";
+import { controlPlayback, type PlayerAction, type SpotifyCreds } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
@@ -7,7 +7,9 @@ const ACTIONS: PlayerAction[] = ["play", "pause", "next", "previous", "play-trac
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { action?: string; uri?: string };
+    // creds ride along in the body so playback control uses the same per-widget
+    // credentials as the now-playing poll (falls back to SPOTIFY_* env vars)
+    const body = (await request.json()) as { action?: string; uri?: string; creds?: SpotifyCreds };
 
     if (!body.action || !ACTIONS.includes(body.action as PlayerAction)) {
       return NextResponse.json({ ok: false, error: "invalid action" }, { status: 400 });
@@ -18,7 +20,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "invalid track uri" }, { status: 400 });
     }
 
-    const result = await controlPlayback(body.action as PlayerAction, body.uri);
+    const result = await controlPlayback(body.action as PlayerAction, body.uri, body.creds);
     return NextResponse.json(result, { status: result.ok ? 200 : 502 });
   } catch (error) {
     console.error("spotify-control route error:", error);

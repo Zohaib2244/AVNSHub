@@ -78,23 +78,31 @@ function toHours(minutes: number): number {
   return Math.round((minutes / 60) * 10) / 10;
 }
 
-function getCredentials(): { apiKey: string; steamId: string } {
-  const apiKey = process.env.STEAM_API_KEY;
-  const steamId = process.env.STEAM_PROFILE_ID;
+/** Credentials passed in from the widget's settings. Blank fields fall back to
+    the STEAM_* env vars, so existing .env.local setups keep working. */
+export type SteamCreds = {
+  apiKey?: string;
+  steamId?: string;
+};
+
+function getCredentials(creds?: SteamCreds): { apiKey: string; steamId: string } {
+  const apiKey = creds?.apiKey?.trim() || process.env.STEAM_API_KEY || "";
+  const steamId = creds?.steamId?.trim() || process.env.STEAM_PROFILE_ID || "";
   if (!apiKey || !steamId) {
     throw new Error("Missing STEAM_API_KEY / STEAM_PROFILE_ID");
   }
   return { apiKey, steamId };
 }
 
-let cache: { data: CurrentlyPlaying; expiresAt: number } | null = null;
+// caches keyed by steamId so switching the configured profile refetches
+let cache: { data: CurrentlyPlaying; expiresAt: number; key: string } | null = null;
 
-export async function getCurrentlyPlaying(): Promise<CurrentlyPlaying> {
-  if (cache && cache.expiresAt > Date.now()) {
+export async function getCurrentlyPlaying(creds?: SteamCreds): Promise<CurrentlyPlaying> {
+  const { apiKey, steamId } = getCredentials(creds);
+
+  if (cache && cache.key === steamId && cache.expiresAt > Date.now()) {
     return cache.data;
   }
-
-  const { apiKey, steamId } = getCredentials();
 
   const [ownedRes, recentRes, summaryRes] = await Promise.all([
     fetch(`${OWNED_GAMES_URL}?key=${apiKey}&steamid=${steamId}&include_appinfo=1&format=json`, {
@@ -120,7 +128,7 @@ export async function getCurrentlyPlaying(): Promise<CurrentlyPlaying> {
 
   const owned = ownedData.response.games ?? [];
   if (owned.length === 0) {
-    cache = { data: null, expiresAt: Date.now() + CACHE_TTL_MS };
+    cache = { data: null, expiresAt: Date.now() + CACHE_TTL_MS, key: steamId };
     return null;
   }
 
@@ -161,18 +169,18 @@ export async function getCurrentlyPlaying(): Promise<CurrentlyPlaying> {
     recentlyPlayed,
   };
 
-  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS, key: steamId };
   return data;
 }
 
-let libraryCache: { data: GameLibrary; expiresAt: number } | null = null;
+let libraryCache: { data: GameLibrary; expiresAt: number; key: string } | null = null;
 
-export async function getGameLibrary(): Promise<GameLibrary> {
-  if (libraryCache && libraryCache.expiresAt > Date.now()) {
+export async function getGameLibrary(creds?: SteamCreds): Promise<GameLibrary> {
+  const { apiKey, steamId } = getCredentials(creds);
+
+  if (libraryCache && libraryCache.key === steamId && libraryCache.expiresAt > Date.now()) {
     return libraryCache.data;
   }
-
-  const { apiKey, steamId } = getCredentials();
 
   const res = await fetch(`${OWNED_GAMES_URL}?key=${apiKey}&steamid=${steamId}&include_appinfo=1&format=json`, {
     cache: "no-store",
@@ -183,7 +191,7 @@ export async function getGameLibrary(): Promise<GameLibrary> {
   const owned = json.response.games ?? [];
 
   if (owned.length === 0) {
-    libraryCache = { data: null, expiresAt: Date.now() + LIBRARY_CACHE_TTL_MS };
+    libraryCache = { data: null, expiresAt: Date.now() + LIBRARY_CACHE_TTL_MS, key: steamId };
     return null;
   }
 
@@ -202,6 +210,6 @@ export async function getGameLibrary(): Promise<GameLibrary> {
     games,
   };
 
-  libraryCache = { data, expiresAt: Date.now() + LIBRARY_CACHE_TTL_MS };
+  libraryCache = { data, expiresAt: Date.now() + LIBRARY_CACHE_TTL_MS, key: steamId };
   return data;
 }

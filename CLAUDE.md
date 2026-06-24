@@ -154,7 +154,7 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”‚   â”‚   â”œâ”€â”€ HubCorePanel.tsx      # settings/widget-manager edge tabs
 â”‚   â”‚   â”œâ”€â”€ CanvasSwitcher.tsx    # AVN Hub Canvases edge pill stack
 â”‚   â”‚   â””â”€â”€ WallpaperLayer.tsx    # BG image/video layer + mouse parallax
-â”‚   â”œâ”€â”€ NutBotTerminal.tsx    # tabs/mock shells/xterm â€” rendered by nutbot at L
+â”‚   â”œâ”€â”€ NutBotTerminal.tsx    # tabs (log/real shells/creator)/xterm â€” rendered by nutbot at L
 â”‚   â””â”€â”€ *.tsx                 # widget content components (no shell markup)
 â”œâ”€â”€ config/
 â”‚   â”œâ”€â”€ widgets.tsx           # WIDGETS manifest registry + SPAN_MAP + DEFAULT_ORDER
@@ -236,26 +236,34 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 
 ## Environment Variables Needed
 ```
-SPOTIFY_CLIENT_ID=
-SPOTIFY_CLIENT_SECRET=
-SPOTIFY_REFRESH_TOKEN=
-STEAM_API_KEY=
+SPOTIFY_CLIENT_ID=      # optional now â€” the Now Playing widget can also take these
+SPOTIFY_CLIENT_SECRET=  # in its gear settings (per-widget). Env vars are the
+SPOTIFY_REFRESH_TOKEN=  # fallback used when a settings field is left blank.
+STEAM_API_KEY=          # optional â€” Currently Playing widget settings can supply these
 STEAM_PROFILE_ID=76561199044933923
 HOMELAB_STATUS_URL=
-GITHUB_TOKEN=           # optional
+GITHUB_TOKEN=           # optional â€” GitHub widget settings can supply username + token
 HOMELAB_MOCK_DATA=      # optional, dev-only â€” "true" serves realistic mock v2 telemetry
                         # (CPU/Mem/disks/network + all 8 services) instead of HOMELAB_STATUS_URL,
                         # for testing the new capsules on machines without homelab access
-NEXT_PUBLIC_NUTBOT_SHELL_URL=  # optional, dev-only â€” set to ws://localhost:4001 (with
-                        # `npm run nutbot:shell` running) to add a "real shell" tab to NutBot,
-                        # backed by an actual pty on this machine. NEVER set in a
-                        # deployed/Tailscale-exposed build
+NUTBOT_SHELL_DISABLED=  # optional â€” set "true" to disable NutBot's integrated real
+                        # shell route (/api/nutbot-shell). The shell is ON by default
+                        # and gives anyone who can reach the UI a real shell on the host
+                        # as the server's user â€” intended for the single-user/self-hosted
+                        # /full-trust model. Disable it if you expose the hub more widely.
 ```
+
+**Credentials in widget settings:** the Spotify / Steam / GitHub widgets each expose their credentials as fields in the gear/settings popover (Spotify uses a masked `password` field type for the secret + refresh token; Steam for the api key; GitHub for the token). Values are stored client-side in the layout and POSTed to that widget's own API route, which falls back to the `*_*` env vars above when a field is blank â€” so existing `.env.local` setups keep working unchanged, and per-widget settings override them. Lib clients (`lib/spotify.ts`/`steam.ts`/`github.ts`) take an optional creds arg and key their module caches by it so switching accounts refetches.
 
 ## Deploy â€” Docker + Tailscale
 
+**Runtime model (as of v2.1):** AVN Hub runs the Next.js **dev server** (`next dev`, Turbopack) as its actual runtime â€” *not* a `next build`/`next start` standalone image. The widget creator writes real `.tsx` into the source tree at runtime and depends on the dev server's file-watcher/HMR (load a new widget with no rebuild), the TS toolchain (`tsc` validation), the full source tree, and an agent CLI being present. A slim prod build has none of those and would break the headline feature. This is safe because AVN Hub is single-user/self-hosted/full-trust â€” the "never run next dev in prod" rule is a multi-tenant perf+security rule that doesn't bind here. The `Dockerfile` runs `npm run dev`; `docker-compose.yml` bind-mounts the project so agent-written widgets persist to the host (with an anonymous `node_modules` volume so native bindings aren't shadowed). The agent CLI (`claude`/`codex`/`opencode`) must be available wherever the server runs â€” inside the container, or just run the hub directly on a host that already has it (`npm run dev`).
+
 ```bash
-# On the homelab machine, in this repo:
+# Option A (recommended) â€” directly on a host that has your agent CLI:
+npm install && npm run dev
+
+# Option B â€” Docker (CLI must be available inside the container):
 docker compose up -d --build
 
 # Expose over Tailscale HTTPS (no domain, no cert config needed):
@@ -264,6 +272,10 @@ tailscale serve https / http://localhost:3000
 ```
 
 Secrets are passed at runtime via `env_file: .env.local` â€” they are never baked into the image layer.
+
+## Versioning & changelog
+
+Track every notable change in [`CHANGELOG.md`](./CHANGELOG.md) (Keep a Changelog format). Add entries under `## [Unreleased]` (grouped Added / Changed / Fixed / Removed) as you work. On a release, rename `Unreleased` to the version + date and bump **all three** version markers together: `version` in `package.json`, the `v2.x` string in `components/dashboard/BootSequence.tsx`, and the changelog. Current version: **2.1.0**.
 
 ---
 

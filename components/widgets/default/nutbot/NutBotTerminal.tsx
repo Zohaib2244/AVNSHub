@@ -2,9 +2,14 @@
 import "./NutBotTerminal.css";
 import "./creator/WidgetCreatorPanel.css";
 
-// NutBot's full terminal — log ticker, mock shell tabs, and the optional
-// xterm real shell. Lives in the face widget's click-to-expand overlay, so
-// xterm only mounts when the terminal is actually open.
+// NutBot's full terminal: an ambient log ticker, one or more REAL cross-platform
+// shell tabs (each a live pty on the host via /api/nutbot-shell), and the widget
+// creator. Lives in the face widget's click-to-expand overlay, so the shells
+// only mount when the terminal is actually open.
+//
+// Shell tabs stay mounted (hidden with display:none) while you switch tabs, so
+// the underlying pty session and its scrollback survive — a tab is only torn
+// down when you close it.
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,8 +19,6 @@ import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 
-const SHELL_WS_URL = process.env.NEXT_PUBLIC_NUTBOT_SHELL_URL;
-
 export const LOG_MESSAGES = [
   "[ok] homelab uplink ... stable",
   "[ok] spotify.auth ... connected",
@@ -24,48 +27,18 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v1.5 idle, awaiting input...",
+  "[info] nutbot v2.1 idle, awaiting input...",
 ];
 
-const HELP_TEXT = "available: help, whoami, neofetch, ls, date, echo <text>, clear";
-const PROMPT = "avn@homeserver:~$";
-
-function runCommand(raw: string): string | null {
-  const trimmed = raw.trim();
-  if (!trimmed) return "";
-
-  const [bin, ...args] = trimmed.split(/\s+/);
-
-  switch (bin.toLowerCase()) {
-    case "help":
-      return HELP_TEXT;
-    case "whoami":
-      return "avn-hub";
-    case "neofetch":
-      return "os: nutos | host: a very nutty home server | shell: nutbot-sh";
-    case "ls":
-      return "now-playing/  homelab/  github-activity/  nutbot.exe";
-    case "date":
-      return new Date().toString();
-    case "echo":
-      return args.join(" ");
-    case "clear":
-      return null;
-    default:
-      return `nutbot: command not found: ${bin} (real shell access coming soon)`;
-  }
-}
-
-type ShellState = { history: { cmd: string; output: string }[]; input: string };
+type TabKind = "log" | "shell" | "creator";
+type TerminalTab = { id: string; title: string; kind: TabKind };
 type LogLine = { id: number; text: string };
-type TerminalTab = { id: string; title: string };
 
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
-const DEFAULT_TABS: TerminalTab[] = [
-  { id: "log", title: "log" },
-  { id: "shell-1", title: "shell 1" },
-  ...(SHELL_WS_URL ? [{ id: "real-shell", title: "real shell" }] : []),
-  { id: "creator", title: "creator" },
+const INITIAL_TABS: TerminalTab[] = [
+  { id: "log", title: "log", kind: "log" },
+  { id: "shell-1", title: "shell 1", kind: "shell" },
+  { id: "creator", title: "creator", kind: "creator" },
 ];
 
 export function NutBotTerminal() {
@@ -86,9 +59,8 @@ export function NutBotTerminal() {
     return () => clearInterval(id);
   }, []);
 
-  const [tabs, setTabs] = useState<TerminalTab[]>(() => DEFAULT_TABS);
+  const [tabs, setTabs] = useState<TerminalTab[]>(() => INITIAL_TABS);
   const [activeTab, setActiveTab] = useState("log");
-  const [shells, setShells] = useState<Record<string, ShellState>>({ "shell-1": { history: [], input: "" } });
   const shellCount = useRef(1);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -96,7 +68,7 @@ export function NutBotTerminal() {
     let restoreTimer: number | undefined;
     try {
       const stored = sessionStorage.getItem(NUTBOT_TAB_KEY);
-      if (stored && DEFAULT_TABS.some((tab) => tab.id === stored)) {
+      if (stored && INITIAL_TABS.some((tab) => tab.id === stored)) {
         restoreTimer = window.setTimeout(() => {
           skipTabWrite.current = false;
           setActiveTab(stored);
@@ -119,44 +91,29 @@ export function NutBotTerminal() {
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [logLines, shells, activeTab]);
+  }, [logLines, activeTab]);
 
   function addShellTab() {
     shellCount.current += 1;
     const id = `shell-${shellCount.current}`;
-    setTabs((prev) => [...prev, { id, title: `shell ${shellCount.current}` }]);
-    setShells((prev) => ({ ...prev, [id]: { history: [], input: "" } }));
+    const title = `shell ${shellCount.current}`;
+    // insert the new shell just before the creator tab so creator stays last
+    setTabs((prev) => {
+      const creatorIdx = prev.findIndex((t) => t.kind === "creator");
+      const tab: TerminalTab = { id, title, kind: "shell" };
+      if (creatorIdx === -1) return [...prev, tab];
+      return [...prev.slice(0, creatorIdx), tab, ...prev.slice(creatorIdx)];
+    });
     setActiveTab(id);
   }
 
   function closeTab(id: string) {
     setTabs((prev) => prev.filter((tab) => tab.id !== id));
-    setShells((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
     setActiveTab((current) => (current === id ? "log" : current));
   }
 
-  function updateInput(id: string, value: string) {
-    setShells((prev) => ({ ...prev, [id]: { ...prev[id], input: value } }));
-  }
-
-  function submitCommand(id: string) {
-    setShells((prev) => {
-      const shell = prev[id];
-      const output = runCommand(shell.input);
-
-      if (output === null) {
-        return { ...prev, [id]: { history: [], input: "" } };
-      }
-
-      return { ...prev, [id]: { history: [...shell.history, { cmd: shell.input, output }], input: "" } };
-    });
-  }
-
-  const activeShell = shells[activeTab];
+  const activeKind = tabs.find((t) => t.id === activeTab)?.kind ?? "log";
+  const shellTabs = tabs.filter((t) => t.kind === "shell");
 
   return (
     <div className="nutbot-terminal">
@@ -170,7 +127,8 @@ export function NutBotTerminal() {
               onClick={() => setActiveTab(tab.id)}
             >
               {tab.title}
-              {tab.id.startsWith("shell-") && (
+              {/* only shell tabs are closeable, and never the last remaining one */}
+              {tab.kind === "shell" && shellTabs.length > 1 && (
                 <X
                   size={10}
                   strokeWidth={2}
@@ -194,8 +152,11 @@ export function NutBotTerminal() {
         </div>
       </div>
 
-      <div className={`term-body${activeTab === "real-shell" ? " term-body-real" : ""}${activeTab === "creator" ? " term-body-creator" : ""}`} ref={bodyRef}>
-        {activeTab === "log" ? (
+      <div
+        className={`term-body${activeKind === "shell" ? " term-body-real" : ""}${activeKind === "creator" ? " term-body-creator" : ""}`}
+        ref={bodyRef}
+      >
+        {activeKind === "log" && (
           <AnimatePresence initial={false}>
             {logLines.map((line) => (
               <motion.div
@@ -209,37 +170,21 @@ export function NutBotTerminal() {
               </motion.div>
             ))}
           </AnimatePresence>
-        ) : activeTab === "creator" ? (
-          <WidgetCreatorPanel />
-        ) : activeTab === "real-shell" ? (
-          <RealShell wsUrl={SHELL_WS_URL ?? ""} />
-        ) : (
-          activeShell?.history.map((entry, i) => (
-            <div key={i}>
-              <div className="term-line">
-                <span className="term-prompt-prefix">{PROMPT}</span> {entry.cmd}
-              </div>
-              {entry.output && <div className="term-line term-output">{entry.output}</div>}
-            </div>
-          ))
         )}
 
-        {activeTab !== "log" && activeTab !== "real-shell" && activeTab !== "creator" && activeShell && (
-          <div className="term-prompt">
-            <span className="term-prompt-prefix">{PROMPT}</span>
-            <input
-              className="term-input"
-              value={activeShell.input}
-              onChange={(e) => updateInput(activeTab, e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submitCommand(activeTab);
-              }}
-              spellCheck={false}
-              autoComplete="off"
-              aria-label="nutbot shell input"
-            />
+        {activeKind === "creator" && <WidgetCreatorPanel />}
+
+        {/* shells stay mounted across tab switches so their pty + scrollback
+            persist; only the active one is visible */}
+        {shellTabs.map((tab) => (
+          <div
+            key={tab.id}
+            className="term-shell-pane"
+            style={{ display: activeTab === tab.id ? "block" : "none" }}
+          >
+            <RealShell />
           </div>
-        )}
+        ))}
       </div>
     </div>
   );

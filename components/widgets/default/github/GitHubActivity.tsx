@@ -6,15 +6,26 @@ import { Check, Copy, Github, GitCommitHorizontal } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { timeAgo } from "@/lib/format";
-import type { GitHubActivity as GitHubActivityData, GitHubRepos } from "@/lib/github";
+import type { GitHubActivity as GitHubActivityData, GitHubConfig, GitHubRepos } from "@/lib/github";
 
 /* eslint-disable @next/next/no-img-element -- github avatar is a tiny external image */
 
 const POLL_URL = "/api/github-activity";
 const POLL_MS = 60_000;
 
+/** GitHub config from this widget's settings, or undefined when blank (GET +
+    server default username / GITHUB_TOKEN fallback). Both the main and detail
+    components derive it from the same settings, so they share one poll cache. */
+function githubConfigFrom(settings: Record<string, string | number | boolean>): GitHubConfig | undefined {
+  const username = String(settings.githubUsername ?? "").trim();
+  const token = String(settings.githubToken ?? "").trim();
+  if (!username && !token) return undefined;
+  return { username, token };
+}
+
 export function GitHubActivity() {
-  const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS);
+  const { settings } = useWidget();
+  const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS, githubConfigFrom(settings));
 
   return (
     <>
@@ -57,19 +68,25 @@ export function GitHubActivity() {
 type Tab = "commits" | "repos";
 
 export function GitHubActivityMore() {
-  const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS);
   const { settings } = useWidget();
+  const config = githubConfigFrom(settings);
+  const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS, config);
   const [repos, setRepos] = useState<GitHubRepos>(null);
   const [tab, setTab] = useState<Tab>("commits");
   const [copiedRepo, setCopiedRepo] = useState<string | null>(null);
 
-  // only mounts at L size (the detail area), so this lazy-loads on first reveal
+  // only mounts at L size (the detail area), so this lazy-loads on first reveal.
+  // POST the per-widget config when set (else GET + server fallback).
   useEffect(() => {
-    fetch("/api/github-repos")
+    const init: RequestInit | undefined = config
+      ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(config) }
+      : undefined;
+    fetch("/api/github-repos", init)
       .then((r) => r.json())
       .then(setRepos)
       .catch(() => {});
-  }, []);
+    // re-fetch if the configured account changes
+  }, [config?.username, config?.token]);
 
   function copyClone(repo: { name: string; cloneUrl: string }) {
     navigator.clipboard.writeText(`git clone ${repo.cloneUrl}`).then(() => {

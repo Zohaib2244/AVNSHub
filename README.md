@@ -166,11 +166,24 @@ Both dark and light modes are first-class — not an afterthought. Eight colour 
 
 ## Self-hosting
 
+### Runtime model — AVN Hub runs the Next.js **dev server** as its runtime
+
+This is deliberate, and it's the most important thing to understand before deploying. AVN Hub is **not** shipped as a slim `next build` / `next start` image. It runs `next dev` (Turbopack) as its actual runtime, because the NutBot widget creator writes real `.tsx` into the source tree at runtime and depends on things a compiled production build does not have:
+
+1. the dev server's **file-watcher / HMR**, so a newly generated widget appears with **no rebuild and no restart**
+2. the **TypeScript toolchain** (`tsc`), to validate generated widgets before registering them
+3. the **full source tree + an agent CLI** (`claude` / `codex` / `opencode`), which the creator reads and shells out to
+
+The usual "never run `next dev` in production" advice is a *multi-tenant performance + security* rule. AVN Hub is a **single-user, self-hosted, full-trust** instance — your own box, reached privately over your tailnet — so that rule doesn't apply, and a dev-server runtime is the natural fit rather than a workaround. See [`docs/AVN_HUB.md`](docs/AVN_HUB.md) and [`CHANGELOG.md`](CHANGELOG.md).
+
+> **Agent CLI requirement:** the widget creator needs an agent CLI installed **and authenticated wherever the server runs**. The simplest path is to run the hub **directly on a machine that already has your CLI** (option A below). If you containerize it (option B), the CLI must be available *inside* the container.
+
 ### Requirements
 
 - Node.js 20+
-- Docker + Docker Compose
+- An agent CLI for the widget creator — one of [Claude Code](https://claude.com/claude-code), Codex, or OpenCode — installed and authenticated
 - A [Tailscale](https://tailscale.com) account (free) for private HTTPS
+- Docker + Docker Compose (only for option B)
 
 ### 1. Clone & configure
 
@@ -204,7 +217,16 @@ GITHUB_TOKEN=
 HOMELAB_MOCK_DATA=true   # serve realistic mock telemetry without a real homelab
 ```
 
-### 3. Run with Docker
+### 3. Run it
+
+**Option A — directly on the host (recommended).** Simplest path, and your agent CLI is already installed and authenticated here:
+
+```bash
+npm install
+npm run dev          # serves on http://localhost:3000
+```
+
+**Option B — Docker Compose.** The image runs `next dev` and bind-mounts the project so agent-written widgets persist to the host and HMR picks them up. Your agent CLI must be available *inside* the container (mount it in, extend the image, or install + authenticate it there):
 
 ```bash
 docker compose up -d --build

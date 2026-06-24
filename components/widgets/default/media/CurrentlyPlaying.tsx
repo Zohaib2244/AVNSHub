@@ -8,12 +8,21 @@ import { GameLibrary } from "@/components/widgets/default/media/GameLibrary";
 import { usePolling } from "@/lib/usePolling";
 import { timeAgo } from "@/lib/format";
 import { useWidget } from "@/components/framework/WidgetContext";
-import type { CurrentlyPlaying as CurrentlyPlayingData } from "@/lib/steam";
+import type { CurrentlyPlaying as CurrentlyPlayingData, SteamCreds } from "@/lib/steam";
 
 /* eslint-disable @next/next/no-img-element -- steam avatars are tiny external images */
 
 const POLL_URL = "/api/currently-playing";
 const POLL_MS = 60_000;
+
+/** Steam creds from this widget's settings, or undefined when blank (GET +
+    server env-var fallback). */
+function steamCredsFrom(settings: Record<string, string | number | boolean>): SteamCreds | undefined {
+  const apiKey = String(settings.steamApiKey ?? "").trim();
+  const steamId = String(settings.steamProfileId ?? "").trim();
+  if (!apiKey && !steamId) return undefined;
+  return { apiKey, steamId };
+}
 
 /** L-tier addition: games played in the last two weeks */
 function RecentlyPlayed({ data }: { data: CurrentlyPlayingData | undefined }) {
@@ -39,8 +48,9 @@ function RecentlyPlayed({ data }: { data: CurrentlyPlayingData | undefined }) {
 }
 
 export function CurrentlyPlaying() {
-  const { size, hoverExpanded } = useWidget();
-  const { data } = usePolling<CurrentlyPlayingData>(POLL_URL, POLL_MS);
+  const { size, hoverExpanded, settings } = useWidget();
+  const creds = steamCredsFrom(settings);
+  const { data } = usePolling<CurrentlyPlayingData>(POLL_URL, POLL_MS, creds);
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -145,7 +155,7 @@ export function CurrentlyPlaying() {
         </div>
       )}
 
-      <GameLibrary open={libraryOpen} onClose={() => setLibraryOpen(false)} />
+      <GameLibrary open={libraryOpen} onClose={() => setLibraryOpen(false)} creds={creds} />
     </>
   );
 }
