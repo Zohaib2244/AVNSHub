@@ -5,7 +5,7 @@ import { Send, Square, PlusCircle } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
-import { placeWidgetAuto } from "@/lib/slotLayout";
+import { placeWidgetAuto, unplaceWidgetTemporarily, restorePlacementSnapshot, type PlacementSnapshot } from "@/lib/slotLayout";
 import { isValidSlug } from "@/lib/widget-creator/slug";
 
 type Phase =
@@ -93,6 +93,12 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     return { id: "idle" };
   });
   const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
+  // tracks a widget pulled off the canvas for the duration of an edit-mode run
+  // (see generate()) — kept until the run finishes cleanly (auto-restore) or
+  // the user restores it manually after a failed/aborted run
+  const [editHidden, setEditHidden] = useState(false);
+  const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -145,6 +151,21 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setPhase({ id: "connecting", harness: activeHarness });
     emitWorking();
+
+    // Editing an existing widget overwrites its live source file while it may
+    // still be mounted on the dashboard — pull it off the canvas for the
+    // duration of the run so the browser never has to compile/render a
+    // possibly-broken intermediate version. Restored automatically once the
+    // run finishes cleanly; left hidden (with a manual restore option) on any
+    // failure/abort, since the file may have been left in a broken state.
+    if (settings.editSlug) {
+      const editSlug = settings.editSlug;
+      const snapshot = unplaceWidgetTemporarily(editSlug);
+      if (snapshot.kind !== "none") {
+        hiddenEditRef.current = { slug: editSlug, snapshot };
+        setEditHidden(true);
+      }
+    }
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -208,6 +229,13 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
                 ];
               });
               clearSignal();
+              // the run finished cleanly (no tsc errors, or we wouldn't be in this
+              // branch) — safe to put an edited widget back where it was
+              if (slug && hiddenEditRef.current?.slug === slug) {
+                restorePlacementSnapshot(slug, hiddenEditRef.current.snapshot);
+                hiddenEditRef.current = null;
+                setEditHidden(false);
+              }
               if (slug) {
                 setDoneWidgetId(slug);
                 setAdded(false);
@@ -255,6 +283,15 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
                 { role: "ok", text: `[info] switched to edit mode for "${attemptedSlug}" — describe the fix and resubmit` },
               ]);
             }
+            // the run didn't finish cleanly — leave the widget off the canvas
+            // (don't risk rendering a broken intermediate file) until the user
+            // either fixes it and resubmits, or restores it manually
+            if (hiddenEditRef.current) {
+              setMessages((prev) => [
+                ...prev,
+                { role: "ok", text: `[info] "${hiddenEditRef.current!.slug}" is still off the canvas — fix and resubmit to restore it automatically, or use "restore to canvas" below.` },
+              ]);
+            }
           }
         }
       }
@@ -294,17 +331,48 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     setPhase({ id: "idle" });
     setDoneWidgetId(null);
     setAdded(false);
-    // a finished session may have auto-switched into edit mode (see "done"/tsc_errors
-    // handling above) — starting a new chat should start fresh in create mode
-    onSettingsChange({ editSlug: undefined });
+    // a finished session may have auto-switched into edit mode and accumulated
+    // identity fields for the widget it was targeting — starting a new chat
+    // must reset all of it, or a stale slug surviving into the next message
+    // could get misread as "create" for a widget that already exists (the
+    // exact desync that let an edit-mode run delete a working widget)
+    onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
     try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
     try { sessionStorage.removeItem(MESSAGES_KEY); } catch {}
   }
 
-  function handleAddToLayout() {
-    if (!doneWidgetId) return;
-    placeWidgetAuto(doneWidgetId);
-    setAdded(true);
+  // placeWidgetAuto can fail right after a "done" event because the registry
+  // module the dashboard reads from (CUSTOM_WIDGETS) hasn't picked up the
+  // dev-server's file-watcher/HMR update yet — retry briefly instead of
+  // reporting success regardless of whether the placement actually happened.
+  async function handleAddToLayout() {
+    if (!doneWidgetId || adding) return;
+    setAdding(true);
+    for (let attempt = 0; attempt < 12; attempt++) {
+      if (placeWidgetAuto(doneWidgetId)) {
+        setAdding(false);
+        setAdded(true);
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    setAdding(false);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "error",
+        text: `couldn't place "${doneWidgetId}" on the canvas — every region may be full, or the dashboard hasn't picked up the new widget yet. Try the Widget Manager, or reload the page.`,
+      },
+    ]);
+  }
+
+  function restoreHiddenEditWidget() {
+    const pending = hiddenEditRef.current;
+    if (!pending) return;
+    if (restorePlacementSnapshot(pending.slug, pending.snapshot)) {
+      hiddenEditRef.current = null;
+      setEditHidden(false);
+    }
   }
 
   const isGenerating = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
@@ -385,15 +453,21 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
               new
             </button>
             {doneWidgetId && !added && (
-              <button type="button" className="wc-add-btn" onClick={handleAddToLayout}>
+              <button type="button" className="wc-add-btn" onClick={handleAddToLayout} disabled={adding}>
                 <PlusCircle size={11} strokeWidth={2} />
-                add to layout
+                {adding ? "adding..." : "add to layout"}
               </button>
             )}
             {added && (
               <span className="wc-added-hint">added ✓</span>
             )}
           </>
+        )}
+        {editHidden && !isGenerating && (
+          <button type="button" className="wc-add-btn" onClick={restoreHiddenEditWidget}>
+            <PlusCircle size={11} strokeWidth={2} />
+            restore to canvas
+          </button>
         )}
         <textarea
           className="wc-chat-input"

@@ -45,13 +45,18 @@ function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
   const comp = slug ? componentName(slug) : "<Pascal>Widget";
   const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
 
+  // In edit mode the only settings that still apply are slug + the freeform
+  // description/data fields actually describing this edit — name/icon/sizes/
+  // orientations/HOE are create-time identity fields edited separately via the
+  // deterministic update-meta route, and a stale value here (e.g. surviving
+  // from a prior create-mode session) must never leak into an edit prompt.
   const settingsSummary = [
-    settings.name && `Widget name: "${settings.name}"`,
+    !isEdit && settings.name && `Widget name: "${settings.name}"`,
     (settings.slug || settings.editSlug) && `Slug (id): "${settings.slug || settings.editSlug}"`,
-    settings.icon && `Lucide icon: ${settings.icon}`,
-    settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
-    settings.orientations?.length && `Orientations: ${settings.orientations.join(", ")}`,
-    settings.hoe && `HOE (Hover On Expand): enabled, mode: ${settings.hoeMode ?? "default"}`,
+    !isEdit && settings.icon && `Lucide icon: ${settings.icon}`,
+    !isEdit && settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
+    !isEdit && settings.orientations?.length && `Orientations: ${settings.orientations.join(", ")}`,
+    !isEdit && settings.hoe && `HOE (Hover On Expand): enabled, mode: ${settings.hoeMode ?? "default"}`,
     settings.sDescription && `S size content: ${settings.sDescription}`,
     settings.mDescription && `M size content: ${settings.mDescription}`,
     settings.lDescription && `L size content: ${settings.lDescription}`,
@@ -268,6 +273,22 @@ export async function POST(req: Request) {
   };
   const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain } = body;
 
+  // Guard against a desynced client sending a "create" (no editSlug) for a
+  // slug that already exists — without this, a stale `settings.slug` left
+  // over from a prior edit session would look like a brand-new widget to the
+  // rollback logic below and could wipe out an already-working registration
+  // on a tsc failure. Determined from registry state, not the client's flags.
+  const targetId = settings.editSlug ?? settings.slug;
+  const existedBeforeThisRun = Boolean(targetId && readRegistry()[targetId]);
+  if (!settings.editSlug && settings.slug && existedBeforeThisRun) {
+    return new Response(
+      `event: error\ndata: ${JSON.stringify({
+        message: `A widget with id "${settings.slug}" already exists. Switch to edit mode to modify it instead of creating a new one.`,
+      })}\n\n`,
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+  }
+
   const fullPrompt = buildPrompt(settings, userPrompt);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
@@ -338,10 +359,13 @@ export async function POST(req: Request) {
             // can't keep the build in a "Module not found" / type error state.
             // The generated files are kept on disk — the user can ask to fix them.
             // For edits: leave the registration intact (it existed before this run).
-            const isNew = !settings.editSlug;
-            if (isNew && settings.slug) {
-              removeFromComponentMap(settings.slug);
-              removeRegistryEntry(settings.slug);
+            // Driven by `existedBeforeThisRun` (actual prior registry state captured
+            // before any mutation), NOT `settings.editSlug` — a desynced client flag
+            // must never be trusted to delete an already-working widget.
+            const isNew = !existedBeforeThisRun;
+            if (isNew && targetId) {
+              removeFromComponentMap(targetId);
+              removeRegistryEntry(targetId);
             }
             sendEvent(write, "error", {
               message: isNew

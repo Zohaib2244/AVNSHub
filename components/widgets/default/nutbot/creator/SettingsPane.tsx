@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
 import { WidgetPicker } from "./WidgetPicker";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
-import { slugify } from "@/lib/widget-creator/slug";
+import customRegistryRaw from "@/config/customRegistry.json";
+import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
+import { renameWidgetPlacement } from "@/lib/slotLayout";
 
 type Props = {
   settings: GenerateSettings;
@@ -38,6 +40,194 @@ const ORI_OPTIONS = ["h", "v"] as const;
 const HOE_MODES = ["both", "width", "height"] as const;
 
 const IMAGE_KEY_MAP = { S: "sImageRef", M: "mImageRef", L: "lImageRef" } as const;
+
+type RawRegistryEntry = {
+  title: string;
+  iconName: string;
+  sizes: string[];
+  orientations: string[];
+  defaults: { size: string; orientation: string };
+  settings?: { key: string; label: string; type: string }[];
+};
+
+const RAW_REGISTRY = customRegistryRaw as Record<string, RawRegistryEntry>;
+
+/** Edit-mode identity form — title/icon/sizes/orientations/defaults/slug for
+    an already-generated custom widget, saved via the deterministic
+    update-meta route (no LLM involved, so it can never break the component).
+    The widget's own settings schema is shown read-only below — only the
+    generator (re-describing the widget) can change what that schema offers. */
+function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: string) => void }) {
+  const entry = RAW_REGISTRY[id];
+  const [title, setTitle] = useState(entry?.title ?? "");
+  const [iconName, setIconName] = useState(entry?.iconName ?? "");
+  const [sizes, setSizes] = useState<string[]>(entry?.sizes ?? ["S", "M", "L"]);
+  const [orientations, setOrientations] = useState<string[]>(entry?.orientations ?? ["h"]);
+  const [defaultSize, setDefaultSize] = useState(entry?.defaults?.size ?? "M");
+  const [defaultOrientation, setDefaultOrientation] = useState(entry?.defaults?.orientation ?? "h");
+  const [slug, setSlug] = useState(id);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [error, setError] = useState("");
+
+  // re-derive the form whenever the target widget changes (picker switch)
+  useEffect(() => {
+    const next = RAW_REGISTRY[id];
+    setTitle(next?.title ?? "");
+    setIconName(next?.iconName ?? "");
+    setSizes(next?.sizes ?? ["S", "M", "L"]);
+    setOrientations(next?.orientations ?? ["h"]);
+    setDefaultSize(next?.defaults?.size ?? "M");
+    setDefaultOrientation(next?.defaults?.orientation ?? "h");
+    setSlug(id);
+    setStatus("idle");
+    setError("");
+  }, [id]);
+
+  function toggle(list: string[], setList: (v: string[]) => void, value: string) {
+    const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+    if (next.length > 0) setList(next);
+  }
+
+  async function handleSave() {
+    const trimmedSlug = slug.trim();
+    if (!isValidSlug(trimmedSlug)) {
+      setStatus("error");
+      setError(`invalid slug "${trimmedSlug}" — use only lowercase letters, numbers, and hyphens`);
+      return;
+    }
+    setStatus("saving");
+    setError("");
+    try {
+      const res = await fetch("/api/widget-creator/update-meta", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          title,
+          iconName,
+          sizes,
+          orientations,
+          defaultSize,
+          defaultOrientation,
+          newSlug: trimmedSlug !== id ? trimmedSlug : undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.ok) {
+        setStatus("error");
+        setError(data.error ?? `save failed (${res.status})`);
+        return;
+      }
+      if (data.id && data.id !== id) {
+        renameWidgetPlacement(id, data.id);
+        onIdChange(data.id);
+      }
+      setStatus("saved");
+    } catch (err) {
+      setStatus("error");
+      setError((err as Error).message ?? "save failed");
+    }
+  }
+
+  const settingsSchema = entry?.settings ?? [];
+
+  return (
+    <Section title="current configuration">
+      {settingsSchema.length > 0 && (
+        <div className="wc-meta-readonly">
+          <span className="wc-field-label">widget settings schema (read-only — re-describe the widget to change)</span>
+          <div className="wc-meta-schema-list">
+            {settingsSchema.map((f) => (
+              <span key={f.key} className="wc-meta-schema-chip">{f.label} · {f.type}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="wc-row-pair">
+        <div className="wc-field">
+          <span className="wc-field-label">title</span>
+          <input className="wc-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+        </div>
+        <div className="wc-field">
+          <span className="wc-field-label">icon</span>
+          <input
+            className="wc-input"
+            list="wc-icon-list"
+            value={iconName}
+            onChange={(e) => setIconName(e.target.value)}
+          />
+          <datalist id="wc-icon-list">
+            {LUCIDE_SUGGESTIONS.map((i) => <option key={i} value={i} />)}
+          </datalist>
+        </div>
+      </div>
+
+      <div className="wc-field">
+        <span className="wc-field-label">slug</span>
+        <input className="wc-input" value={slug} onChange={(e) => setSlug(e.target.value)} />
+      </div>
+
+      <div className="wc-row wc-row-spread">
+        <div className="wc-inline-label">sizes</div>
+        <div className="wc-toggle-group">
+          {SIZE_OPTIONS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`wc-toggle-btn${sizes.includes(s) ? " active" : ""}`}
+              onClick={() => toggle(sizes, setSizes, s)}
+            >{s}</button>
+          ))}
+        </div>
+        <div className="wc-inline-label">ori</div>
+        <div className="wc-toggle-group">
+          {ORI_OPTIONS.map((o) => (
+            <button
+              key={o}
+              type="button"
+              className={`wc-toggle-btn${orientations.includes(o) ? " active" : ""}`}
+              onClick={() => toggle(orientations, setOrientations, o)}
+            >{o}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="wc-row wc-row-spread">
+        <div className="wc-inline-label">default size</div>
+        <div className="wc-toggle-group">
+          {sizes.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className={`wc-toggle-btn${defaultSize === s ? " active" : ""}`}
+              onClick={() => setDefaultSize(s)}
+            >{s}</button>
+          ))}
+        </div>
+        <div className="wc-inline-label">default ori</div>
+        <div className="wc-toggle-group">
+          {orientations.map((o) => (
+            <button
+              key={o}
+              type="button"
+              className={`wc-toggle-btn${defaultOrientation === o ? " active" : ""}`}
+              onClick={() => setDefaultOrientation(o)}
+            >{o}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="wc-row wc-row-spread">
+        <button type="button" className="wc-add-btn" onClick={handleSave} disabled={status === "saving"}>
+          {status === "saving" ? "saving..." : "save"}
+        </button>
+        {status === "saved" && <span className="wc-added-hint">saved ✓</span>}
+        {status === "error" && <span className="wc-msg-error-tag">{error}</span>}
+      </div>
+    </Section>
+  );
+}
 
 export function SettingsPane({ settings, onChange }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
@@ -93,6 +283,10 @@ export function SettingsPane({ settings, onChange }: Props) {
             onChange={(id) => onChange({ editSlug: id })}
           />
         </Section>
+      )}
+
+      {isEditMode && settings.editSlug && (
+        <EditMetaForm id={settings.editSlug} onIdChange={(newId) => onChange({ editSlug: newId })} />
       )}
 
       {!isEditMode && (

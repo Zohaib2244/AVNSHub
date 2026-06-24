@@ -502,6 +502,85 @@ export function importSlotLayout(raw: unknown): boolean {
   return true;
 }
 
+export type PlacementSnapshot =
+  | { kind: "region"; region: SlotRegionId; col: number; row: number; colSpan: number; rowSpan: number; settings: SettingsValues }
+  | { kind: "terminal" }
+  | { kind: "none" };
+
+/** read a widget's current placement without mutating anything */
+export function getPlacementSnapshot(id: string): PlacementSnapshot {
+  const current = getSlotLayout();
+  const instance = current.widgets.find((w) => w.id === id);
+  if (instance) {
+    return {
+      kind: "region",
+      region: instance.region,
+      col: instance.col,
+      row: instance.row,
+      colSpan: instance.colSpan,
+      rowSpan: instance.rowSpan,
+      settings: instance.settings,
+    };
+  }
+  if (current.terminalWidgetId === id) return { kind: "terminal" };
+  return { kind: "none" };
+}
+
+/** remove a widget from its current placement (region or terminal) and
+    return a snapshot for restorePlacementSnapshot() — used by the Widget
+    Creator to pull a widget off the visible canvas while an edit run is live
+    overwriting its source file, so the browser never has to compile a
+    possibly-broken intermediate version of an already-working widget. */
+export function unplaceWidgetTemporarily(id: string): PlacementSnapshot {
+  const snapshot = getPlacementSnapshot(id);
+  if (snapshot.kind === "region") removeWidget(id);
+  else if (snapshot.kind === "terminal") setTerminalWidget(null);
+  return snapshot;
+}
+
+/** restore a widget to the placement captured by getPlacementSnapshot() /
+    unplaceWidgetTemporarily(). Falls back to placeWidgetAuto() if the
+    original cell no longer fits. Returns true if the widget ended up placed
+    (or didn't need to be), false if no fit could be found anywhere. */
+export function restorePlacementSnapshot(id: string, snapshot: PlacementSnapshot): boolean {
+  if (snapshot.kind === "none") return true;
+  const current = getSlotLayout();
+  if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return true;
+
+  if (snapshot.kind === "terminal") {
+    setTerminalWidget(id);
+    return true;
+  }
+
+  const manifest = getManifest(id);
+  if (!manifest) return false;
+  const dims = current.regionDims[snapshot.region];
+  const occupancy = buildOccupancy(dims, current.widgets.filter((w) => w.region === snapshot.region).map(rectOf));
+  const rect: Rect = { col: snapshot.col, row: snapshot.row, colSpan: snapshot.colSpan, rowSpan: snapshot.rowSpan };
+  if (canPlace(rect, dims, occupancy)) {
+    commit({
+      ...current,
+      widgets: [...current.widgets, { id, region: snapshot.region, ...rect, settings: snapshot.settings }],
+    });
+    return true;
+  }
+  return placeWidgetAuto(id) !== null;
+}
+
+/** swap a placed widget's id in-place (region instance or terminal slot) —
+    used after a Widget Creator slug rename so an existing placement survives
+    under the new id instead of falling back to "unplaced". */
+export function renameWidgetPlacement(oldId: string, newId: string): void {
+  const current = getSlotLayout();
+  if (current.terminalWidgetId === oldId) {
+    commit({ ...current, terminalWidgetId: newId });
+    return;
+  }
+  if (current.widgets.some((w) => w.id === oldId)) {
+    commit({ ...current, widgets: current.widgets.map((w) => (w.id === oldId ? { ...w, id: newId } : w)) });
+  }
+}
+
 /** export the current slot layout as a downloadable JSON file */
 export function exportSlotLayout(): void {
   const current = getSlotLayout();
