@@ -85,12 +85,11 @@ import {
   removeWidget as removeSlotWidget,
   resetSlotLayout,
   setRegionDims,
-  setTerminalWidget,
   subscribeSlotLayout,
 } from "@/lib/slotLayout";
-import { REGION_DIMS_BOUNDS, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
+import { REGION_DIMS_BOUNDS, REGION_GRID, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
 
-const REGION_IDS: SlotRegionId[] = ["left", "right", "base"];
+const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
 type HubCoreTab = "settings" | "widgets";
 type CanvasSettingsSection = "appearance" | "general" | "layout" | "canvases";
 type WidgetFilter = "all" | "system" | "custom";
@@ -715,10 +714,6 @@ function DefaultModeSettings() {
       {REGION_IDS.map((region) => (
         <RegionDimsRow key={region} region={region} dims={slotLayout.regionDims[region]} />
       ))}
-      <div className="wset-row">
-        <span>nutbot</span>
-        <span className="hub-core-fixed-note">1 slot · fixed</span>
-      </div>
       <div className="hub-core-io-row">
         <button type="button" className="hub-core-io-btn" onClick={exportSlotLayout} title="download current layout as JSON">
           <Download size={14} strokeWidth={1.75} />
@@ -742,12 +737,9 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const query = search.trim().toLowerCase();
-  const allPlacedRows = [
-    ...slotLayout.widgets.map((w) => ({ id: w.id, location: regionShortLabel(w.region), terminal: false })),
-    ...(slotLayout.terminalWidgetId
-      ? [{ id: slotLayout.terminalWidgetId, location: "terminal", terminal: true }]
-      : []),
-  ].filter((row) => getManifest(row.id));
+  const allPlacedRows = slotLayout.widgets
+    .map((w) => ({ id: w.id, location: regionShortLabel(w.region) }))
+    .filter((row) => getManifest(row.id));
   const placedRows = allPlacedRows.filter(
     (row) => matchesWidgetFilter(row.id, filter, customIds) && matchesWidgetSearch(row.id, query, row.location),
   );
@@ -767,7 +759,6 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
     setDeletingId(id);
     setDeleteError(null);
     removeSlotWidget(id);
-    if (slotLayout.terminalWidgetId === id) setTerminalWidget(null);
     try {
       const res = await fetch("/api/widget-creator/delete", {
         method: "POST",
@@ -804,10 +795,7 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
             onDelete={deleteCustomWidget}
             primaryLabel="remove widget"
             primaryTitle="remove from canvas"
-            onPrimary={() => {
-              if (slotLayout.terminalWidgetId === id) setTerminalWidget(null);
-              else removeSlotWidget(id);
-            }}
+            onPrimary={() => removeSlotWidget(id)}
             primaryIcon={<Minus size={13} strokeWidth={2} />}
           />
         )}

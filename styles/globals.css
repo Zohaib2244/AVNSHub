@@ -431,17 +431,18 @@ html[data-backdrop="transparent"] .frame {
 }
 
 /* ─── slot layout (region-based grid, "Preferred Layout") ──────────
-   Three-column frame: Left | Center | Right. Center stacks a single
-   Terminal slot above the 3x2 Base grid. Left/Right are 2x8 grids.
+   Three-column frame: Left | Center | Right. Center stacks Central Base (a
+   region like any other, defaulting to a single undivided cell — see
+   config/slotLayout.ts) above the 3x2 Base grid. Left/Right are 2x8 grids.
    Column/row ratios default to 2fr 3fr 2fr / 7fr 3fr, which keeps a
    cell roughly the same size across regions — Left/Right are 2 cols /
    8 rows, Base is 3 cols / 2 rows, so Center starts 1.5x a column wide
    and Base starts at ~30% of the height (enough for two M-size rows
    without overflow). These ratios are user-adjustable (lib/slotLayout.ts
-   frameRatios, persisted) via drag handles on the terminal cell's
-   edges — SlotDashboard sets the --col-l/--col-c/--col-r and
-   --row-term/--row-base custom properties below from that state; the
-   var() fallbacks are the defaults above.
+   frameRatios, persisted) via drag handles on Central Base's edges —
+   SlotDashboard sets the --col-l/--col-c/--col-r and --row-center/--row-base
+   custom properties below from that state; the var() fallbacks are the
+   defaults above.
    Placement within each region is separately manual; each .slot-cell's
    gridColumn/gridRow comes from its persisted rect. */
 
@@ -453,7 +454,7 @@ html[data-backdrop="transparent"] .frame {
 
 .slot-center {
   display: grid;
-  grid-template-rows: var(--row-term, 7fr) var(--row-base, 3fr);
+  grid-template-rows: var(--row-center, 7fr) var(--row-base, 3fr);
   gap: 12px;
   min-height: 0;
 }
@@ -522,52 +523,26 @@ html[data-backdrop="transparent"] .frame {
 /* dashed outline on every placed widget while editing — mirrors
    .widget-slot.editing in Graph Layout */
 .slot-cell.editing .block,
-.slot-cell.editing .namecard,
-.slot-terminal.editing .block,
-.slot-terminal.editing .namecard {
+.slot-cell.editing .namecard {
   outline: 1.5px dashed var(--accent-cyan);
   outline-offset: 3px;
   /* block clicks/interactions on widget content in edit mode */
   pointer-events: none;
 }
 
-
-.slot-terminal {
+/* wraps Central Base's SlotRegion — exists only as the positioning anchor
+   for the W/E/S frame-ratio drag handles (SlotDashboard); the region itself
+   (.slot-region, .slot-cell, .slot-cell-empty) is otherwise identical to
+   left/right/base */
+.slot-center-region {
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-.slot-terminal > .capsule {
+.slot-center-region > .slot-region {
   flex: 1;
-}
-
-.slot-terminal-empty {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px dashed var(--border);
-  border-radius: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.slot-terminal-empty.editing {
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.slot-terminal-empty.editing:hover,
-.slot-terminal-empty.editing:focus-visible {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  outline: none;
 }
 
 /* empty placement cell — click target for SlotPlacementPopover */
@@ -803,10 +778,10 @@ html[data-backdrop="transparent"] .frame {
     grid-template-columns: 1fr;
   }
 
-  /* frameRatios only affect the desktop 3-column/2-row split — hide the
-     terminal's resize handles on the single-column mobile layout where
+  /* frameRatios only affect the desktop 3-column/2-row split — hide
+     Central Base's resize handles on the single-column mobile layout where
      they'd have no visible effect */
-  .slot-terminal .resize-handle {
+  .slot-center-region .resize-handle {
     display: none;
   }
 }
@@ -822,40 +797,30 @@ html[data-backdrop="transparent"] .frame {
    hovered, so cells that happen to overflow don't show a permanent
    scrollbar track. */
 .slot-cell .block,
-.slot-cell .namecard,
-.slot-terminal .block,
-.slot-terminal .namecard {
+.slot-cell .namecard {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 .slot-cell .block:hover,
-.slot-cell .namecard:hover,
-.slot-terminal .block:hover,
-.slot-terminal .namecard:hover {
+.slot-cell .namecard:hover {
   scrollbar-color: var(--border) transparent;
 }
 
 .slot-cell .block::-webkit-scrollbar,
-.slot-cell .namecard::-webkit-scrollbar,
-.slot-terminal .block::-webkit-scrollbar,
-.slot-terminal .namecard::-webkit-scrollbar {
+.slot-cell .namecard::-webkit-scrollbar {
   width: 6px;
 }
 
 .slot-cell .block::-webkit-scrollbar-thumb,
-.slot-cell .namecard::-webkit-scrollbar-thumb,
-.slot-terminal .block::-webkit-scrollbar-thumb,
-.slot-terminal .namecard::-webkit-scrollbar-thumb {
+.slot-cell .namecard::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 3px;
 }
 
 .slot-cell .block:hover::-webkit-scrollbar-thumb,
-.slot-cell .namecard:hover::-webkit-scrollbar-thumb,
-.slot-terminal .block:hover::-webkit-scrollbar-thumb,
-.slot-terminal .namecard:hover::-webkit-scrollbar-thumb {
+.slot-cell .namecard:hover::-webkit-scrollbar-thumb {
   background: var(--border);
 }
 

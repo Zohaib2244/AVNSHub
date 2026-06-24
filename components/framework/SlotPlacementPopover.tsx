@@ -1,24 +1,23 @@
 "use client";
 
-// Click-to-place picker for Slot Layout — opened from an empty cell
-// (SlotRegion) or the empty terminal slot (SlotDashboard). Lists unplaced
-// widgets that fit the target region (any widget fits the single-slot
-// terminal); picking one commits via placeWidget/setTerminalWidget.
+// Click-to-place picker for Slot Layout — opened from an empty cell in any
+// region (SlotRegion). Lists unplaced widgets that fit the target region;
+// picking one commits via placeWidget.
 
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Search, X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
-import { minFootprint, type RegionId } from "@/config/slotLayout";
+import { minFootprint, type SlotRegionId } from "@/config/slotLayout";
 import { buildOccupancy, findFit } from "@/lib/grid/occupancy";
 import { fuzzyFilter } from "@/lib/fuzzy";
-import { getSlotLayout, getUnplacedWidgets, placeWidget, setTerminalWidget } from "@/lib/slotLayout";
+import { getSlotLayout, getUnplacedWidgets, placeWidget } from "@/lib/slotLayout";
 
 export function SlotPlacementPopover({
   region,
   onClose,
   preferredCell,
 }: {
-  region: RegionId;
+  region: SlotRegionId;
   onClose: () => void;
   preferredCell?: { col: number; row: number };
 }) {
@@ -33,7 +32,7 @@ export function SlotPlacementPopover({
     function onDown(e: PointerEvent) {
       const target = e.target as Element;
       // the empty-cell target toggles on click — closing here too would reopen it
-      if (target.closest(".slot-cell-empty") || target.closest(".slot-terminal-empty")) return;
+      if (target.closest(".slot-cell-empty")) return;
       if (panelRef.current && !panelRef.current.contains(target)) onClose();
     }
     function onKey(e: KeyboardEvent) {
@@ -49,19 +48,16 @@ export function SlotPlacementPopover({
 
   const unplaced = getUnplacedWidgets();
   const slotLayout = getSlotLayout();
-  const candidates =
-    region === "terminal"
-      ? unplaced
-      : unplaced.filter((id) => {
-          const dims = slotLayout.regionDims[region];
-          const occupancy = buildOccupancy(
-            dims,
-            slotLayout.widgets
-              .filter((w) => w.region === region)
-              .map((w) => ({ col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan })),
-          );
-          return findFit(dims, occupancy, minFootprint(id)) !== null;
-        });
+  const candidates = unplaced.filter((id) => {
+    const dims = slotLayout.regionDims[region];
+    const occupancy = buildOccupancy(
+      dims,
+      slotLayout.widgets
+        .filter((w) => w.region === region)
+        .map((w) => ({ col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan })),
+    );
+    return findFit(dims, occupancy, minFootprint(id)) !== null;
+  });
 
   const filtered = fuzzyFilter(candidates, query, (id) => getManifest(id)?.title ?? id);
   const clampedIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : 0;
@@ -77,8 +73,7 @@ export function SlotPlacementPopover({
   }, [clampedIndex]);
 
   function handlePick(id: string) {
-    if (region === "terminal") setTerminalWidget(id);
-    else placeWidget(id, region, preferredCell);
+    placeWidget(id, region, preferredCell);
     onClose();
   }
 

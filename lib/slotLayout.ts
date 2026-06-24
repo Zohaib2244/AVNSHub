@@ -18,7 +18,6 @@ import {
   DEFAULT_FRAME_RATIOS,
   FRAME_RATIO_MIN_FR,
   REGION_GRID,
-  TERMINAL_REGION,
   clampRegionDims,
   minFootprint,
   type FrameRatios,
@@ -43,18 +42,16 @@ export type SlotWidgetInstance = {
 };
 
 export type SlotLayoutState = {
-  version: 3;
-  /** order is insignificant — placement is purely positional (region + rect) */
+  version: 4;
+  /** order is insignificant — placement is purely positional (region + rect).
+      Central Base ("center" region) widgets live here too, like any other
+      region — no separate field. */
   widgets: SlotWidgetInstance[];
-  terminalWidgetId: string | null;
-  /** settings for the terminal occupant, stored separately because the
-      terminal is a single fixed slot rather than a SlotWidgetInstance */
-  terminalSettings: SettingsValues;
   /** per-region grid dims, editable via AVN Hub Core Settings; defaults to
       REGION_GRID */
   regionDims: Record<SlotRegionId, RegionDims>;
   /** macro column/row proportions for .slot-frame/.slot-center, adjustable
-      via drag handles on the terminal cell; defaults to DEFAULT_FRAME_RATIOS */
+      via drag handles on Central Base's edges; defaults to DEFAULT_FRAME_RATIOS */
   frameRatios: FrameRatios;
 };
 
@@ -92,17 +89,20 @@ function buildDefaultState(): SlotLayoutState {
     }
 
     defaultState = {
-      version: 3,
+      version: 4,
       regionDims: {
-        left:  { cols: 2, rows: 8 },
-        right: { cols: 2, rows: 8 },
-        base:  { cols: 3, rows: 2 },
+        left:   { cols: 2, rows: 8 },
+        right:  { cols: 2, rows: 8 },
+        base:   { cols: 3, rows: 2 },
+        center: { cols: 1, rows: 1 },
       },
       frameRatios: {
         columns:    [2, 3, 2] as FrameRatios["columns"],
         centerRows: [5, 5]    as FrameRatios["centerRows"],
       },
       widgets: [
+        // ── center (Central Base) ────────────────────────────────
+        entry("nutbot",         "center", 0, 0, 1, 1, {}),
         // ── left column ──────────────────────────────────────────
         entry("clock",          "left",  0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "height", showCalendar: true, showLofi: true }),
         entry("now-playing",    "left",  0, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
@@ -119,10 +119,6 @@ function buildDefaultState(): SlotLayoutState {
         entry("identity",       "base",  0, 0, 3, 1, { hoverExpand: false, hoverExpandAxis: "height" }),
         entry("github",         "base",  0, 1, 3, 1, { hoverExpand: true,  hoverExpandAxis: "height", flyoutCommits: 5 }),
       ].filter((w): w is SlotWidgetInstance => w !== null),
-      terminalWidgetId: TERMINAL_REGION.defaultWidget,
-      terminalSettings: TERMINAL_REGION.defaultWidget
-        ? resolveSettings(getManifest(TERMINAL_REGION.defaultWidget)!)
-        : {},
     };
   }
   return defaultState;
@@ -134,22 +130,20 @@ function buildDefaultState(): SlotLayoutState {
 function buildEmptyState(): SlotLayoutState {
   if (!emptyState) {
     emptyState = {
-      version: 3,
+      version: 4,
       regionDims: { ...REGION_GRID },
       frameRatios: {
         columns: [...DEFAULT_FRAME_RATIOS.columns] as FrameRatios["columns"],
         centerRows: [...DEFAULT_FRAME_RATIOS.centerRows] as FrameRatios["centerRows"],
       },
       widgets: [],
-      terminalWidgetId: null,
-      terminalSettings: {},
     };
   }
   return emptyState;
 }
 
 function isRegionId(value: unknown): value is SlotRegionId {
-  return value === "left" || value === "right" || value === "base";
+  return value === "left" || value === "right" || value === "base" || value === "center";
 }
 
 /* a stored layout may predate regionDims (version 1) — default every region
@@ -198,18 +192,21 @@ function sanitizeFrameRatios(raw: unknown): FrameRatios {
 /* a stored layout may predate widgets added since, reference unknown ids, or
    (after manual localStorage edits) contain out-of-bounds/overlapping rects
    — keep only entries that pass isValidPlacement against siblings already
-   accepted; everything else silently returns to the unplaced pool */
+   accepted; everything else silently returns to the unplaced pool.
+   version < 4 predates Central Base being a real region — see the
+   terminalWidgetId migration below, which turns that old fixed-slot field
+   into a normal placed widget in the new "center" region. */
 function sanitize(raw: unknown): SlotLayoutState | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const stored = raw as Record<string, unknown>;
-  if (stored.version !== 1 && stored.version !== 2 && stored.version !== 3) return null;
+  if (stored.version !== 1 && stored.version !== 2 && stored.version !== 3 && stored.version !== 4) return null;
 
   const regionDims =
-    stored.version === 2 || stored.version === 3
+    stored.version === 2 || stored.version === 3 || stored.version === 4
       ? sanitizeRegionDims(stored.regionDims)
       : ({ ...REGION_GRID } as Record<SlotRegionId, RegionDims>);
   const frameRatios =
-    stored.version === 3
+    stored.version === 3 || stored.version === 4
       ? sanitizeFrameRatios(stored.frameRatios)
       : {
           columns: [...DEFAULT_FRAME_RATIOS.columns] as FrameRatios["columns"],
@@ -217,7 +214,7 @@ function sanitize(raw: unknown): SlotLayoutState | null {
         };
 
   const seen = new Set<string>();
-  const byRegion: Record<SlotRegionId, Rect[]> = { left: [], right: [], base: [] };
+  const byRegion: Record<SlotRegionId, Rect[]> = { left: [], right: [], base: [], center: [] };
   const widgets: SlotWidgetInstance[] = [];
 
   if (Array.isArray(stored.widgets)) {
@@ -258,22 +255,19 @@ function sanitize(raw: unknown): SlotLayoutState | null {
     }
   }
 
-  const terminal = stored.terminalWidgetId;
-  const terminalWidgetId =
-    typeof terminal === "string" && (terminal in WIDGETS || terminal in CUSTOM_WIDGETS) && !seen.has(terminal)
-      ? terminal
-      : null;
-  const terminalManifest = terminalWidgetId ? getManifest(terminalWidgetId) : null;
-  const terminalSettings = terminalManifest
-    ? resolveSettings(
-        terminalManifest,
-        stored.terminalSettings && typeof stored.terminalSettings === "object"
-          ? (stored.terminalSettings as SettingsValues)
-          : undefined,
-      )
-    : {};
+  // migrate a pre-v4 fixed terminal slot into a normal placed widget in
+  // "center" — only if it's still valid and wasn't already placed somewhere
+  // by the loop above; dropped silently (not auto-corrected) if it doesn't fit
+  const oldTerminalId = stored.terminalWidgetId;
+  if (typeof oldTerminalId === "string" && (oldTerminalId in WIDGETS || oldTerminalId in CUSTOM_WIDGETS) && !seen.has(oldTerminalId)) {
+    const manifest = getManifest(oldTerminalId);
+    const rect: Rect = { col: 0, row: 0, colSpan: 1, rowSpan: 1 };
+    if (manifest && isValidPlacement(regionDims.center, [...byRegion.center, rect])) {
+      widgets.push({ id: oldTerminalId, region: "center", ...rect, settings: resolveSettings(manifest) });
+    }
+  }
 
-  return { version: 3, widgets, terminalWidgetId, terminalSettings, regionDims, frameRatios };
+  return { version: 4, widgets, regionDims, frameRatios };
 }
 
 function loadForCanvas(canvasId: string): SlotLayoutState {
@@ -334,12 +328,11 @@ subscribeCanvases(() => {
   listeners.forEach((listener) => listener());
 });
 
-/** widgets that aren't placed in any region and aren't the terminal occupant
-    — the candidates offered by the placement popover */
+/** widgets that aren't placed in any region — the candidates offered by the
+    placement popover */
 export function getUnplacedWidgets(): string[] {
   const current = getSlotLayout();
   const placed = new Set<string>(current.widgets.map((w) => w.id));
-  if (current.terminalWidgetId) placed.add(current.terminalWidgetId);
   const builtIn = (Object.keys(WIDGETS) as string[]).filter((id) => !placed.has(id));
   const custom = Object.keys(CUSTOM_WIDGETS).filter((id) => !placed.has(id));
   return [...builtIn, ...custom];
@@ -349,7 +342,7 @@ export function getUnplacedWidgets(): string[] {
     first available cell in `region`; no-op if already placed or region is full */
 export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { col: number; row: number }): boolean {
   const current = getSlotLayout();
-  if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return false;
+  if (current.widgets.some((w) => w.id === id)) return false;
 
   const manifest = getManifest(id);
   if (!manifest) return false;
@@ -371,7 +364,7 @@ export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { 
 }
 
 export function getRegionsThatFitWidget(id: string, layout: SlotLayoutState = getSlotLayout()): SlotRegionId[] {
-  if (layout.widgets.some((w) => w.id === id) || layout.terminalWidgetId === id) return [];
+  if (layout.widgets.some((w) => w.id === id)) return [];
   if (!getManifest(id)) return [];
 
   const footprint = minFootprint(id);
@@ -411,36 +404,6 @@ export function updateWidgetSettings(id: string, settings: SettingsValues) {
   commit({
     ...current,
     widgets: current.widgets.map((w) => (w.id === id ? { ...w, settings: nextSettings } : w)),
-  });
-}
-
-/** update settings for the widget occupying the fixed terminal slot */
-export function updateTerminalWidgetSettings(settings: SettingsValues) {
-  const current = getSlotLayout();
-  const id = current.terminalWidgetId;
-  if (!id) return;
-
-  const manifest = getManifest(id);
-  if (!manifest) return;
-
-  commit({
-    ...current,
-    terminalSettings: resolveSettings(manifest, { ...current.terminalSettings, ...settings }),
-  });
-}
-
-/** set/clear the terminal slot's occupant; if `id` was placed in a region
-    it's removed from there first */
-export function setTerminalWidget(id: string | null) {
-  const current = getSlotLayout();
-  if (current.terminalWidgetId === id) return;
-  const placedInstance = id ? current.widgets.find((w) => w.id === id) : undefined;
-  const manifest = id ? getManifest(id) : null;
-  commit({
-    ...current,
-    widgets: id ? current.widgets.filter((w) => w.id !== id) : current.widgets,
-    terminalWidgetId: id,
-    terminalSettings: manifest ? resolveSettings(manifest, placedInstance?.settings) : {},
   });
 }
 
@@ -493,13 +456,13 @@ export function setRegionDims(region: SlotRegionId, dims: RegionDims) {
 }
 
 /** macro column/row proportions for .slot-frame/.slot-center — read by
-    SlotDashboard to size the frame and by the terminal's resize handles to
+    SlotDashboard to size the frame and by Central Base's resize handles to
     compute drag deltas */
 export function getFrameRatios(): FrameRatios {
   return getSlotLayout().frameRatios;
 }
 
-/** commit a new frame/center fr split (terminal resize handles) — values
+/** commit a new frame/center fr split (Central Base's resize handles) — values
     are rounded and clamped to FRAME_RATIO_MIN_FR; callers are expected to
     preserve each pair's sum (one region's gain is the adjacent region's
     loss) so the overall frame proportions stay stable */
@@ -538,7 +501,6 @@ export function importSlotLayout(raw: unknown): boolean {
 
 export type PlacementSnapshot =
   | { kind: "region"; region: SlotRegionId; col: number; row: number; colSpan: number; rowSpan: number; settings: SettingsValues }
-  | { kind: "terminal"; settings: SettingsValues }
   | { kind: "none" };
 
 /** read a widget's current placement without mutating anything */
@@ -556,7 +518,6 @@ export function getPlacementSnapshot(id: string): PlacementSnapshot {
       settings: instance.settings,
     };
   }
-  if (current.terminalWidgetId === id) return { kind: "terminal", settings: current.terminalSettings };
   return { kind: "none" };
 }
 
@@ -568,7 +529,6 @@ export function getPlacementSnapshot(id: string): PlacementSnapshot {
 export function unplaceWidgetTemporarily(id: string): PlacementSnapshot {
   const snapshot = getPlacementSnapshot(id);
   if (snapshot.kind === "region") removeWidget(id);
-  else if (snapshot.kind === "terminal") setTerminalWidget(null);
   return snapshot;
 }
 
@@ -579,13 +539,7 @@ export function unplaceWidgetTemporarily(id: string): PlacementSnapshot {
 export function restorePlacementSnapshot(id: string, snapshot: PlacementSnapshot): boolean {
   if (snapshot.kind === "none") return true;
   const current = getSlotLayout();
-  if (current.widgets.some((w) => w.id === id) || current.terminalWidgetId === id) return true;
-
-  if (snapshot.kind === "terminal") {
-    setTerminalWidget(id);
-    updateTerminalWidgetSettings(snapshot.settings);
-    return true;
-  }
+  if (current.widgets.some((w) => w.id === id)) return true;
 
   const manifest = getManifest(id);
   if (!manifest) return false;
@@ -607,10 +561,6 @@ export function restorePlacementSnapshot(id: string, snapshot: PlacementSnapshot
     under the new id instead of falling back to "unplaced". */
 export function renameWidgetPlacement(oldId: string, newId: string): void {
   const current = getSlotLayout();
-  if (current.terminalWidgetId === oldId) {
-    commit({ ...current, terminalWidgetId: newId });
-    return;
-  }
   if (current.widgets.some((w) => w.id === oldId)) {
     commit({ ...current, widgets: current.widgets.map((w) => (w.id === oldId ? { ...w, id: newId } : w)) });
   }

@@ -1,26 +1,32 @@
 // Slot Layout region config — pure data, mirrors how config/widgets.tsx is
 // pure config for the widget registry. Slot Layout divides the page into
-// fixed regions (left/right columns, a base grid, and a single terminal
-// slot); widgets occupy a manually-placed rectangle of cells within a
+// four regions (left/right columns, a base grid, and "center" — aka Central
+// Base, the big region above the base grid that defaults to one undivided
+// cell); widgets occupy a manually-placed rectangle of cells within a
 // region. See lib/slotLayout.ts for the persisted placement store and
 // lib/grid/occupancy.ts for the placement/resize math.
 
 import type { WidgetId } from "@/config/widgets";
 
-export type RegionId = "left" | "right" | "base" | "terminal";
+export type SlotRegionId = "left" | "right" | "base" | "center";
 
-/** the three subdivided regions — terminal is a single fixed slot with no
-    occupancy grid, so it's intentionally excluded here */
-export type SlotRegionId = Exclude<RegionId, "terminal">;
+/** kept as an alias — "center" used to be a separate fixed "terminal" slot
+    excluded from this set; it's a real region now, so the two types are
+    identical, but call sites that conceptually mean "any region" can still
+    import either name */
+export type RegionId = SlotRegionId;
 
 export type RegionDims = { cols: number; rows: number };
 
 /** default grid dims — also the fallback when a stored layout omits/corrupts
-    regionDims (see lib/slotLayout.ts sanitize()) */
+    regionDims (see lib/slotLayout.ts sanitize()). "center" (Central Base)
+    defaults to a single undivided cell — bump its dims from Hub Core →
+    Layout to subdivide it like any other region. */
 export const REGION_GRID: Record<SlotRegionId, RegionDims> = {
   left: { cols: 2, rows: 8 },
   right: { cols: 2, rows: 8 },
   base: { cols: 3, rows: 2 },
+  center: { cols: 1, rows: 1 },
 };
 
 /** display labels for the AVN Hub Core Settings region-dims editor */
@@ -28,6 +34,7 @@ export const REGION_LABELS: Record<SlotRegionId, string> = {
   left: "left grid",
   right: "right grid",
   base: "base grid",
+  center: "central base",
 };
 
 /** bounds for user-editable region grid dims (AVN Hub Core Settings →
@@ -41,14 +48,12 @@ export function clampRegionDims(dims: RegionDims): RegionDims {
   };
 }
 
-export const TERMINAL_REGION = { id: "terminal" as const, defaultWidget: "nutbot" as WidgetId };
-
 /** macro proportions of the slot frame — .slot-frame's 3 columns
-    (left | center | right) and .slot-center's 2 rows (terminal | base),
+    (left | center | right) and .slot-center's 2 rows (Central Base | base),
     expressed as integer `fr` units. Defaults mirror the static values the
     CSS originally shipped with (2fr 3fr 2fr / 7fr 3fr). Adjustable via drag
-    handles on the terminal cell's edges (see SlotDashboard) — growing the
-    terminal reclaims space from the adjacent column/base and vice versa. */
+    handles on Central Base's edges (see SlotDashboard) — growing it
+    reclaims space from the adjacent column/base and vice versa. */
 export type FrameRatios = {
   columns: [number, number, number];
   centerRows: [number, number];

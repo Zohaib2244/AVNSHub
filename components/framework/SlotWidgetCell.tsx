@@ -169,8 +169,10 @@ export function SlotWidgetCell({
   const effectiveHoverEffect = activeHoverEffect ?? flip?.effect;
   const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
 
+  const regionDims = getSlotLayout().regionDims[instance.region];
   const { size, orientation } = sizeClassForFootprint(
     { colSpan: rect.colSpan, rowSpan: rect.rowSpan },
+    regionDims,
     manifest.sizes,
     manifest.orientations,
   );
