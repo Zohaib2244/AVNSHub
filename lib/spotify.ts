@@ -21,6 +21,25 @@ export type NowPlaying = {
 
 export type PlayerAction = "play" | "pause" | "next" | "previous" | "play-track";
 
+/** Credentials passed in from the widget's settings. Any field left blank
+    falls back to the corresponding SPOTIFY_* env var, so existing .env.local
+    setups keep working unchanged. */
+export type SpotifyCreds = {
+  clientId?: string;
+  clientSecret?: string;
+  refreshToken?: string;
+};
+
+function resolveCreds(creds?: SpotifyCreds): { clientId: string; clientSecret: string; refreshToken: string } {
+  const clientId = creds?.clientId?.trim() || process.env.SPOTIFY_CLIENT_ID || "";
+  const clientSecret = creds?.clientSecret?.trim() || process.env.SPOTIFY_CLIENT_SECRET || "";
+  const refreshToken = creds?.refreshToken?.trim() || process.env.SPOTIFY_REFRESH_TOKEN || "";
+  if (!clientId || !clientSecret || !refreshToken) {
+    throw new Error("Missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN");
+  }
+  return { clientId, clientSecret, refreshToken };
+}
+
 type SpotifyArtist = { name: string };
 type SpotifyImage = { url: string };
 type SpotifyTrack = {
@@ -31,19 +50,15 @@ type SpotifyTrack = {
   duration_ms: number;
 };
 
-let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+// token + now-playing caches are keyed by the resolved refresh token, so
+// switching credentials in the widget settings refetches instead of serving
+// another account's cached data
+let cachedAccessToken: { token: string; expiresAt: number; key: string } | null = null;
 
-async function getAccessToken(): Promise<string> {
-  if (cachedAccessToken && cachedAccessToken.expiresAt > Date.now()) {
+async function getAccessToken(resolved: { clientId: string; clientSecret: string; refreshToken: string }): Promise<string> {
+  const { clientId, clientSecret, refreshToken } = resolved;
+  if (cachedAccessToken && cachedAccessToken.key === refreshToken && cachedAccessToken.expiresAt > Date.now()) {
     return cachedAccessToken.token;
-  }
-
-  const clientId = process.env.SPOTIFY_CLIENT_ID;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
-  const refreshToken = process.env.SPOTIFY_REFRESH_TOKEN;
-
-  if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN");
   }
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -65,6 +80,7 @@ async function getAccessToken(): Promise<string> {
   cachedAccessToken = {
     token: data.access_token,
     expiresAt: Date.now() + data.expires_in * 1000 - ACCESS_TOKEN_SAFETY_MARGIN_MS,
+    key: refreshToken,
   };
 
   return cachedAccessToken.token;
@@ -152,10 +168,10 @@ async function fetchCurrentlyPlayingRaw(
   };
 }
 
-let cachedNowPlaying: { data: NowPlaying; expiresAt: number } | null = null;
+let cachedNowPlaying: { data: NowPlaying; expiresAt: number; key: string } | null = null;
 
-async function fetchNowPlaying(): Promise<NowPlaying> {
-  const accessToken = await getAccessToken();
+async function fetchNowPlaying(resolved: { clientId: string; clientSecret: string; refreshToken: string }): Promise<NowPlaying> {
+  const accessToken = await getAccessToken(resolved);
   const [current, recent] = await Promise.all([
     fetchCurrentlyPlayingRaw(accessToken),
     fetchRecentTracks(accessToken),
@@ -187,14 +203,15 @@ async function fetchNowPlaying(): Promise<NowPlaying> {
   };
 }
 
-export async function getNowPlaying(): Promise<NowPlaying> {
-  if (cachedNowPlaying && cachedNowPlaying.expiresAt > Date.now()) {
+export async function getNowPlaying(creds?: SpotifyCreds): Promise<NowPlaying> {
+  const resolved = resolveCreds(creds);
+  if (cachedNowPlaying && cachedNowPlaying.key === resolved.refreshToken && cachedNowPlaying.expiresAt > Date.now()) {
     return cachedNowPlaying.data;
   }
 
-  const data = await fetchNowPlaying();
+  const data = await fetchNowPlaying(resolved);
 
-  cachedNowPlaying = { data, expiresAt: Date.now() + NOW_PLAYING_CACHE_TTL_MS };
+  cachedNowPlaying = { data, expiresAt: Date.now() + NOW_PLAYING_CACHE_TTL_MS, key: resolved.refreshToken };
   return data;
 }
 
@@ -203,8 +220,8 @@ export async function getNowPlaying(): Promise<NowPlaying> {
 // spotify:auth` if the refresh token predates it) and Spotify Premium.
 // Controls act on whatever device is currently active.
 
-export async function controlPlayback(action: PlayerAction, uri?: string): Promise<{ ok: boolean; error?: string }> {
-  const accessToken = await getAccessToken();
+export async function controlPlayback(action: PlayerAction, uri?: string, creds?: SpotifyCreds): Promise<{ ok: boolean; error?: string }> {
+  const accessToken = await getAccessToken(resolveCreds(creds));
 
   let url: string;
   let method: "PUT" | "POST" = "PUT";

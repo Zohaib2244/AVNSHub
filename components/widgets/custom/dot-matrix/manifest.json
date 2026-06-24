@@ -1,0 +1,29 @@
+{
+  "title": "dot matrix",
+  "iconName": "Star",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "colorMode",
+      "label": "accent color",
+      "type": "select",
+      "default": "orange",
+      "options": [
+        { "value": "orange", "label": "orange" },
+        { "value": "cyan", "label": "cyan" }
+      ]
+    },
+    {
+      "key": "interaction",
+      "label": "mouse mode",
+      "type": "select",
+      "default": "repel",
+      "options": [
+        { "value": "repel", "label": "repel" },
+        { "value": "attract", "label": "attract" }
+      ]
+    }
+  ]
+}

@@ -277,3 +277,41 @@ Wallpaper images/videos and user-uploaded ambient clips are too large for
 
 All keys are written immediately on change and read on mount. Corrupted or
 missing keys fall back to sensible defaults automatically.
+
+---
+
+## Runtime model (why AVN Hub runs the dev server)
+
+AVN Hub runs the Next.js **dev server** (`next dev`, Turbopack) as its actual
+runtime â€” not a compiled `next build` / `next start` standalone image. This is
+intentional, and it's a consequence of the widget creator being the centre of
+the product.
+
+When NutBot generates a widget it **writes real `.tsx` into the source tree**
+(`components/widgets/custom/<slug>/`) and edits `config/customComponentMap.tsx`
+and `config/customRegistry.json`. For that widget to appear in the running hub
+without you rebuilding and restarting, three things must be true at runtime:
+
+1. **File-watcher / HMR** picks up the newly written files and Fast-Refreshes
+   them in. (The creator's "add to layout" even retries briefly while waiting
+   for HMR to land â€” see `ChatCanvas.tsx`.)
+2. The **TypeScript toolchain** (`tsc`) is present, so generated widgets are
+   validated and rolled back on type errors before registering.
+3. The **full source tree + an agent CLI** (`claude` / `codex` / `opencode`)
+   are present, because the creator reads the tree and shells out to the CLI.
+
+A slim production build has none of these, so it would break the headline
+feature. The usual "never run `next dev` in production" guidance is a
+*multi-tenant performance + security* rule; AVN Hub is **single-user,
+self-hosted, full-trust** (your own machine, reached privately over your
+tailnet), so that rule doesn't apply and the dev-server runtime is the correct
+fit rather than a workaround.
+
+**Resilience.** Because generated code runs in your app, each widget is wrapped
+in an error boundary (`WidgetErrorBoundary` in
+`components/framework/WidgetShell.tsx`) so a runtime throw in one widget renders
+an inline error instead of white-screening the whole hub. The boundary resets
+when you resize the widget, change its settings, or HMR swaps the module after
+an edit â€” so a fixed widget recovers without a manual reload. Pair this with the
+container's `restart: unless-stopped` policy to auto-recover the long-lived dev
+server. See `CHANGELOG.md` (2.1.0) and `README.md` â€º Self-hosting.

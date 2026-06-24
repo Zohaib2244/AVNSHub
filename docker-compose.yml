@@ -2,8 +2,21 @@ services:
   avn-hub:
     build: .
     container_name: avn-hub
-    restart: unless-stopped
+    restart: unless-stopped     # auto-recover the long-lived dev server
     ports:
       - "3000:3000"
     env_file:
-      - .env.local          # real secrets — never baked into the image
+      - .env.local              # real secrets — never baked into the image
+    volumes:
+      # Bind-mount the project so widgets the agent writes at runtime persist to
+      # the host and HMR sees every edit. The anonymous volume keeps the image's
+      # Linux node_modules from being shadowed by a host (e.g. Windows/macOS)
+      # node_modules with mismatched native bindings.
+      - .:/app
+      - /app/node_modules
+    # The NutBot widget creator shells out to an agent CLI (claude / codex /
+    # opencode) and runs `tsc`. Both must be available INSIDE this container, or
+    # the creator can't generate widgets. The simplest alternative is to skip
+    # Docker and run the hub directly on a host that already has your CLI
+    # installed and authenticated: `npm install && npm run dev`.
+    # See README › Self-hosting.

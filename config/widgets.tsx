@@ -58,6 +58,10 @@ export type SettingsField =
   | { key: string; label: string; type: "toggle"; default: boolean }
   | { key: string; label: string; type: "select"; default: string; options: { value: string; label: string }[] }
   | { key: string; label: string; type: "text"; default: string; placeholder?: string }
+  // "password" is a text value rendered with a masked input — use it for API
+  // keys/tokens/secrets entered in widget settings (stored client-side in the
+  // layout, sent to that widget's own API route). Validated like text.
+  | { key: string; label: string; type: "password"; default: string; placeholder?: string }
   | { key: string; label: string; type: "number"; default: number; min?: number; max?: number };
 
 export type SettingsValues = Record<string, string | number | boolean>;
@@ -300,6 +304,14 @@ export const WIDGETS = {
     sizes: ["S", "M", "L"],
     orientations: ["h"],
     defaults: { size: "M", orientation: "h" },
+    // Spotify credentials — entered here per-widget; the server route falls back
+    // to SPOTIFY_* env vars when a field is left blank. Run `npm run spotify:auth`
+    // to obtain a refresh token.
+    settings: [
+      { key: "spotifyClientId", label: "spotify client id", type: "text", default: "", placeholder: "client id" },
+      { key: "spotifyClientSecret", label: "spotify client secret", type: "password", default: "", placeholder: "client secret" },
+      { key: "spotifyRefreshToken", label: "spotify refresh token", type: "password", default: "", placeholder: "refresh token" },
+    ],
     flags: { customHeader: true, className: "spotify-capsule" },
   },
   "ambient-sound": {
@@ -319,6 +331,12 @@ export const WIDGETS = {
     sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
     defaults: { size: "M", orientation: "v" },
+    // Steam credentials — the server route falls back to STEAM_* env vars when
+    // blank. Profile must be public; the id is the 17-digit SteamID64.
+    settings: [
+      { key: "steamApiKey", label: "steam api key", type: "password", default: "", placeholder: "api key" },
+      { key: "steamProfileId", label: "steam profile id", type: "text", default: "", placeholder: "76561199…" },
+    ],
     flags: { customHeader: true, className: "steam-card" },
   },
   github: {
@@ -330,7 +348,14 @@ export const WIDGETS = {
     sizes: ["S", "M", "L"],
     orientations: ["h"],
     defaults: { size: "M", orientation: "h" },
-    settings: [{ key: "flyoutCommits", label: "commits shown", type: "number", default: 5, min: 1, max: 15 }],
+    // GitHub config — username drives which public activity is shown; token is
+    // optional (raises rate limit 60→5000/hr). Server route falls back to
+    // GITHUB_TOKEN env var + the built-in default username when blank.
+    settings: [
+      { key: "githubUsername", label: "github username", type: "text", default: "", placeholder: "octocat" },
+      { key: "githubToken", label: "github token (optional)", type: "password", default: "", placeholder: "ghp_…" },
+      { key: "flyoutCommits", label: "commits shown", type: "number", default: 5, min: 1, max: 15 },
+    ],
     flags: { customHeader: true, accent: true },
   },
   tracker: {

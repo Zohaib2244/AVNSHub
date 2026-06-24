@@ -65,15 +65,18 @@ function SchemaField({
         </label>
       );
     case "text":
+    case "password":
       return (
         <label className="wset-row">
           <span>{field.label}</span>
           <input
             className="wset-input"
-            type="text"
+            type={field.type === "password" ? "password" : "text"}
             placeholder={field.placeholder}
             value={String(value)}
             onChange={(e) => onChange(e.target.value)}
+            autoComplete={field.type === "password" ? "new-password" : "off"}
+            spellCheck={false}
           />
         </label>
       );

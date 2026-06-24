@@ -23,21 +23,46 @@ import {
 import type { RegionId } from "@/config/slotLayout";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 
+const CANVAS_OUTRO_DURATION = 0.24;
+
 // Catches render errors inside a single widget so a broken custom component
-// never crashes the entire dashboard.
+// never crashes the entire dashboard — critical for the agent-generated
+// widget playground, where a freshly-written widget can throw at runtime even
+// after passing the creator's `tsc` gate (tsc can't catch a runtime throw).
+//
+// `resetKey` lets a crashed widget recover without a full remount: when the
+// user resizes it or changes its settings (or HMR swaps the module after an
+// edit), the key changes and the boundary clears its error to give the new
+// render another chance, instead of staying stuck on the old failure.
 class WidgetErrorBoundary extends Component<
-  { id: string; children: ReactNode },
-  { error: Error | null }
+  { id: string; resetKey: string; children: ReactNode },
+  { error: Error | null; resetKey: string }
 > {
-  state = { error: null };
+  constructor(props: { id: string; resetKey: string; children: ReactNode }) {
+    super(props);
+    this.state = { error: null, resetKey: props.resetKey };
+  }
   static getDerivedStateFromError(error: Error) { return { error }; }
+  static getDerivedStateFromProps(
+    props: { resetKey: string },
+    state: { error: Error | null; resetKey: string },
+  ) {
+    // a changed resetKey means the user/HMR altered this widget — drop the
+    // stale error so the new render is attempted
+    if (props.resetKey !== state.resetKey) return { error: null, resetKey: props.resetKey };
+    return null;
+  }
+  componentDidCatch(error: Error) {
+    // surface it in the console so generated-widget failures are debuggable
+    console.error(`[widget:${this.props.id}] render error:`, error);
+  }
   render() {
     if (this.state.error) {
       return (
-        <div className="block-label" style={{ color: "var(--accent-red, #ff4040)", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
+        <div className="block-label" style={{ color: "var(--status-down)", flexDirection: "column", gap: 4, alignItems: "flex-start" }}>
           <span>{this.props.id} — render error</span>
           <span style={{ fontSize: "0.6rem", opacity: 0.7, fontFamily: "var(--font-jetbrains-mono, monospace)" }}>
-            {(this.state.error as Error).message}
+            {this.state.error.message}
           </span>
         </div>
       );
@@ -98,7 +123,7 @@ export function WidgetShell({
           {manifest.title}
         </div>
       )}
-      <WidgetErrorBoundary id={manifest.id}>
+      <WidgetErrorBoundary id={manifest.id} resetKey={`${size}|${orientation}|${JSON.stringify(settings)}`}>
         <Suspense>
           <Content />
           {/* detail content shows once the card is large enough to hold it */}
@@ -129,7 +154,18 @@ export function WidgetShell({
       data-size={size}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" }}
+      exit="exit"
+      transition={{
+        opacity: { duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" },
+        scale: { duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" },
+      }}
+      variants={{
+        exit: {
+          opacity: 0,
+          scale: 0.97,
+          transition: { duration: CANVAS_OUTRO_DURATION, delay: 0, ease: "easeIn" },
+        },
+      }}
     >
       <WidgetContext.Provider value={ctx}>
         {flags.plainChrome ? body : (
