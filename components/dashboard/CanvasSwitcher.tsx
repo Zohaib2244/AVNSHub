@@ -39,18 +39,29 @@ export function CanvasGlyph({ canvas }: { canvas: Canvas }) {
   return <span className="canvas-pill-glyph">{abbreviate(canvas.name)}</span>;
 }
 
+const CREATE_POPOVER_KEY = "canvas-create";
+
 export function CanvasSwitcher() {
   const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
   const { activePopover, setActivePopover } = useLayout();
   const [collapsed, setCollapsed] = useState(false);
+  const [draftName, setDraftName] = useState("");
+  const [draftIcon, setDraftIcon] = useState<string | undefined>(undefined);
 
   function manageKeyFor(id: string) {
     return `canvas-manage:${id}`;
   }
 
   function handleAdd() {
-    const id = createCanvas(`canvas ${canvases.length + 1}`);
-    setActivePopover(manageKeyFor(id));
+    setDraftName(`canvas ${canvases.length + 1}`);
+    setDraftIcon(undefined);
+    setActivePopover(CREATE_POPOVER_KEY);
+  }
+
+  function confirmCreate() {
+    const id = createCanvas(draftName);
+    if (draftIcon) setCanvasIcon(id, draftIcon);
+    setActivePopover(null);
   }
 
   return (
@@ -87,16 +98,52 @@ export function CanvasSwitcher() {
                 onCloseManage={() => setActivePopover(null)}
               />
             ))}
-            <button
-              type="button"
-              className="hub-core-btn edge-btn canvas-add-btn"
-              onClick={handleAdd}
-              aria-label="add canvas"
-              title="add canvas"
-            >
-              <Plus size={13} strokeWidth={2} />
-              <span className="edge-btn-label">new</span>
-            </button>
+            <div className="canvas-pill-wrap">
+              <button
+                type="button"
+                className="hub-core-btn edge-btn canvas-add-btn"
+                onClick={handleAdd}
+                aria-label="add canvas"
+                title="add canvas"
+              >
+                <Plus size={13} strokeWidth={2} />
+                <span className="edge-btn-label">new</span>
+              </button>
+
+              <AnimatePresence>
+                {activePopover === CREATE_POPOVER_KEY && (
+                  <motion.div
+                    className="canvas-manage-panel"
+                    initial={{ opacity: 0, x: 6 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 6 }}
+                    transition={{ duration: 0.15, ease: "easeOut" }}
+                  >
+                    <input
+                      className="canvas-manage-input"
+                      autoFocus
+                      value={draftName}
+                      onChange={(e) => setDraftName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") confirmCreate();
+                        if (e.key === "Escape") setActivePopover(null);
+                      }}
+                      aria-label="new canvas name"
+                      placeholder="canvas name"
+                    />
+                    <CanvasIconPicker value={draftIcon} onChange={(icon) => setDraftIcon(icon ?? undefined)} />
+                    <div className="canvas-manage-actions">
+                      <button type="button" className="hub-core-io-btn" onClick={confirmCreate}>
+                        create
+                      </button>
+                      <button type="button" className="hub-widget-btn" onClick={() => setActivePopover(null)}>
+                        x
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

@@ -303,6 +303,24 @@ body {
   overflow-x: hidden;
 }
 
+/* ─── wallpaper layer ─────────────────────────────────────────────
+   Three stacked layers: BG (this wallpaper image, or body's flat color
+   if none is set) -> Canvas (.frame, below) -> widgets (.block, further
+   below). BG itself has no solid/blur/transparent mode — only the canvas
+   and each widget do. .wallpaper-layer sits behind everything (z-index:
+   -1, child of body so it always paints in front of body's own flat
+   background, behind dashboard content) and is always visible wherever
+   the canvas/widgets above it aren't opaque. */
+
+.wallpaper-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -330,10 +348,24 @@ body {
 /* ─── outer frame (whole-dashboard bezel) ───────────────────────── */
 
 .frame {
+  background: var(--bg-page);
   border: 1.5px solid var(--border);
   border-radius: 22px;
   padding: 16px;
   box-shadow: 4px 4px 0 var(--shadow);
+  transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+/* canvas backdrop mode (Hub Core -> appearance) — controls the .frame layer
+   specifically, distinct from BG (the wallpaper, see .wallpaper-layer above)
+   and from each widget's own .block (see the cardBackdrop rules below) */
+html[data-backdrop="blur"] .frame {
+  background: color-mix(in srgb, var(--bg-page) 55%, transparent);
+  backdrop-filter: blur(18px);
+}
+
+html[data-backdrop="transparent"] .frame {
+  background: transparent;
 }
 
 @media (min-width: 1024px) {
@@ -877,6 +909,37 @@ body {
 .block:hover {
   border-color: var(--accent-orange);
   box-shadow: 5px 5px 0 var(--shadow);
+}
+
+/* the global widget backdrop default (Hub Core -> appearance, independent
+   from canvas backdrop — see .frame above) cascades to every card that
+   hasn't set its own override (see WidgetShell's data-backdrop,
+   config/widgets.tsx's cardBackdrop framework setting) — :not([data-backdrop])
+   is what makes "auto" mean "inherit the widget default" without needing JS
+   to resolve it */
+html[data-widget-backdrop="blur"] .block:not([data-backdrop]) {
+  background: color-mix(in srgb, var(--bg-card) 55%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+html[data-widget-backdrop="transparent"] .block:not([data-backdrop]) {
+  background: transparent;
+}
+
+/* explicit per-widget override — always wins over the widget-default cascade */
+.block[data-backdrop="solid"] {
+  background: var(--bg-card);
+  backdrop-filter: none;
+}
+
+.block[data-backdrop="blur"] {
+  background: color-mix(in srgb, var(--bg-card) 55%, transparent);
+  backdrop-filter: blur(10px);
+}
+
+.block[data-backdrop="transparent"] {
+  background: transparent;
+  backdrop-filter: none;
 }
 
 /* ─── block typography ───────────────────────────────────────── */
@@ -1773,6 +1836,70 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ─── wallpaper picker (Hub Core → appearance) ───────────────────── */
+
+.wallpaper-picker {
+  display: flex;
+}
+
+.wallpaper-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border: 1.5px dashed var(--border);
+  border-radius: 8px;
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  font-size: 0.66rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wallpaper-drop:hover,
+.wallpaper-drop.dragging {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.wallpaper-preview {
+  position: relative;
+  width: 100%;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+}
+
+.wallpaper-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wallpaper-clear {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.wallpaper-clear:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
 }
 
 .hub-reset:hover {

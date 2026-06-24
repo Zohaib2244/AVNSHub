@@ -10,6 +10,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   ChevronDown,
   Download,
+  Droplets,
+  Ghost,
+  ImageOff,
+  ImagePlus,
   LayoutGrid,
   Lock,
   Minus,
@@ -18,6 +22,7 @@ import {
   RotateCcw,
   Search,
   Settings,
+  Square,
   Sun,
   SunMoon,
   Trash2,
@@ -51,6 +56,20 @@ import {
   type ThemeMode,
 } from "@/lib/theme";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
+import {
+  clearWallpaper,
+  getBackdropMode,
+  getServerBackdropMode,
+  getServerWallpaperUrl,
+  getServerWidgetBackdropMode,
+  getWallpaperUrl,
+  getWidgetBackdropMode,
+  setBackdropMode,
+  setWallpaper,
+  setWidgetBackdropMode,
+  subscribeWallpaper,
+  type BackdropMode,
+} from "@/lib/wallpaper";
 import {
   exportSlotLayout,
   getRegionsThatFitWidget,
@@ -275,9 +294,93 @@ function PaletteRow() {
   );
 }
 
+const BACKDROP_OPTIONS: { mode: BackdropMode; Icon: typeof Square; label: string }[] = [
+  { mode: "solid", Icon: Square, label: "solid" },
+  { mode: "blur", Icon: Droplets, label: "blur" },
+  { mode: "transparent", Icon: Ghost, label: "transparent" },
+];
+
+function BackdropModeRow({
+  getMode,
+  getServerMode,
+  setMode,
+}: {
+  getMode: () => BackdropMode;
+  getServerMode: () => BackdropMode;
+  setMode: (mode: BackdropMode) => void;
+}) {
+  const mode = useSyncExternalStore(subscribeWallpaper, getMode, getServerMode);
+  return (
+    <div className="seg-row hub-theme-row">
+      {BACKDROP_OPTIONS.map(({ mode: m, Icon, label }) => (
+        <button
+          key={m}
+          type="button"
+          className={`seg-btn${mode === m ? " active" : ""}`}
+          onClick={() => setMode(m)}
+          aria-pressed={mode === m}
+        >
+          <Icon size={12} strokeWidth={1.75} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function WallpaperPicker({ canvasId }: { canvasId: string }) {
+  const url = useSyncExternalStore(subscribeWallpaper, () => getWallpaperUrl(canvasId), getServerWallpaperUrl);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  function handleFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (file && file.type.startsWith("image/")) void setWallpaper(canvasId, file);
+  }
+
+  return (
+    <div className="wallpaper-picker">
+      {url ? (
+        <div className="wallpaper-preview">
+          <img src={url} alt="canvas wallpaper" className="wallpaper-thumb" />
+          <button
+            type="button"
+            className="wallpaper-clear"
+            onClick={() => void clearWallpaper(canvasId)}
+            aria-label="remove wallpaper"
+          >
+            <ImageOff size={11} strokeWidth={1.75} />
+          </button>
+        </div>
+      ) : (
+        <div
+          className={`wallpaper-drop${dragging ? " dragging" : ""}`}
+          onClick={() => inputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            handleFiles(e.dataTransfer.files);
+          }}
+        >
+          <ImagePlus size={12} strokeWidth={1.75} />
+          <span>browse or drop an image</span>
+        </div>
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        style={{ display: "none" }}
+        onChange={(e) => handleFiles(e.target.files)}
+      />
+    </div>
+  );
+}
+
 function AppearanceSettings() {
-  const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
-  const activeName = canvases.find((c) => c.id === activeId)?.name ?? "this canvas";
+  const { activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
   return (
     <div className="hub-appearance-panel">
       <div className="hub-setting-stack">
@@ -288,7 +391,26 @@ function AppearanceSettings() {
         <span className="hub-setting-label">palette</span>
         <PaletteRow />
       </div>
-      {canvases.length > 1 && <div className="hub-core-fixed-note">applies to &ldquo;{activeName}&rdquo; only — each canvas has its own theme</div>}
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">wallpaper</span>
+        <WallpaperPicker canvasId={activeId} />
+      </div>
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">canvas backdrop</span>
+        <BackdropModeRow
+          getMode={() => getBackdropMode(activeId)}
+          getServerMode={getServerBackdropMode}
+          setMode={(mode) => setBackdropMode(activeId, mode)}
+        />
+      </div>
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">widget backdrop</span>
+        <BackdropModeRow
+          getMode={() => getWidgetBackdropMode(activeId)}
+          getServerMode={getServerWidgetBackdropMode}
+          setMode={(mode) => setWidgetBackdropMode(activeId, mode)}
+        />
+      </div>
     </div>
   );
 }

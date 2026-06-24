@@ -85,6 +85,10 @@ export function WidgetShell({
   const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
+  // "auto" inherits the global widget backdrop default (independent from the
+  // canvas's own backdrop mode) via the CSS :not([data-backdrop]) cascade
+  // (globals.css) — only set the attribute for an explicit per-widget override
+  const cardBackdrop = settings.cardBackdrop !== "auto" ? (settings.cardBackdrop as string) : undefined;
 
   const body = (
     <>
@@ -128,7 +132,11 @@ export function WidgetShell({
       transition={{ duration: 0.3, delay: entranceDelay ?? 0, ease: "easeOut" }}
     >
       <WidgetContext.Provider value={ctx}>
-        {flags.plainChrome ? body : <div className={blockClasses}>{body}</div>}
+        {flags.plainChrome ? body : (
+          <div className={blockClasses} data-backdrop={cardBackdrop}>
+            {body}
+          </div>
+        )}
       </WidgetContext.Provider>
     </motion.div>
   );

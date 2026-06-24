@@ -73,6 +73,18 @@ export const FRAMEWORK_SETTINGS: SettingsField[] = [
       { value: "height", label: "height" },
     ],
   },
+  {
+    key: "cardBackdrop",
+    label: "card backdrop",
+    type: "select",
+    default: "auto",
+    options: [
+      { value: "auto", label: "auto (widget default)" },
+      { value: "solid", label: "solid" },
+      { value: "blur", label: "blur" },
+      { value: "transparent", label: "transparent" },
+    ],
+  },
 ];
 
 export type WidgetManifest = {

@@ -35,13 +35,16 @@ export default function RootLayout({
     >
       <head>
         {/* pre-paint theme script — must stay a raw string (no TS imports
-            possible here). Theme/palette are per-canvas (lib/theme.ts,
-            lib/canvases.ts); "default" below must match DEFAULT_CANVAS_ID. */}
+            possible here). Theme/palette/backdrop are per-canvas
+            (lib/theme.ts, lib/wallpaper.ts, lib/canvases.ts); "default" below
+            must match DEFAULT_CANVAS_ID. The wallpaper image itself isn't
+            read here — IndexedDB is async-only, so it necessarily pops in
+            after mount (see WallpaperLayer). */}
         <Script
           id="nutmag-theme-init"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var a="default";try{var c=JSON.parse(localStorage.getItem("nutmag-canvases"));if(c&&typeof c.activeId==="string")a=c.activeId;}catch(e){}var s=a==="default"?"":"::"+a;var t=localStorage.getItem("nutmag-theme"+s);var h=new Date().getHours();if(t==="light"||(t==="auto"&&h>=6&&h<20)){document.documentElement.dataset.theme="light";}var p=localStorage.getItem("nutmag-palette"+s);if(p&&p!=="ember"){document.documentElement.dataset.palette=p;}}catch(e){}})();`,
+            __html: `(function(){try{var a="default";try{var c=JSON.parse(localStorage.getItem("nutmag-canvases"));if(c&&typeof c.activeId==="string")a=c.activeId;}catch(e){}var s=a==="default"?"":"::"+a;var t=localStorage.getItem("nutmag-theme"+s);var h=new Date().getHours();if(t==="light"||(t==="auto"&&h>=6&&h<20)){document.documentElement.dataset.theme="light";}var p=localStorage.getItem("nutmag-palette"+s);if(p&&p!=="ember"){document.documentElement.dataset.palette=p;}var b=localStorage.getItem("nutmag-backdrop"+s);if(b==="blur"||b==="transparent"){document.documentElement.dataset.backdrop=b;}var w=localStorage.getItem("nutmag-widget-backdrop"+s);if(w==="blur"||w==="transparent"){document.documentElement.dataset.widgetBackdrop=w;}}catch(e){}})();`,
           }}
         />
       </head>
