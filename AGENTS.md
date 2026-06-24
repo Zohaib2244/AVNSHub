@@ -22,6 +22,8 @@ Use these files as the source of truth:
   - `nutmag-slot-layout` for Slot Layout.
   - `nutmag-layout` for Graph Layout.
   - `nutmag-layout-mode`, `nutmag-theme`, `nutmag-palette`, `nutmag-prefs` for global UI state.
+  - `nutmag-canvases` for AVN Hub Canvases (`lib/canvases.ts`). Every per-canvas key above (slot-layout/theme/palette) plus `nutmag-backdrop`, `nutmag-widget-backdrop`, and `nutmag-parallax` (`lib/wallpaper.ts`) get a `::<canvasId>` suffix for any canvas other than the default — see `canvasScopedKey()`.
+  - Wallpaper images/videos and uploaded ambient-sound clips are too big for localStorage and live in IndexedDB instead (`lib/idb.ts`'s generic blob store; `lib/wallpaper.ts` and `lib/ambient.ts` are its only consumers so far, but it's written generically for future reuse).
 
 ## Interaction Rules
 

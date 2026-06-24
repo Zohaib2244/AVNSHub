@@ -59,12 +59,17 @@ import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs"
 import {
   clearWallpaper,
   getBackdropMode,
+  getParallax,
   getServerBackdropMode,
+  getServerParallax,
+  getServerWallpaperKind,
   getServerWallpaperUrl,
   getServerWidgetBackdropMode,
+  getWallpaperKind,
   getWallpaperUrl,
   getWidgetBackdropMode,
   setBackdropMode,
+  setParallax,
   setWallpaper,
   setWidgetBackdropMode,
   subscribeWallpaper,
@@ -330,19 +335,24 @@ function BackdropModeRow({
 
 function WallpaperPicker({ canvasId }: { canvasId: string }) {
   const url = useSyncExternalStore(subscribeWallpaper, () => getWallpaperUrl(canvasId), getServerWallpaperUrl);
+  const kind = useSyncExternalStore(subscribeWallpaper, () => getWallpaperKind(canvasId), getServerWallpaperKind);
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
 
   function handleFiles(files: FileList | null) {
     const file = files?.[0];
-    if (file && file.type.startsWith("image/")) void setWallpaper(canvasId, file);
+    if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) void setWallpaper(canvasId, file);
   }
 
   return (
     <div className="wallpaper-picker">
       {url ? (
         <div className="wallpaper-preview">
-          <img src={url} alt="canvas wallpaper" className="wallpaper-thumb" />
+          {kind === "video" ? (
+            <video src={url} className="wallpaper-thumb" autoPlay loop muted playsInline />
+          ) : (
+            <img src={url} alt="canvas wallpaper" className="wallpaper-thumb" />
+          )}
           <button
             type="button"
             className="wallpaper-clear"
@@ -365,17 +375,31 @@ function WallpaperPicker({ canvasId }: { canvasId: string }) {
           }}
         >
           <ImagePlus size={12} strokeWidth={1.75} />
-          <span>browse or drop an image</span>
+          <span>browse or drop an image/video</span>
         </div>
       )}
       <input
         ref={inputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,video/*"
         style={{ display: "none" }}
         onChange={(e) => handleFiles(e.target.files)}
       />
     </div>
+  );
+}
+
+function ParallaxToggle({ canvasId }: { canvasId: string }) {
+  const enabled = useSyncExternalStore(subscribeWallpaper, () => getParallax(canvasId), getServerParallax);
+  return (
+    <label className="wset-row">
+      <span>mouse parallax</span>
+      <input
+        type="checkbox"
+        checked={enabled}
+        onChange={(e) => setParallax(canvasId, e.target.checked)}
+      />
+    </label>
   );
 }
 
@@ -394,6 +418,7 @@ function AppearanceSettings() {
       <div className="hub-setting-stack">
         <span className="hub-setting-label">wallpaper</span>
         <WallpaperPicker canvasId={activeId} />
+        <ParallaxToggle canvasId={activeId} />
       </div>
       <div className="hub-setting-stack">
         <span className="hub-setting-label">canvas backdrop</span>

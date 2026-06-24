@@ -112,13 +112,21 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
   "last_checked": "2026-06-08T14:32:00Z"
 }
 ```
-- **v2 (design-only, see `lib/homelab.ts`)**: per-service `telemetry` â€” storage for Immich/Nextcloud, download queues for Sonarr/Radarr/qBittorrent, request queue for Jellyseerr, media sessions for Jellyfin â€” plus a top-level `host` block with connected drives/disks (capacity used/total) and container network rx/tx stats. The aggregator that produces this is a separate homelab-side project, not yet built.
+- **v2 (design-only, see `lib/homelab.ts`)**: per-service `telemetry` â€” storage for Immich/Nextcloud, download queues for Sonarr/Radarr/qBittorrent, request queue for Jellyseerr, media sessions for Jellyfin. The aggregator that produces this per-service telemetry is a separate homelab-side project, not yet built, so `ArrStack`/`StorageApps`/`Jellyfin` stay on `HOMELAB_MOCK_DATA`/`HOMELAB_STATUS_URL` mock data for now.
+- **Host telemetry (System Stats / Disk Storage / Network Stats widgets) is real, not mocked** â€” `lib/systemStats.ts` reads live CPU/memory/disk/network straight off the machine the Next.js server process is actually running on, via the `systeminformation` package (Node has no built-in cross-platform way to get disk usage or network throughput). Served via `/api/system-stats`, polled every 60s, 10s server-side cache. Deliberately a different machine/concept from the mocked per-service homelab telemetry above â€” this is "the box AVN Hub itself runs on," not "the homelab's other services." `getServerStats()`'s drive list filters out macOS's internal `/System/Volumes/*` and `/private/*` mounts (APFS implementation detail, not real user-facing drives); no-op on Linux. Widget title reads "system stats" (not "server") â€” the manifest id stays `server-stats` since it's a persistence key.
 
 ### 5. GitHub Activity
 - Source: GitHub public events API (`/users/Zohaib2244/events/public`), filtered to push commits
 - Shows: most recent commit message + repo + relative time â€” standalone hero block with the orange-accent left border
 - More-info panel: next several recent commits (message Â· repo Â· relative time)
 - Env var (optional): `GITHUB_TOKEN` â€” raises rate limit from 60/hr to 5000/hr; works unauthenticated too
+
+### 6. Ambient Sound
+- Built-in presets (rain, wind, drone, room tone) are synthesized live via the Web Audio API in `lib/ambient.ts` â€” no bundled audio assets, same idea as Diss Glade's oscillator-based song
+- User-uploaded custom clips are stored as raw `Blob`s in IndexedDB via `lib/idb.ts`'s generic blob store, with a small `{id, name}` registry in `localStorage["nutmag-ambient-tracks"]`
+- Play/pause, volume, and a real-time bar visualizer (`AnalyserNode` + direct DOM mutation per frame, not React state, so the animation never re-renders)
+- Global, not per-canvas â€” it's a personal-mood setting, not tied to a canvas's layout or theme
+- L size adds the full track list with upload/delete; S/M show progressively less
 
 ---
 
@@ -130,26 +138,38 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”‚   â”œâ”€â”€ layout.tsx            # Root layout, fonts, pre-paint theme/palette script
 â”‚   â””â”€â”€ api/                  # Proxy routes (hide all API keys)
 â”‚       â”œâ”€â”€ now-playing/  currently-playing/  steam-library/  spotify-control/
-â”‚       â”œâ”€â”€ homelab/  homelab-v2/  uptime/
-â”‚       â””â”€â”€ github-activity/  github-repos/
+â”‚       â”œâ”€â”€ homelab/  homelab-v2/  system-stats/  uptime/
+â”‚       â”œâ”€â”€ github-activity/  github-repos/
+â”‚       â””â”€â”€ widget-creator/   # generate/edit/delete/export/import/harnesses
 â”œâ”€â”€ components/
 â”‚   â”œâ”€â”€ framework/            # THE widget framework â€” touch with care
 â”‚   â”‚   â”œâ”€â”€ WidgetShell.tsx   # card chrome + label + detail-at-L (no expansion)
 â”‚   â”‚   â”œâ”€â”€ WidgetContext.tsx # useWidget() â€” { id, size, orientation, settings }
 â”‚   â”‚   â””â”€â”€ WidgetSettingsPopover.tsx  # gear popover (placement + schema form)
-â”‚   â”œâ”€â”€ widgets/
-â”‚   â”‚   â””â”€â”€ NutBotFaceWidget.tsx  # face at S/M, terminal at L
-â”‚   â”œâ”€â”€ Dashboard.tsx         # grid + dnd-kit drag/drop + edit mode
-â”‚   â”œâ”€â”€ LayoutProvider.tsx    # layout store context (instances, editMode)
+â”‚   â”œâ”€â”€ widgets/default/      # built-in widgets, one subfolder per module
+â”‚   â”‚   â””â”€â”€ ambient/AmbientSoundWidget.tsx
+â”‚   â”œâ”€â”€ dashboard/
+â”‚   â”‚   â”œâ”€â”€ SlotDashboard.tsx     # Slot Layout grid + dnd-kit + edit mode
+â”‚   â”‚   â”œâ”€â”€ LayoutProvider.tsx    # layout store context (instances, editMode)
+â”‚   â”‚   â”œâ”€â”€ HubCorePanel.tsx      # settings/widget-manager edge tabs
+â”‚   â”‚   â”œâ”€â”€ CanvasSwitcher.tsx    # AVN Hub Canvases edge pill stack
+â”‚   â”‚   â””â”€â”€ WallpaperLayer.tsx    # BG image/video layer + mouse parallax
 â”‚   â”œâ”€â”€ NutBotTerminal.tsx    # tabs/mock shells/xterm â€” rendered by nutbot at L
 â”‚   â””â”€â”€ *.tsx                 # widget content components (no shell markup)
 â”œâ”€â”€ config/
 â”‚   â”œâ”€â”€ widgets.tsx           # WIDGETS manifest registry + SPAN_MAP + DEFAULT_ORDER
 â”‚   â”œâ”€â”€ themes.ts             # theme pack metadata (tokens live in globals.css)
+â”‚   â”œâ”€â”€ canvasIcons.ts        # curated Lucide set for canvas pill icons
 â”‚   â””â”€â”€ links.ts              # Identity block quicklinks (extensible)
 â”œâ”€â”€ lib/
 â”‚   â”œâ”€â”€ layout.ts             # layout store v2 (instances, sanitize, v1 migration)
-â”‚   â”œâ”€â”€ theme.ts              # mode (light/auto/dark) + palette stores
+â”‚   â”œâ”€â”€ slotLayout.ts         # Slot Layout region/placement store
+â”‚   â”œâ”€â”€ canvases.ts           # AVN Hub Canvases store + canvasScopedKey()
+â”‚   â”œâ”€â”€ theme.ts              # mode (light/auto/dark) + palette stores, per-canvas
+â”‚   â”œâ”€â”€ wallpaper.ts          # BG image/video + canvas/widget backdrop modes + parallax, per-canvas
+â”‚   â”œâ”€â”€ idb.ts                # generic IndexedDB key/value blob store (wallpaper, ambient tracks, future)
+â”‚   â”œâ”€â”€ ambient.ts            # Ambient Sound presets (Web Audio synthesis) + custom track storage
+â”‚   â”œâ”€â”€ systemStats.ts        # real host CPU/mem/disk/network via `systeminformation`
 â”‚   â”œâ”€â”€ prefs.ts              # global prefs store (polling, boot sequence)
 â”‚   â”œâ”€â”€ usePolling.ts         # shared per-URL polling cache
 â”‚   â”œâ”€â”€ useGridColumns.ts     # breakpoint â†’ grid column count
@@ -157,9 +177,10 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”‚   â”œâ”€â”€ sessions.ts           # session tracker store
 â”‚   â””â”€â”€ spotify.ts  steam.ts  github.ts  homelab.ts   # server-side API clients
 â”œâ”€â”€ styles/
-â”‚   â””â”€â”€ globals.css           # tokens (+ theme packs), grid, card/per-size CSS
+â”‚   â””â”€â”€ globals.css           # tokens (+ theme packs), grid, card/per-size CSS, backdrop modes
 â”œâ”€â”€ docs/
-â”‚   â””â”€â”€ CREATING_WIDGETS.md   # widget authoring guide (humans + LLMs)
+â”‚   â”œâ”€â”€ CREATING_WIDGETS.md   # widget authoring guide (humans + LLMs)
+â”‚   â””â”€â”€ AVN_HUB.md            # Hub Core / layout / theme / persistence reference
 â”œâ”€â”€ CLAUDE.md                 # This file
 â””â”€â”€ .env.local                # All API keys â€” never commit this
 ```
@@ -196,11 +217,18 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > - Widget add/remove moved into the Hub Core Widget Manager tab; NutBot renders its terminal at L; canvas appearance/prefs/reset controls live in Hub Core settings
 > - Authoring guide written: [`docs/CREATING_WIDGETS.md`](./docs/CREATING_WIDGETS.md)
 
-> **Next â€” widget-creator chat (planned)**
-> - An in-UI chat widget backed by an LLM (likely Claude CLI) whose sole job is to scaffold new widgets into this ecosystem on request ("make me an X widget"). It should follow `docs/CREATING_WIDGETS.md` exactly: generate the content component + manifest entry + `DEFAULT_ORDER` line. Keep that doc authoritative and machine-followable so this is a thin wrapper.
+> **NutBot widget-creator chat** (âœ… shipped)
+> - In-UI chat (NutBot's `CREATOR` tab) that scaffolds new widgets on request, backed by a choice of CLI harness â€” `claude`, `codex`, or `opencode` (`lib/widget-creator/harnessAdapters.ts`), with auto-fallback if one hits a rate limit. Generates the content component + manifest entry, TypeScript-checks before registering, rolls back on failure. Follows `docs/CREATING_WIDGETS.md` as its own prompt context, so that doc stays authoritative for both humans and the LLM.
+> - Harness availability (`/api/widget-creator/harnesses`) is checked by actually spawning `<command> --version` rather than shelling out to `which`/`where` â€” `which` doesn't exist on Windows at all, and even on Unix it bypassed the same Windows-shim resolution (`shell: true`) the real generation spawn already needed.
+
+> **AVN Hub Canvases** (âœ… shipped â€” see "AVN Hub Canvases" under Widget Framework above)
+
+> **Personalization layer** (âœ… shipped)
+> - Per-canvas wallpaper (image or short looping video, stored in IndexedDB) + independent canvas/widget backdrop modes (solid/blur/transparent) + opt-in mouse parallax â€” see `lib/wallpaper.ts`
+> - Ambient Sound widget â€” synthesized presets + user-uploaded clips, real-time visualizer â€” see `lib/ambient.ts`
 
 > **Now â€” content finalization & v2 modules**
-> - Homelab v2 host telemetry (drives, network) â€” types defined in `lib/homelab.ts`; aggregator still to build on the homelab side
+> - Host telemetry (System Stats / Disk Storage / Network Stats) is now real, not mock â€” see Module 4. The per-service v2 telemetry (Immich/Nextcloud storage, Sonarr/Radarr/qBittorrent queues, Jellyseerr requests, Jellyfin sessions) still needs the separate homelab-side aggregator project; those widgets stay on mock data until it ships.
 > - Personal uptime stat â€” switch from fixed "days since project epoch" to live session uptime (resets on server restart), plus a future DB-backed historical tracker
 > - Grid default-layout tuning (span presets per widget) after living with the new arrangement
 

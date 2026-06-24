@@ -1,12 +1,12 @@
 "use client";
 
 import { usePolling } from "@/lib/usePolling";
-import { formatBytes, formatRate, type HomelabStatusV2 } from "@/lib/homelab";
+import { formatBytes, formatRate, type HostTelemetry } from "@/lib/homelab";
 
 export function NetworkStats() {
-  const { data } = usePolling<HomelabStatusV2>("/api/homelab-v2", 60_000);
+  const { data } = usePolling<HostTelemetry>("/api/system-stats", 60_000);
 
-  const net = data?.host.network ?? null;
+  const net = data?.network ?? null;
 
   return (
     <>
@@ -17,9 +17,9 @@ export function NetworkStats() {
 }
 
 export function NetworkStatsMore() {
-  const { data } = usePolling<HomelabStatusV2>("/api/homelab-v2", 60_000);
+  const { data } = usePolling<HostTelemetry>("/api/system-stats", 60_000);
 
-  const net = data?.host.network ?? null;
+  const net = data?.network ?? null;
   if (!net) return <div className="block-sub">no network data</div>;
 
   return (

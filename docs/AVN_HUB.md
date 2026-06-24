@@ -35,6 +35,33 @@ permanently deletes custom widgets.
 
 ---
 
+## Canvases
+
+A vertical pill stack on the edge of the frame, directly below the
+wrench/settings/widgets tabs. Each pill is a named canvas â€” an independent
+context (home, work, entertainment, whatever you actually use) with its own:
+
+- Widget arrangement (Slot Layout placements/region dims)
+- Theme mode + palette
+- Wallpaper + backdrop modes + parallax setting (see "Wallpaper & backdrop"
+  below)
+
+Switching canvases re-skins the whole card â€” not just the grid.
+
+**Switching** â€” click a pill. **Renaming / changing icon** â€” double-click a
+pill to open its manage flyout (name field + icon picker), or use the
+"canvases" accordion in Hub Core settings for an at-a-glance list.
+**Creating** â€” click the `+` pill. This opens the same name/icon panel
+*first*; nothing is created until you press `create`. Press `cancel` or
+`Escape` to back out without creating anything. **Deleting** â€” open a pill's
+manage flyout and press the trash icon; the last remaining canvas can't be
+deleted, and deleting one also clears its layout/theme/wallpaper data.
+
+New canvases start empty (no widgets placed) with default theme/wallpaper â€”
+not a clone of whichever canvas you created them from.
+
+---
+
 ## Layout modes
 
 ### Default Mode (Slot Layout)
@@ -161,6 +188,37 @@ Persisted to the legacy `localStorage["nutmag-palette"]` key.
 
 ---
 
+## Wallpaper & backdrop
+
+Three independent, stacked layers â€” each set per-canvas from Hub Core â†’
+Appearance:
+
+| Layer | What it is | Controlled by |
+|-------|-----------|--------------|
+| BG | An optional wallpaper image or short looping video, full-bleed behind everything. No mode of its own â€” it's just there, or it isn't. | Drag-drop or browse picker |
+| Canvas | The bezel holding the grid (`.frame`) | "canvas backdrop": solid / blur / transparent |
+| Widgets | Every widget card (`.block`) | "widget backdrop": solid / blur / transparent â€” a *global default* every widget inherits via "auto" |
+
+Solid keeps today's opaque look (wallpaper hidden behind the canvas/widgets).
+Blur makes that layer translucent with a frosted-glass `backdrop-filter`.
+Transparent removes its background entirely, showing whatever's behind it
+raw. Canvas and widget backdrop are independent dials â€” setting one does not
+change the other.
+
+Any single widget can override the global widget-backdrop default from its
+own gear menu (`card backdrop`: auto / solid / blur / transparent) â€”
+`auto` means "inherit whatever the global widget-backdrop default is."
+
+**Mouse parallax** â€” an opt-in toggle next to the wallpaper picker. When on,
+the wallpaper subtly tracks the cursor (off by default).
+
+Wallpaper images/videos are stored in IndexedDB (too large for
+`localStorage`'s quota), namespaced per canvas. Backdrop modes and the
+parallax toggle are small strings, so they stay in `localStorage` like theme
+mode and palette.
+
+---
+
 ## General preferences
 
 Available in Hub Core settings, or via the `lib/prefs.ts` store:
@@ -193,13 +251,29 @@ layouts and preferences.
 
 | Key | What's stored |
 |-----|--------------|
+| `nutmag-canvases` | Canvas identities (id/name/icon) + active canvas id |
 | `nutmag-layout` | Graph mode widget order, size, orientation, hidden, per-widget settings |
 | `nutmag-slot-layout` | Default mode: region dims + per-region widget placements |
 | `nutmag-layout-mode` | Active layout mode (`graph` or `slots`) |
 | `nutmag-theme` | Theme mode (`light`, `auto`, `dark`) |
 | `nutmag-palette` | Active colour palette (`ember`, `slate`, `moss`, `plum`, `reef`, `raspberry`, `circuit`, `graphite`) |
+| `nutmag-backdrop` | Canvas backdrop mode (`solid`, `blur`, `transparent`) |
+| `nutmag-widget-backdrop` | Global widget backdrop default (`solid`, `blur`, `transparent`) |
+| `nutmag-parallax` | Mouse parallax on/off |
 | `nutmag-prefs` | Global prefs (polling, boot sequence) |
 | `nutmag-sessions` | Session tracker (uptime stats) |
+| `nutmag-ambient-tracks` / `-selected` / `-volume` | Ambient Sound custom track registry, selected track, volume (global, not per-canvas) |
+
+Every key from `nutmag-slot-layout` through `nutmag-parallax` is **per-canvas**:
+the original/default canvas keeps the bare key above (so existing users need
+no migration); every canvas created after Canvases shipped gets a
+`<key>::<canvasId>` suffixed key instead. See `lib/canvases.ts`'s
+`canvasScopedKey()`.
+
+Wallpaper images/videos and user-uploaded ambient clips are too large for
+`localStorage`'s quota, so those live in **IndexedDB** instead (database
+`nutmag-db`, object store `blobs`, keyed `wallpaper:<canvasId>` /
+`ambient:<trackId>`) â€” see `lib/idb.ts`.
 
 All keys are written immediately on change and read on mount. Corrupted or
 missing keys fall back to sensible defaults automatically.

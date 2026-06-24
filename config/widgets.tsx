@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
+  AudioWaveform,
   Clock,
   Cpu,
   Database,
@@ -33,6 +34,7 @@ import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
 import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
 import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
 import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
+import { AmbientSoundWidget } from "@/components/widgets/default/ambient/AmbientSoundWidget";
 import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
 
 /* ─── widget framework contracts ─────────────────────────────────────
@@ -85,6 +87,7 @@ export const FRAMEWORK_SETTINGS: SettingsField[] = [
       { value: "transparent", label: "transparent" },
     ],
   },
+  { key: "showHeader", label: "show name & icon", type: "toggle", default: true },
 ];
 
 export type WidgetManifest = {
@@ -206,7 +209,7 @@ export const WIDGETS = {
   },
   "server-stats": {
     id: "server-stats",
-    title: "server stats",
+    title: "system stats",
     icon: Cpu,
     component: ServerStats,
     detail: ServerStatsMore,
@@ -299,6 +302,15 @@ export const WIDGETS = {
     defaults: { size: "M", orientation: "h" },
     flags: { customHeader: true, className: "spotify-capsule" },
   },
+  "ambient-sound": {
+    id: "ambient-sound",
+    title: "ambient sound",
+    icon: AudioWaveform,
+    component: AmbientSoundWidget,
+    sizes: ["S", "M", "L"],
+    orientations: ["h"],
+    defaults: { size: "M", orientation: "h" },
+  },
   "currently-playing": {
     id: "currently-playing",
     title: "currently playing",
@@ -348,6 +360,7 @@ export const DEFAULT_ORDER: string[] = [
   "nutbot",
   "now-playing",
   "currently-playing",
+  "ambient-sound",
   "github",
   "homelab",
   "server-stats",

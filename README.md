@@ -55,6 +55,26 @@ Theme mode and palette are controlled from Hub Core settings and persisted in `l
 
 ---
 
+### AVN Hub Canvases — one card, multiple contexts
+
+A vertical pill stack on the edge of the frame lets you keep several independent named layouts — home, work, entertainment, whatever contexts you actually live in — and switch between them in one click. Each canvas has its **own** widget arrangement, theme mode, palette, and wallpaper, so switching canvases re-skins the whole card, not just the grid. Double-click a pill to rename it or pick an icon; the "+" button asks for a name and icon *before* creating anything, so a stray click can't spawn a layout you have to clean up.
+
+---
+
+### Personalization — wallpapers, backdrop modes, and ambient sound
+
+Three independent, stacked layers, each per-canvas:
+
+- **BG** — an optional wallpaper behind everything: a photo, or a short looping video (muted, autoplay). Drag-drop or browse to set it from Hub Core → Appearance.
+- **Canvas backdrop** — solid, blurred (frosted glass), or fully transparent, controlling how much of the wallpaper shows through behind the grid.
+- **Widget backdrop** — a separate, independent solid/blur/transparent default for every widget card, with the option to override any single widget from its own gear menu.
+
+Toggle **mouse parallax** to have the wallpaper subtly track the cursor.
+
+Pair it with the **Ambient Sound** widget — rain, wind, drone, and room-tone presets synthesized live (no audio files shipped), plus the ability to upload your own looping clips, with a real-time bar visualizer while it plays.
+
+---
+
 ### NutBot Widget Creator — build widgets by describing them
 
 ![NutBot Widget Creator close-up](<docs/screenshots/Widget Creator.png>)
@@ -134,7 +154,7 @@ The settings panel is not exclusive-collapse: Appearance, General, and Layout ca
 
 ### Bundled example widgets
 
-AVN Hub ships with a working set of widgets so the playground has real texture immediately: identity, music, games, homelab status, GitHub activity, clock/date, quicklinks, and NutBot itself. Use them as-is, delete the ones that do not fit, or treat them as reference implementations for your own generated or hand-written widgets.
+AVN Hub ships with a working set of widgets so the playground has real texture immediately: identity, music, games, homelab status, live system stats (real CPU/memory/disk/network for the machine AVN Hub runs on, not mock data), GitHub activity, clock/date, quicklinks, ambient sound, and NutBot itself. Use them as-is, delete the ones that do not fit, or treat them as reference implementations for your own generated or hand-written widgets.
 
 ---
 
@@ -223,44 +243,58 @@ After a custom widget is registered, it appears in the Widget Manager and gets t
 
 ```text
 app/
-  page.tsx              # root — BootSequence + GlyphStrip + SlotDashboard
-  layout.tsx            # fonts, pre-paint theme/palette script
-  api/                  # proxy routes (Spotify, Steam, homelab, GitHub, widget creator)
+  page.tsx              # root — BootSequence + GlyphStrip + WallpaperLayer + SlotDashboard
+  layout.tsx            # fonts, pre-paint theme/palette/backdrop script
+  api/                  # proxy routes (Spotify, Steam, homelab, system-stats, GitHub, widget creator)
 components/
   framework/            # widget shell, context, settings popover, error boundary
-  widgets/default/      # built-in widgets (nutbot, now-playing, homelab, github…)
+  widgets/default/      # built-in widgets (nutbot, now-playing, homelab, ambient, github…)
   widgets/custom/       # NutBot-generated custom widgets live here
-  dashboard/            # SlotDashboard, HubCorePanel, LayoutProvider, etc.
+  dashboard/            # SlotDashboard, HubCorePanel, LayoutProvider, CanvasSwitcher, WallpaperLayer
 config/
-  widgets.tsx           # manifest registry + DEFAULT_ORDER
+  widgets.tsx           # manifest registry + DEFAULT_ORDER + FRAMEWORK_SETTINGS
   themes.ts             # palette metadata
+  canvasIcons.ts        # curated icon set for canvas pills
   customRegistry.json   # auto-managed by widget creator
   customComponentMap.tsx
 lib/
   slotLayout.ts         # slot layout store
   layout.ts             # widget instance types + graph layout store
+  canvases.ts           # AVN Hub Canvases store + per-canvas key namespacing
+  wallpaper.ts          # BG image/video + canvas/widget backdrop modes + parallax
+  idb.ts                # generic IndexedDB blob store
+  ambient.ts            # Ambient Sound synthesis presets + custom track storage
+  systemStats.ts        # real host CPU/mem/disk/network via systeminformation
   usePolling.ts         # shared per-URL polling cache
   format.ts             # timeAgo, formatDuration, formatMins
   nutbotSignal.ts       # cross-component NutBot expression signalling
 styles/
-  globals.css           # design tokens, theme packs, grid, card CSS
+  globals.css           # design tokens, theme packs, grid, card CSS, backdrop modes
 docs/
   CREATING_WIDGETS.md   # widget authoring guide
+  AVN_HUB.md            # Hub Core / layout / theme / persistence reference
 ```
 
 ---
 
 ## Persistence
 
-All layout and preference state lives in `localStorage` — no database needed.
+Layout and preference state lives in `localStorage`; wallpaper images/videos and uploaded ambient clips live in IndexedDB (too large for `localStorage`'s quota). No database needed either way.
 
 | Key | Contents |
 | --- | --- |
-| `nutmag-slot-layout` | Region dims + widget placements |
-| `nutmag-theme` | Theme mode (light / auto / dark) |
-| `nutmag-palette` | Active colour palette |
+| `nutmag-canvases` | Canvas identities + active canvas |
+| `nutmag-slot-layout` | Region dims + widget placements (per canvas) |
+| `nutmag-theme` | Theme mode — light / auto / dark (per canvas) |
+| `nutmag-palette` | Active colour palette (per canvas) |
+| `nutmag-backdrop` / `nutmag-widget-backdrop` | Canvas / widget backdrop mode — solid / blur / transparent (per canvas) |
+| `nutmag-parallax` | Mouse parallax on/off (per canvas) |
 | `nutmag-prefs` | Polling on/off, boot sequence on/off |
 | `nutmag-sessions` | Session uptime tracker |
+| `nutmag-ambient-tracks` / `-selected` / `-volume` | Ambient Sound custom track registry + selection + volume |
+| IndexedDB `nutmag-db` (`blobs` store) | Wallpaper images/videos, uploaded ambient clips |
+
+Per-canvas keys use the bare name for the original/default canvas (no migration needed for existing users) and a `::<canvasId>` suffix for every canvas created after Canvases shipped.
 
 ---
 
@@ -268,10 +302,11 @@ All layout and preference state lives in `localStorage` — no database needed.
 
 | | |
 | --- | --- |
-| Framework | Next.js 15 (App Router) |
+| Framework | Next.js 16 (App Router) |
 | Styling | Tailwind CSS + CSS custom properties |
 | Animations | Framer Motion |
 | Drag & resize | dnd-kit + custom resize handles |
+| System telemetry | `systeminformation` (real CPU/mem/disk/network) |
 | NutBot face | SVG with RAF animation loop |
 | Widget AI | Claude Code / OpenCode / Codex CLI |
 | Deployment | Docker + Tailscale |

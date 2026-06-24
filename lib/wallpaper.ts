@@ -13,18 +13,27 @@
 // Canvas and widget defaults are deliberately independent dials, not one
 // cascading from the other — small strings, so both stay in localStorage like
 // theme mode/palette, namespaced the same way.
+//
+// The wallpaper itself can be an image or a short looping video (same Blob
+// storage either way — IndexedDB preserves Blob.type through the structured
+// clone, so kindOf() below is all that's needed to tell them apart at read
+// time). Parallax is a separate opt-in toggle that nudges the wallpaper layer
+// with the mouse — purely cosmetic, lives next to the wallpaper picker in
+// Hub Core's Appearance settings.
 
 import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
 import { idbDelete, idbGet, idbSet } from "@/lib/idb";
 
 export type BackdropMode = "solid" | "blur" | "transparent";
+export type WallpaperKind = "image" | "video";
 
 const CANVAS_MODE_KEY = "nutmag-backdrop";
 const WIDGET_MODE_KEY = "nutmag-widget-backdrop";
+const PARALLAX_KEY = "nutmag-parallax";
 const listeners = new Set<() => void>();
 
-/** canvasId -> resolved object URL, or null once confirmed empty */
-const urlCache = new Map<string, string | null>();
+/** canvasId -> resolved object URL + blob kind, or null once confirmed empty */
+const urlCache = new Map<string, { url: string; kind: WallpaperKind } | null>();
 /** canvasId -> in-flight load, so concurrent getters don't double-fetch */
 const loading = new Map<string, Promise<void>>();
 
@@ -40,11 +49,19 @@ function widgetModeKey(canvasId: string): string {
   return canvasScopedKey(WIDGET_MODE_KEY, canvasId);
 }
 
+function parallaxKey(canvasId: string): string {
+  return canvasScopedKey(PARALLAX_KEY, canvasId);
+}
+
+function kindOf(blob: Blob): WallpaperKind {
+  return blob.type.startsWith("video/") ? "video" : "image";
+}
+
 async function load(canvasId: string): Promise<void> {
   if (loading.has(canvasId)) return loading.get(canvasId);
   const promise = (async () => {
     const blob = await idbGet(wallpaperKey(canvasId));
-    urlCache.set(canvasId, blob ? URL.createObjectURL(blob) : null);
+    urlCache.set(canvasId, blob ? { url: URL.createObjectURL(blob), kind: kindOf(blob) } : null);
     loading.delete(canvasId);
     listeners.forEach((listener) => listener());
   })();
@@ -57,26 +74,51 @@ async function load(canvasId: string): Promise<void> {
     that hasn't been loaded yet */
 export function getWallpaperUrl(canvasId: string = getActiveCanvasId()): string | null {
   if (!urlCache.has(canvasId) && !loading.has(canvasId)) void load(canvasId);
-  return urlCache.get(canvasId) ?? null;
+  return urlCache.get(canvasId)?.url ?? null;
 }
 
 export function getServerWallpaperUrl(): null {
   return null;
 }
 
+/** "image" | "video" | null (no wallpaper set, or not loaded yet) — drives
+    whether WallpaperLayer renders a <video> or a background-image div */
+export function getWallpaperKind(canvasId: string = getActiveCanvasId()): WallpaperKind | null {
+  if (!urlCache.has(canvasId) && !loading.has(canvasId)) void load(canvasId);
+  return urlCache.get(canvasId)?.kind ?? null;
+}
+
+export function getServerWallpaperKind(): null {
+  return null;
+}
+
 export async function setWallpaper(canvasId: string, file: File): Promise<void> {
   await idbSet(wallpaperKey(canvasId), file);
   const previous = urlCache.get(canvasId);
-  if (previous) URL.revokeObjectURL(previous);
-  urlCache.set(canvasId, URL.createObjectURL(file));
+  if (previous) URL.revokeObjectURL(previous.url);
+  urlCache.set(canvasId, { url: URL.createObjectURL(file), kind: kindOf(file) });
   listeners.forEach((listener) => listener());
 }
 
 export async function clearWallpaper(canvasId: string): Promise<void> {
   await idbDelete(wallpaperKey(canvasId));
   const previous = urlCache.get(canvasId);
-  if (previous) URL.revokeObjectURL(previous);
+  if (previous) URL.revokeObjectURL(previous.url);
   urlCache.set(canvasId, null);
+  listeners.forEach((listener) => listener());
+}
+
+/** opt-in mouse-follow parallax on the wallpaper layer — off by default */
+export function getParallax(canvasId: string = getActiveCanvasId()): boolean {
+  return localStorage.getItem(parallaxKey(canvasId)) === "1";
+}
+
+export function getServerParallax(): boolean {
+  return false;
+}
+
+export function setParallax(canvasId: string, enabled: boolean) {
+  localStorage.setItem(parallaxKey(canvasId), enabled ? "1" : "0");
   listeners.forEach((listener) => listener());
 }
 

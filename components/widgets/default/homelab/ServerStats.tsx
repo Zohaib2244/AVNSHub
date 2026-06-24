@@ -3,12 +3,12 @@ import "./ServerStats.css";
 
 import { Cpu, MemoryStick, HardDrive, Network } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
-import { formatBytes, formatRate, type HomelabStatusV2 } from "@/lib/homelab";
+import { formatBytes, formatRate, type HostTelemetry } from "@/lib/homelab";
 
 export function ServerStats() {
-  const { data } = usePolling<HomelabStatusV2>("/api/homelab-v2", 60_000);
+  const { data } = usePolling<HostTelemetry>("/api/system-stats", 60_000);
 
-  const host = data?.host ?? null;
+  const host = data ?? null;
   const drives = host?.drives ?? [];
   const storagePct = drives.length > 0 ? drives.reduce((sum, d) => sum + d.used_pct, 0) / drives.length : null;
 
@@ -49,9 +49,9 @@ export function ServerStats() {
 }
 
 export function ServerStatsMore() {
-  const { data } = usePolling<HomelabStatusV2>("/api/homelab-v2", 60_000);
+  const { data } = usePolling<HostTelemetry>("/api/system-stats", 60_000);
 
-  const host = data?.host ?? null;
+  const host = data ?? null;
   if (!host) return <div className="block-sub">no host data</div>;
   const drives = host.drives;
 

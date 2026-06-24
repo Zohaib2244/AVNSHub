@@ -92,7 +92,7 @@ export function WidgetShell({
 
   const body = (
     <>
-      {!flags.customHeader && (
+      {!flags.customHeader && settings.showHeader !== false && (
         <div className="block-label">
           <Icon size={14} strokeWidth={1.75} />
           {manifest.title}
