@@ -25,6 +25,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { CanvasSwitcher } from "@/components/dashboard/CanvasSwitcher";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { DEFAULT_ORDER, WIDGETS, getManifest, type WidgetManifest } from "@/config/widgets";
 import { THEME_PACKS } from "@/config/themes";
@@ -137,31 +138,37 @@ export function HubCorePanel() {
     <div ref={panelRef} className="hub-core hub-core-slot">
       <button
         type="button"
-        className={`hub-core-btn${editMode ? " active" : ""}`}
+        className={`hub-core-btn edge-btn${editMode ? " active" : ""}`}
         onClick={editMode ? lockLayout : startEdit}
         aria-label={editMode ? "exit edit mode" : "enter edit mode"}
         title={editMode ? "exit edit mode" : "enter edit mode"}
       >
         {editMode ? <Lock size={14} strokeWidth={1.75} /> : <Wrench size={14} strokeWidth={1.75} />}
+        <span className="edge-btn-label">{editMode ? "lock" : "edit"}</span>
       </button>
       <button
         type="button"
-        className={`hub-core-btn${activeTab === "settings" ? " active" : ""}`}
+        className={`hub-core-btn edge-btn${activeTab === "settings" ? " active" : ""}`}
         onClick={() => setActiveTab((tab) => (tab === "settings" ? null : "settings"))}
         aria-label={activeTab === "settings" ? "close avn hub core settings" : "open avn hub core settings"}
         title="avn hub core settings"
       >
         <Settings size={14} strokeWidth={1.75} />
+        <span className="edge-btn-label">settings</span>
       </button>
       <button
         type="button"
-        className={`hub-core-btn${activeTab === "widgets" ? " active" : ""}`}
+        className={`hub-core-btn edge-btn${activeTab === "widgets" ? " active" : ""}`}
         onClick={() => setActiveTab((tab) => (tab === "widgets" ? null : "widgets"))}
         aria-label={activeTab === "widgets" ? "close widget manager" : "open widget manager"}
         title="widget manager"
       >
         <LayoutGrid size={14} strokeWidth={1.75} />
+        <span className="edge-btn-label">widgets</span>
       </button>
+
+      <div className="hub-core-divider" aria-hidden />
+      <CanvasSwitcher />
 
       <AnimatePresence>
         {activeTab && (

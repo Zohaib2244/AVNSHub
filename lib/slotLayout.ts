@@ -5,6 +5,14 @@
 // "visible" — there's no hidden flag, removing a widget just drops it back
 // into the unplaced pool. sanitize() drops invalid/overlapping entries back
 // to that pool rather than trying to auto-correct them.
+//
+// Canvases (lib/canvases.ts) layer multiple named arrangements on top of this
+// one store: each canvas gets its own localStorage slot under
+// slotLayoutKey(canvasId), and this module reloads `state` whenever the
+// active canvas changes (subscribed once at module load below). The
+// DEFAULT_CANVAS_ID canvas keeps the baked-in buildDefaultState() arrangement
+// for backwards compatibility; every other canvas starts from
+// buildEmptyState() — a blank slate the user fills in per-canvas.
 
 import {
   DEFAULT_FRAME_RATIOS,
@@ -20,6 +28,7 @@ import {
 import { WIDGETS, getManifest, resolveSettings, type SettingsValues } from "@/config/widgets";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
+import { DEFAULT_CANVAS_ID, getActiveCanvasId, slotLayoutKey, subscribeCanvases } from "@/lib/canvases";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
 
@@ -46,11 +55,13 @@ export type SlotLayoutState = {
   frameRatios: FrameRatios;
 };
 
-const STORAGE_KEY = "nutmag-slot-layout";
 const listeners = new Set<() => void>();
 
 let state: SlotLayoutState | null = null;
 let defaultState: SlotLayoutState | null = null;
+let emptyState: SlotLayoutState | null = null;
+/** which canvas `state` currently holds — null until first load */
+let currentCanvasId: string | null = null;
 
 function rectOf(instance: SlotWidgetInstance): Rect {
   return { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
@@ -109,6 +120,25 @@ function buildDefaultState(): SlotLayoutState {
     };
   }
   return defaultState;
+}
+
+/** the starting state for any canvas other than DEFAULT_CANVAS_ID — a blank
+    region grid with nothing placed, so a freshly created canvas is empty
+    rather than a duplicate of the baked-in default arrangement */
+function buildEmptyState(): SlotLayoutState {
+  if (!emptyState) {
+    emptyState = {
+      version: 3,
+      regionDims: { ...REGION_GRID },
+      frameRatios: {
+        columns: [...DEFAULT_FRAME_RATIOS.columns] as FrameRatios["columns"],
+        centerRows: [...DEFAULT_FRAME_RATIOS.centerRows] as FrameRatios["centerRows"],
+      },
+      widgets: [],
+      terminalWidgetId: null,
+    };
+  }
+  return emptyState;
 }
 
 function isRegionId(value: unknown): value is SlotRegionId {
@@ -230,18 +260,24 @@ function sanitize(raw: unknown): SlotLayoutState | null {
   return { version: 3, widgets, terminalWidgetId, regionDims, frameRatios };
 }
 
+function loadForCanvas(canvasId: string): SlotLayoutState {
+  let next = canvasId === DEFAULT_CANVAS_ID ? buildDefaultState() : buildEmptyState();
+  try {
+    const raw = localStorage.getItem(slotLayoutKey(canvasId));
+    if (raw) {
+      const cleaned = sanitize(JSON.parse(raw));
+      if (cleaned) next = cleaned;
+    }
+  } catch {
+    // corrupt saved state — keep the default/empty starting point
+  }
+  return next;
+}
+
 export function getSlotLayout(): SlotLayoutState {
   if (state === null) {
-    state = buildDefaultState();
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const cleaned = sanitize(JSON.parse(raw));
-        if (cleaned) state = cleaned;
-      }
-    } catch {
-      // corrupt saved state — keep the default
-    }
+    currentCanvasId = getActiveCanvasId();
+    state = loadForCanvas(currentCanvasId);
   }
   return state;
 }
@@ -252,7 +288,7 @@ export function getServerSlotLayout(): SlotLayoutState {
 
 function persist() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(slotLayoutKey(currentCanvasId ?? getActiveCanvasId()), JSON.stringify(state));
   } catch {
     // storage full/blocked — state still applies for this session
   }
@@ -270,6 +306,17 @@ export function subscribeSlotLayout(listener: () => void) {
     listeners.delete(listener);
   };
 }
+
+// reload `state` whenever the active canvas changes — keeps every
+// useSyncExternalStore(subscribeSlotLayout, getSlotLayout, ...) consumer in
+// sync without each of them needing to know canvases exist
+subscribeCanvases(() => {
+  const activeId = getActiveCanvasId();
+  if (state !== null && activeId === currentCanvasId) return;
+  currentCanvasId = activeId;
+  state = loadForCanvas(activeId);
+  listeners.forEach((listener) => listener());
+});
 
 /** widgets that aren't placed in any region and aren't the terminal occupant
     — the candidates offered by the placement popover */
@@ -432,10 +479,13 @@ export function setFrameRatios(ratios: FrameRatios) {
   commit({ ...current, frameRatios: next });
 }
 
+/** reset the active canvas's layout back to its starting point — the baked-in
+    arrangement for DEFAULT_CANVAS_ID, or an empty grid for any other canvas */
 export function resetSlotLayout() {
-  state = buildDefaultState();
+  const id = currentCanvasId ?? getActiveCanvasId();
+  state = id === DEFAULT_CANVAS_ID ? buildDefaultState() : buildEmptyState();
   try {
-    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(slotLayoutKey(id));
   } catch {
     // ignore
   }

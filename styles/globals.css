@@ -1344,6 +1344,125 @@ body {
   left: auto;
 }
 
+/* ─── edge-dock hover-expand (wrench/settings/widgets + AVN Hub Canvases) ───
+   every button in the right-edge column shares this: icon-only and 28×32 at
+   rest, grows taller on hover/focus to reveal a vertical text label without
+   widening the dock. Height is the only thing animated so the column's
+   width — and its translateX(100%) attachment to the frame edge — never
+   moves. */
+
+.hub-core.hub-core-slot .hub-core-btn.edge-btn {
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 7px;
+  gap: 3px;
+  overflow: hidden;
+  transition: height 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), color 0.15s ease, border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.hub-core.hub-core-slot .hub-core-btn.edge-btn:hover,
+.hub-core.hub-core-slot .hub-core-btn.edge-btn:focus-visible {
+  height: 76px;
+}
+
+.edge-btn-label {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  white-space: nowrap;
+  color: inherit;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.hub-core-btn.edge-btn:hover .edge-btn-label,
+.hub-core-btn.edge-btn:focus-visible .edge-btn-label {
+  opacity: 1;
+}
+
+.hub-core-divider {
+  width: 28px;
+  margin: 2px 0;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ─── AVN Hub Canvases (canvas switcher) ────────────────────────── */
+
+.canvas-edge-group {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.canvas-pill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  /* deliberately no `overflow: hidden` here (even axis-split clip/auto
+     combinations still clip absolutely-positioned descendants) — the
+     rename/delete flyout (.canvas-manage-panel) is an absolutely-positioned
+     descendant that escapes to the left and must not be clipped. The
+     height: 0 -> auto collapse transition just shows pills a little early
+     instead of cleanly clipping them; an acceptable trade for a working
+     flyout. */
+}
+
+.canvas-pill-wrap {
+  position: relative;
+}
+
+.canvas-pill-glyph {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.64rem;
+  font-weight: 600;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.canvas-manage-panel {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 8px);
+  z-index: 5;
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+
+.canvas-manage-input {
+  width: 100%;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.7rem;
+  outline: none;
+}
+
+.canvas-manage-input:focus {
+  border-color: var(--accent-orange);
+}
+
+.canvas-manage-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
 .hub-core-panel {
   position: absolute;
   top: calc(100% + 8px);
