@@ -11,6 +11,7 @@ This folder is the long-form documentation for AVN Hub. The root README stays sh
 | [AVN_HUB.md](AVN_HUB.md) | Hub Core, layout, theme, preferences, persistence, and runtime reference |
 | [CREATING_WIDGETS.md](CREATING_WIDGETS.md) | Widget authoring rules for humans and LLMs |
 | [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md) | Optional local LLM setup through Bonfire plus CLI chat fallback |
+| [WHATSAPP_BRIDGE_SETUP.md](WHATSAPP_BRIDGE_SETUP.md) | Local WhatsApp Web bridge for the WhatsApp group widget |
 
 ## Specialized Docs
 

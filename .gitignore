@@ -27,6 +27,9 @@ yarn-error.log*
 .env*.local
 .env
 
+# local WhatsApp Web bridge session
+.whatsapp-auth/
+
 # vercel
 .vercel
 

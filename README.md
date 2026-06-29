@@ -21,6 +21,15 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
+Stop helpers:
+
+```bash
+npm run stop:hub         # stop AVN Hub on port 3000
+npm run stop:nutbot-llm  # stop Bonfire + llama.cpp local LLM ports
+npm run stop:whatsapp    # stop the local WhatsApp bridge
+npm run stop:all         # stop all local services
+```
+
 For Docker, Tailscale, environment variables, and the dev-server runtime explanation, see [docs/SETUP.md](docs/SETUP.md).
 
 ## What You Get
@@ -45,6 +54,7 @@ The README is only the doorway. The actual docs are split by job:
 | [docs/AVN_HUB.md](docs/AVN_HUB.md) | Hub Core, layout, theme, preferences, persistence |
 | [docs/CREATING_WIDGETS.md](docs/CREATING_WIDGETS.md) | Hand-writing or LLM-authoring widgets |
 | [docs/NUTBOT_CHAT_SETUP.md](docs/NUTBOT_CHAT_SETUP.md) | Local LLM via Bonfire plus CLI chat fallback |
+| [docs/WHATSAPP_BRIDGE_SETUP.md](docs/WHATSAPP_BRIDGE_SETUP.md) | Local WhatsApp bridge for group-chat widgets |
 | [wallpaper/README.md](wallpaper/README.md) | Wallpaper Engine export build |
 
 ## Custom Widgets

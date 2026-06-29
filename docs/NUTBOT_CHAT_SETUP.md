@@ -183,6 +183,23 @@ If `NUTBOT_CHAT_URL` is omitted, AVN Hub defaults to `http://127.0.0.1:8000`.
 
 With Bonfire reachable and `chatBackend` set to `auto`, NutBot uses Bonfire. The NSFW and search toggles appear only in this mode.
 
+### 8. Stop The Local LLM Stack
+
+If Bonfire and llama.cpp are running in foreground terminals, press `Ctrl+C` in each terminal.
+
+If they are running in the background, AVN Hub includes a helper that stops the default Bonfire and llama.cpp ports:
+
+```bash
+npm run stop:nutbot-llm
+```
+
+The helper stops:
+
+- Bonfire: the port from `NUTBOT_CHAT_URL`, default `8000`.
+- llama.cpp: `NUTBOT_LLAMA_PORT` or `LLAMA_SERVER_PORT`, default `8080`.
+
+If you run llama.cpp on another port, set one of those env vars before using the stop command.
+
 ## Option B: CLI Harness Fallback
 
 Install and authenticate at least one supported CLI on the same host/container that runs AVN Hub:

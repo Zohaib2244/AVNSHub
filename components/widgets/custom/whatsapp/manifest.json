@@ -1,0 +1,43 @@
+{
+  "title": "whatsapp",
+  "iconName": "Wifi",
+  "sizes": ["M", "L"],
+  "orientations": ["h", "v"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "bridgeUrl",
+      "label": "bridge url",
+      "type": "text",
+      "default": "",
+      "placeholder": "http://127.0.0.1:3333"
+    },
+    {
+      "key": "groupId",
+      "label": "group id",
+      "type": "text",
+      "default": "",
+      "placeholder": "120363...@g.us"
+    },
+    {
+      "key": "displayName",
+      "label": "display name",
+      "type": "text",
+      "default": "group chat"
+    },
+    {
+      "key": "limit",
+      "label": "message limit",
+      "type": "number",
+      "default": 20,
+      "min": 5,
+      "max": 50
+    },
+    {
+      "key": "draftMode",
+      "label": "draft mode",
+      "type": "toggle",
+      "default": true
+    }
+  ]
+}
