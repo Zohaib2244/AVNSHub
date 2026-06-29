@@ -179,7 +179,11 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”œâ”€â”€ styles/
 â”‚   â””â”€â”€ globals.css           # tokens (+ theme packs), grid, card/per-size CSS, backdrop modes
 â”œâ”€â”€ docs/
+â”‚   â”œâ”€â”€ README.md             # Documentation map / table of contents
+â”‚   â”œâ”€â”€ SETUP.md              # Install, env vars, Docker, Tailscale, runtime model
+â”‚   â”œâ”€â”€ FEATURES.md           # Product tour and screenshots
 â”‚   â”œâ”€â”€ CREATING_WIDGETS.md   # widget authoring guide (humans + LLMs)
+â”‚   â”œâ”€â”€ NUTBOT_CHAT_SETUP.md  # optional Bonfire/local LLM + CLI chat fallback setup
 â”‚   â””â”€â”€ AVN_HUB.md            # Hub Core / layout / theme / persistence reference
 â”œâ”€â”€ CLAUDE.md                 # This file
 â””â”€â”€ .env.local                # All API keys â€” never commit this

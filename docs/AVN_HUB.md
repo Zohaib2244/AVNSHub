@@ -227,6 +227,8 @@ Available in Hub Core settings, or via the `lib/prefs.ts` store:
 |------------|---------|-------------|
 | **Live data polling** | on | When off, all `usePolling` hooks pause â€” no API calls are made. Useful when working offline or debugging. |
 | **Boot sequence intro** | on | The retro terminal "boot log" animation that plays on first load. Turn off for an instant card. |
+| **NutBot chat backend** | auto | `auto` prefers Bonfire and falls back through the shared CLI harness chain; can also be pinned to Bonfire, a specific harness, or off. See [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md). |
+| **Widget Creator enabled** | on | When off, the creator tab shows a disabled placeholder and does not mount `WidgetCreatorPanel`. |
 
 Persisted to the legacy `localStorage["nutmag-prefs"]` key.
 
@@ -260,7 +262,7 @@ layouts and preferences.
 | `nutmag-backdrop` | Canvas backdrop mode (`solid`, `blur`, `transparent`) |
 | `nutmag-widget-backdrop` | Global widget backdrop default (`solid`, `blur`, `transparent`) |
 | `nutmag-parallax` | Mouse parallax on/off |
-| `nutmag-prefs` | Global prefs (polling, boot sequence) |
+| `nutmag-prefs` | Global prefs (polling, boot sequence, NutBot chat backend, Widget Creator enabled flag, shared harness choice/chain) |
 | `nutmag-sessions` | Session tracker (uptime stats) |
 | `nutmag-ambient-tracks` / `-selected` / `-volume` | Ambient Sound custom track registry, selected track, volume (global, not per-canvas) |
 

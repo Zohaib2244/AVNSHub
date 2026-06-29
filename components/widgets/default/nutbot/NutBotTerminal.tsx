@@ -4,7 +4,7 @@ import "./creator/WidgetCreatorPanel.css";
 import "./chat/NutBotChat.css";
 
 // NutBot's full terminal: an ambient log ticker, a conversational chat tab
-// (talks to a self-hosted Bonfire/Dolphin model), one or more REAL cross-platform
+// (talks to Bonfire/local LLM or a CLI harness fallback), one or more REAL cross-platform
 // shell tabs (each a live pty on the host via /api/nutbot-shell), and the widget
 // creator. Lives in the face widget's click-to-expand overlay, so the shells
 // only mount when the terminal is actually open.
@@ -31,7 +31,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.1 idle, awaiting input...",
+  "[info] nutbot v2.1 custom llm ready...",
 ];
 
 type TabKind = "log" | "chat" | "shell" | "creator";
