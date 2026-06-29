@@ -1,9 +1,38 @@
 "use client";
 
-import { type CSSProperties, type FormEvent, useMemo, useState } from "react";
-import { MessageCircle, RefreshCw, Send, Users, WifiOff } from "lucide-react";
+import { type CSSProperties, type FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { Bot, MessageCircle, RefreshCw, Send, Users, WifiOff } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { usePolling } from "@/lib/usePolling";
+
+type NutbotBackend = "bonfire" | "claude" | "codex" | "opencode";
+type NutbotTrigger = "latest" | "mention";
+
+const MENTION_RE = /@nutbot\b/i;
+const NUTBOT_CONTEXT_MESSAGES = 10;
+
+function lastHandledKey(groupId: string): string {
+  return `nutmag-whatsapp-lastid-${groupId}`;
+}
+
+function conversationKey(groupId: string): string {
+  return `nutmag-whatsapp-conv-${groupId}`;
+}
+
+function readLocal(key: string): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeLocal(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {}
+}
 
 type WhatsAppResponse = {
   connected?: boolean;
@@ -402,9 +431,21 @@ export function WhatsappWidget() {
     : "group chat";
   const limit = clampLimit(settings.limit);
   const draftMode = settings.draftMode !== false;
+  const nutbotReplyEnabled = settings.nutbotReplyEnabled === true;
+  const nutbotTrigger: NutbotTrigger = settings.nutbotTrigger === "latest" ? "latest" : "mention";
+  const nutbotPollSeconds = Math.min(300, Math.max(10, Number(settings.nutbotPollSeconds) || 30));
+  const nutbotAutoSend = settings.nutbotAutoSend === true;
+  const nutbotReplyPrefix = settings.nutbotReplyPrefix !== false;
+  const nutbotBackend: NutbotBackend =
+    settings.nutbotBackend === "claude" || settings.nutbotBackend === "codex" || settings.nutbotBackend === "opencode"
+      ? settings.nutbotBackend
+      : "bonfire";
+  const nutbotBonfireNsfw = settings.nutbotBonfireNsfw === true;
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState("");
+  const [nutbotStatus, setNutbotStatus] = useState("");
+  const nutbotBusyRef = useRef(false);
 
   const pollUrl = useMemo(() => {
     const params = new URLSearchParams({
@@ -415,7 +456,8 @@ export function WhatsappWidget() {
     return `/api/whatsapp?${params.toString()}`;
   }, [bridgeUrl, groupId, limit]);
 
-  const { data, refresh } = usePolling<WhatsAppResponse>(pollUrl, 15_000);
+  const pollIntervalMs = nutbotReplyEnabled ? nutbotPollSeconds * 1000 : 15_000;
+  const { data, refresh } = usePolling<WhatsAppResponse>(pollUrl, pollIntervalMs);
 
   const messages = useMemo(() => normalizeMessages(data?.messages), [data?.messages]);
   const visibleCount = size === "S" ? 3 : size === "M" ? 8 : limit;
@@ -458,6 +500,153 @@ export function WhatsappWidget() {
     }
   }
 
+  // shared by manual send (above) and NutBot's auto-send path below — posts
+  // straight to the bridge, no draft-state involvement
+  async function postWhatsappMessage(message: string): Promise<void> {
+    const res = await fetch("/api/whatsapp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bridgeUrl, groupId, message }),
+    });
+    const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+    if (!res.ok || payload?.error) {
+      throw new Error(payload?.error ?? `send failed (${res.status})`);
+    }
+  }
+
+  // NutBot reading + replying: on every poll tick (interval = nutbotPollSeconds
+  // while this is on), look at the newest non-self message. If it's new (not
+  // already handled) and matches the trigger mode, ask /api/nutbot-chat for a
+  // reply — same backend abstraction (bonfire/claude/codex/opencode) the NutBot
+  // chat tab uses — then either auto-send it or drop it into the draft box for
+  // manual review. One Bonfire conversation per WhatsApp group persists across
+  // replies (so its memory layer can build context over time); harness
+  // backends are stateless per reply (no natural multi-turn session here).
+  useEffect(() => {
+    if (!nutbotReplyEnabled || !configured || !validBridge || nutbotBusyRef.current) return;
+
+    const newestToOldest = messages; // already sorted newest-first by normalizeMessages
+    if (newestToOldest.length === 0) return;
+
+    const lastHandledId = readLocal(lastHandledKey(groupId));
+
+    // first time this group sees nutbot reply mode: baseline to "now" so we
+    // don't reply to the entire existing history at once
+    if (lastHandledId === null) {
+      writeLocal(lastHandledKey(groupId), newestToOldest[0].id);
+      return;
+    }
+
+    if (lastHandledId === newestToOldest[0].id) return; // already handled the newest
+
+    const candidate = newestToOldest.find((message) => !message.fromMe);
+    if (!candidate || candidate.id === lastHandledId) return;
+    if (nutbotTrigger === "mention" && !MENTION_RE.test(candidate.text)) {
+      // not a match, but still the newest — mark handled so we don't re-check it forever
+      writeLocal(lastHandledKey(groupId), newestToOldest[0].id);
+      return;
+    }
+
+    const contextLines = newestToOldest
+      .slice(0, NUTBOT_CONTEXT_MESSAGES)
+      .slice()
+      .reverse()
+      .map((message) => `${message.fromMe ? "NutBot" : message.sender}: ${message.text}`)
+      .join("\n");
+
+    const promptMessage = [
+      `[WhatsApp group "${groupName}"] Recent messages:`,
+      contextLines,
+      "",
+      `Reply naturally as NutBot to ${candidate.sender}'s message above: "${candidate.text}"`,
+    ].join("\n");
+
+    nutbotBusyRef.current = true;
+
+    (async () => {
+      setNutbotStatus("nutbot is replying...");
+      try {
+        const storedConvId = nutbotBackend === "bonfire" ? readLocal(conversationKey(groupId)) : null;
+        const res = await fetch("/api/nutbot-chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            backend: nutbotBackend,
+            message: promptMessage,
+            conversationId: storedConvId,
+            nsfw: nutbotBackend === "bonfire" ? nutbotBonfireNsfw : false,
+            searchEnabled: false,
+            history: [],
+          }),
+        });
+
+        if (!res.ok || !res.body) {
+          throw new Error(`${nutbotBackend} backend unavailable (${res.status})`);
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let reply = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const frame = JSON.parse(line) as { type?: string; data?: unknown };
+              if (frame.type === "token") reply += String(frame.data ?? "");
+              else if (frame.type === "error") throw new Error(String(frame.data ?? "generation failed"));
+              else if ((frame.type === "conversation" || frame.type === "done") && nutbotBackend === "bonfire") {
+                const convData = frame.data as { conversation_id?: string } | undefined;
+                if (convData?.conversation_id) writeLocal(conversationKey(groupId), convData.conversation_id);
+              }
+            } catch {
+              // ignore malformed lines, keep streaming
+            }
+          }
+        }
+
+        reply = reply.trim();
+        if (!reply) throw new Error(`${nutbotBackend} returned no reply`);
+        if (nutbotReplyPrefix) reply = `nutbot: ${reply}`;
+
+        if (nutbotAutoSend) {
+          await postWhatsappMessage(reply);
+          refresh();
+          setNutbotStatus("nutbot replied");
+        } else {
+          setDraft(reply);
+          setNutbotStatus("nutbot drafted a reply — review and send");
+        }
+
+        writeLocal(lastHandledKey(groupId), candidate.id);
+      } catch (err) {
+        setNutbotStatus(`nutbot reply failed: ${err instanceof Error ? err.message : "unknown error"}`);
+        // don't mark handled on failure — retry next poll tick
+      } finally {
+        nutbotBusyRef.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run when the polled message list actually changes or settings change; postWhatsappMessage/refresh are stable per render and don't need to retrigger this
+  }, [
+    messages,
+    nutbotReplyEnabled,
+    nutbotTrigger,
+    nutbotBackend,
+    nutbotBonfireNsfw,
+    nutbotAutoSend,
+    nutbotReplyPrefix,
+    groupId,
+    groupName,
+    configured,
+    validBridge,
+  ]);
+
   if (!bridgeUrl) {
     return <SetupPlaceholder text="Add the bridge URL in widget settings. No .env.local is required." />;
   }
@@ -497,6 +686,13 @@ export function WhatsappWidget() {
         <div style={noticeStyle}>
           <WifiOff aria-hidden="true" size={13} strokeWidth={1.8} />
           <span>{responseError || "bridge reports offline"}</span>
+        </div>
+      )}
+
+      {nutbotReplyEnabled && nutbotStatus && (
+        <div style={noticeStyle}>
+          <Bot aria-hidden="true" size={13} strokeWidth={1.8} style={{ color: "var(--accent-cyan)" }} />
+          <span>{nutbotStatus}</span>
         </div>
       )}
 
@@ -544,7 +740,11 @@ export function WhatsappWidget() {
 
       {size === "L" && (
         <div className="block-sub" style={{ flex: "0 0 auto" }}>
-          replies are manual only - nothing is sent unless you press send.
+          {nutbotReplyEnabled
+            ? nutbotAutoSend
+              ? `nutbot (${nutbotBackend}) auto-replies ${nutbotTrigger === "mention" ? "when tagged @nutbot" : "to every new message"}.`
+              : `nutbot (${nutbotBackend}) drafts replies ${nutbotTrigger === "mention" ? "when tagged @nutbot" : "to every new message"} - nothing is sent until you press send.`
+            : "replies are manual only - nothing is sent unless you press send."}
         </div>
       )}
     </div>

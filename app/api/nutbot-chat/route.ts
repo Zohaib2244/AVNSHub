@@ -22,9 +22,27 @@ let presetIdsCache: PresetIds | null = null;
 async function findOrCreatePreset(base: string, persona: PersonaPreset): Promise<string> {
   const listRes = await fetch(`${base}/presets`);
   if (listRes.ok) {
-    const presets = (await listRes.json()) as Array<{ id: string; name: string }>;
+    const presets = (await listRes.json()) as Array<{ id: string; name: string; description: string; system_prompt: string }>;
     const existing = presets.find((p) => p.name === persona.name);
-    if (existing) return existing.id;
+    if (existing) {
+      // presets are found by name, not content — keep the Bonfire-side copy in
+      // sync with lib/nutbot/persona.ts on every server start instead of
+      // silently serving a stale prompt from whenever the preset was first
+      // created (this used to require deleting the preset by hand to pick up
+      // edits here)
+      if (existing.description !== persona.description || existing.system_prompt !== persona.system_prompt) {
+        await fetch(`${base}/presets/${existing.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            description: persona.description,
+            system_prompt: persona.system_prompt,
+            keywords: persona.keywords,
+          }),
+        }).catch(() => {}); // best-effort — stale prompt beats a broken chat if this fails
+      }
+      return existing.id;
+    }
   }
 
   const createRes = await fetch(`${base}/presets`, {
