@@ -1,0 +1,28 @@
+{
+  "description": "AVN Hub — a living personal dashboard, live on your desktop.",
+  "file": "index.html",
+  "general": {
+    "properties": {
+      "palette": {
+        "order": 0,
+        "text": "Color palette",
+        "type": "combo",
+        "value": "ember",
+        "options": [
+          { "label": "Ember (default)", "value": "ember" },
+          { "label": "Slate", "value": "slate" },
+          { "label": "Moss", "value": "moss" },
+          { "label": "Plum", "value": "plum" },
+          { "label": "Reef", "value": "reef" },
+          { "label": "Berry", "value": "raspberry" },
+          { "label": "Circuit", "value": "circuit" },
+          { "label": "Graphite", "value": "graphite" }
+        ]
+      }
+    },
+    "supportsaudioprocessing": true
+  },
+  "title": "AVN Hub",
+  "type": "web",
+  "visibility": "private"
+}
