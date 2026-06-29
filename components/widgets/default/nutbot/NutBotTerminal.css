@@ -112,6 +112,35 @@
   word-break: break-word;
 }
 
+.term-disabled {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  height: 100%;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.term-disabled-btn {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--accent-orange);
+  background: transparent;
+  color: var(--accent-orange);
+  cursor: pointer;
+}
+
+.term-disabled-btn:hover {
+  background: var(--accent-orange);
+  color: var(--bg-card);
+}
+
 .term-output {
   color: var(--text-muted);
 }

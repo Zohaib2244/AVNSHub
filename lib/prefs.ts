@@ -4,11 +4,17 @@
 
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "./widget-creator/harnessAdapters";
 
+export type ChatBackend = "auto" | "bonfire" | HarnessId | "off";
+
 export type Prefs = {
   /** false = every usePolling consumer fetches once and stops refreshing */
   pollingEnabled: boolean;
   /** false = skip the boot-sequence intro entirely */
   bootSequence: boolean;
+  /** NutBot chat backend selector */
+  chatBackend: ChatBackend;
+  /** false = hide the widget creator without probing/spawning harnesses */
+  creatorEnabled: boolean;
   /** active CLI harness for the widget creator */
   activeHarness: HarnessId;
   /** ordered fallback chain for rate-limit auto-switching */
@@ -18,6 +24,8 @@ export type Prefs = {
 export const DEFAULT_PREFS: Prefs = {
   pollingEnabled: true,
   bootSequence: true,
+  chatBackend: "auto",
+  creatorEnabled: true,
   activeHarness: "claude",
   harnessChain: [...HARNESS_CHAIN_DEFAULT],
 };
@@ -33,6 +41,10 @@ function isHarnessId(v: unknown): v is HarnessId {
   return typeof v === "string" && (VALID_HARNESS_IDS as string[]).includes(v);
 }
 
+function isChatBackend(v: unknown): v is ChatBackend {
+  return v === "auto" || v === "bonfire" || v === "off" || isHarnessId(v);
+}
+
 function sanitize(raw: unknown): Prefs {
   const stored = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const chain = Array.isArray(stored.harnessChain)
@@ -42,6 +54,9 @@ function sanitize(raw: unknown): Prefs {
     pollingEnabled:
       typeof stored.pollingEnabled === "boolean" ? stored.pollingEnabled : DEFAULT_PREFS.pollingEnabled,
     bootSequence: typeof stored.bootSequence === "boolean" ? stored.bootSequence : DEFAULT_PREFS.bootSequence,
+    chatBackend: isChatBackend(stored.chatBackend) ? stored.chatBackend : DEFAULT_PREFS.chatBackend,
+    creatorEnabled:
+      typeof stored.creatorEnabled === "boolean" ? stored.creatorEnabled : DEFAULT_PREFS.creatorEnabled,
     activeHarness: isHarnessId(stored.activeHarness) ? stored.activeHarness : DEFAULT_PREFS.activeHarness,
     harnessChain: chain.length > 0 ? chain : DEFAULT_PREFS.harnessChain,
   };

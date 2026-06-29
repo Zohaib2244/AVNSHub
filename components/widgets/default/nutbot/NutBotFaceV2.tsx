@@ -15,6 +15,8 @@ function signalToExpression(s: Signal): string {
     case "thinking":       return "thinking";
     case "error":          return "error";
     case "working":        return "focused";
+    case "speaking":       return "happy";
+    case "browsing":       return "focused";
     default:               return "idle";
   }
 }

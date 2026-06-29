@@ -32,7 +32,12 @@ export function HarnessPill() {
   }, [open]);
 
   function selectHarness(id: HarnessId) {
-    setPrefs({ activeHarness: id });
+    setPrefs({ activeHarness: id, creatorEnabled: true });
+    setOpen(false);
+  }
+
+  function disableCreator() {
+    setPrefs({ creatorEnabled: false });
     setOpen(false);
   }
 
@@ -47,8 +52,9 @@ export function HarnessPill() {
     setPrefs({ harnessChain: chain });
   }
 
-  const activeLabel = HARNESS_ADAPTERS[prefs.activeHarness]?.label ?? prefs.activeHarness;
-  const activeStatus = statuses.find((s) => s.id === prefs.activeHarness);
+  const creatorOff = !prefs.creatorEnabled;
+  const activeLabel = creatorOff ? "creator off" : HARNESS_ADAPTERS[prefs.activeHarness]?.label ?? prefs.activeHarness;
+  const activeStatus = creatorOff ? undefined : statuses.find((s) => s.id === prefs.activeHarness);
 
   return (
     <div className="hp-root" ref={popoverRef}>
@@ -58,7 +64,7 @@ export function HarnessPill() {
         onClick={() => setOpen((o) => !o)}
         aria-label="select harness"
       >
-        <span className={`hp-dot${activeStatus?.available === false ? " unavailable" : ""}`} />
+        <span className={`hp-dot${creatorOff || activeStatus?.available === false ? " unavailable" : ""}`} />
         ⚡ {activeLabel}
         <ChevronDown size={9} strokeWidth={2} className={open ? "hp-chevron open" : "hp-chevron"} />
       </button>
@@ -72,7 +78,7 @@ export function HarnessPill() {
             return (
               <div
                 key={id}
-                className={`hp-item${prefs.activeHarness === id ? " active" : ""}${!available ? " unavailable" : ""}`}
+                className={`hp-item${prefs.creatorEnabled && prefs.activeHarness === id ? " active" : ""}${!available ? " unavailable" : ""}`}
                 draggable
                 onDragStart={() => setDragging(id)}
                 onDragOver={(e) => { e.preventDefault(); if (dragging && dragging !== id) reorder(dragging, id); }}
@@ -84,10 +90,18 @@ export function HarnessPill() {
                 <span className={`hp-dot${!available ? " unavailable" : ""}`} />
                 <span className="hp-item-label">{HARNESS_ADAPTERS[id]?.label ?? id}</span>
                 {!available && <span className="hp-badge">not installed</span>}
-                {prefs.activeHarness === id && <span className="hp-badge active">active</span>}
+                {prefs.creatorEnabled && prefs.activeHarness === id && <span className="hp-badge active">active</span>}
               </div>
             );
           })}
+          <div
+            className={`hp-item${creatorOff ? " active" : ""}`}
+            onClick={disableCreator}
+          >
+            <span className="hp-dot unavailable" />
+            <span className="hp-item-label">off</span>
+            {creatorOff && <span className="hp-badge active">active</span>}
+          </div>
           <div className="hp-popover-hint">drag to reorder fallback chain</div>
         </div>
       )}

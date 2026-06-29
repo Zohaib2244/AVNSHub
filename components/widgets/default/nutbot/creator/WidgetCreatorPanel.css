@@ -739,6 +739,15 @@
   transition: background 0.1s;
 }
 
+.hp-item-button {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
 .hp-item:hover {
   background: var(--bg-nested);
 }

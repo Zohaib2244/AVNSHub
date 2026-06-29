@@ -1,8 +1,10 @@
 "use client";
 import "./NutBotTerminal.css";
 import "./creator/WidgetCreatorPanel.css";
+import "./chat/NutBotChat.css";
 
-// NutBot's full terminal: an ambient log ticker, one or more REAL cross-platform
+// NutBot's full terminal: an ambient log ticker, a conversational chat tab
+// (talks to a self-hosted Bonfire/Dolphin model), one or more REAL cross-platform
 // shell tabs (each a live pty on the host via /api/nutbot-shell), and the widget
 // creator. Lives in the face widget's click-to-expand overlay, so the shells
 // only mount when the terminal is actually open.
@@ -11,13 +13,15 @@ import "./creator/WidgetCreatorPanel.css";
 // the underlying pty session and its scrollback survive — a tab is only torn
 // down when you close it.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, X } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
+import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
+import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
 
 export const LOG_MESSAGES = [
   "[ok] homelab uplink ... stable",
@@ -30,18 +34,20 @@ export const LOG_MESSAGES = [
   "[info] nutbot v2.1 idle, awaiting input...",
 ];
 
-type TabKind = "log" | "shell" | "creator";
+type TabKind = "log" | "chat" | "shell" | "creator";
 type TerminalTab = { id: string; title: string; kind: TabKind };
 type LogLine = { id: number; text: string };
 
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
 const INITIAL_TABS: TerminalTab[] = [
   { id: "log", title: "log", kind: "log" },
+  { id: "chat", title: "chat", kind: "chat" },
   { id: "shell-1", title: "shell 1", kind: "shell" },
   { id: "creator", title: "creator", kind: "creator" },
 ];
 
 export function NutBotTerminal() {
+  const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
@@ -153,7 +159,7 @@ export function NutBotTerminal() {
       </div>
 
       <div
-        className={`term-body${activeKind === "shell" ? " term-body-real" : ""}${activeKind === "creator" ? " term-body-creator" : ""}`}
+        className={`term-body${activeKind === "shell" ? " term-body-real" : ""}${activeKind === "creator" ? " term-body-creator" : ""}${activeKind === "chat" ? " term-body-chat" : ""}`}
         ref={bodyRef}
       >
         {activeKind === "log" && (
@@ -172,7 +178,20 @@ export function NutBotTerminal() {
           </AnimatePresence>
         )}
 
-        {activeKind === "creator" && <WidgetCreatorPanel />}
+        {activeKind === "chat" && <NutBotChat />}
+
+        {activeKind === "creator" && (
+          prefs.creatorEnabled ? (
+            <WidgetCreatorPanel />
+          ) : (
+            <div className="term-disabled">
+              <span>Widget Creator is turned off</span>
+              <button type="button" className="term-disabled-btn" onClick={() => setPrefs({ creatorEnabled: true })}>
+                turn on
+              </button>
+            </div>
+          )
+        )}
 
         {/* shells stay mounted across tab switches so their pty + scrollback
             persist; only the active one is visible */}

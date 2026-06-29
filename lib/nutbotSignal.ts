@@ -7,6 +7,8 @@ export type Signal =
   | { type: "thinking" }
   | { type: "error"; msg?: string }
   | { type: "working" }
+  | { type: "speaking" }
+  | { type: "browsing" }
   | null;
 
 let signal: Signal = null;
@@ -30,6 +32,9 @@ export function emitThinking()                { emit({ type: "thinking" }, 8000)
 export function emitError(msg?: string)       { emit({ type: "error", msg }, 4000); }
 // Long duration — caller is expected to call clearSignal() when work finishes
 export function emitWorking()                 { emit({ type: "working" }, 120_000); }
+// Chat-specific signals — caller clears explicitly when the reply finishes
+export function emitSpeaking()                { emit({ type: "speaking" }, 120_000); }
+export function emitBrowsing()                { emit({ type: "browsing" }, 30_000); }
 
 export function clearSignal() {
   signal = null;
