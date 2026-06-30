@@ -22,6 +22,7 @@ const _cookie_clicker = lazy(() => import("@/components/widgets/custom/cookie-cl
 const _office_game_dev = lazy(() => import("@/components/widgets/custom/office-game-dev/OfficeGameDevWidget").then((m) => ({ default: m.OfficeGameDevWidget })));
 const _notes = lazy(() => import("@/components/widgets/custom/notes/NotesWidget").then((m) => ({ default: m.NotesWidget })));
 const _quick_links = lazy(() => import("@/components/widgets/custom/quick-links/QuickLinksWidget").then((m) => ({ default: m.QuickLinksWidget })));
+const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -38,5 +39,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "office-game-dev": _office_game_dev,
   "notes": _notes,
   "quick-links": _quick_links,
+  "ambient-data": _ambient_data,
 // --- custom-map end ---
 };

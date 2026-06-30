@@ -605,7 +605,7 @@
     }
   },
   "quick-links": {
-    "title": "quick links",
+    "title": "quick-links",
     "iconName": "Server",
     "sizes": [
       "S",
@@ -620,6 +620,12 @@
       "orientation": "h"
     },
     "settings": [
+      {
+        "key": "zenMode",
+        "label": "zen mode",
+        "type": "toggle",
+        "default": false
+      },
       {
         "key": "density",
         "label": "density",
@@ -709,5 +715,22 @@
         "max": 20
       }
     ]
+  },
+  "ambient-data": {
+    "title": "ambient data",
+    "iconName": "Server",
+    "sizes": [
+      "M",
+      "L",
+      "S"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": []
   }
 }

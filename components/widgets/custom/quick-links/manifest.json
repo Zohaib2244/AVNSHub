@@ -1,10 +1,11 @@
 {
-  "title": "quick links",
+  "title": "quick-links",
   "iconName": "Server",
   "sizes": ["S", "M", "L"],
   "orientations": ["h"],
   "defaults": { "size": "M", "orientation": "h" },
   "settings": [
+    { "key": "zenMode", "label": "zen mode", "type": "toggle", "default": false },
     {
       "key": "density",
       "label": "density",

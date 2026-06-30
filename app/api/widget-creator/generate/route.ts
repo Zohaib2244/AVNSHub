@@ -1,8 +1,8 @@
 ﻿import { spawn } from "child_process";
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
-import { HARNESS_ADAPTERS, HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
-import { lineSignalsLimit, describeLimitReason, type LimitReason } from "@/lib/widget-creator/limitDetection";
+import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
+import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
 import {
   readRegistry,
   componentName,
@@ -98,7 +98,15 @@ ${creatingWidgetsDoc}
 ## Widget spec from the user
 
 ${settingsSummary || "(No structured settings provided - infer from the prompt below.)"}
+${!isEdit && settings.designReferenceHtml ? `
+## Finalized design reference (from Ideate mode — match this exactly)
 
+The user iterated on this mockup in the Ideate tool and finalized it as the target look. Recreate it precisely as a real widget component: same layout, spacing, colors, and animations — but translate the mockup's hardcoded hex values and inline \`<script>\` into the framework's real CSS variables/classes and React state, and branch content per size via \`useWidget().size\` instead of the mockup's separate static boxes.
+
+\`\`\`html
+${settings.designReferenceHtml}
+\`\`\`
+` : ""}
 ## User prompt
 
 ${userPrompt}
@@ -156,103 +164,12 @@ export type GenerateSettings = {
   lImageRef?: string | null;
   dataUrl?: string;
   dataShape?: string;
+  /** raw HTML/CSS source of a mockup finalized in Ideate mode — when present,
+      the harness is asked to recreate it as the real widget (create mode only) */
+  designReferenceHtml?: string;
   harness?: HarnessId;
   harnessChain?: HarnessId[];
 };
-
-type SSEWriter = (data: string) => void;
-
-function sendEvent(write: SSEWriter, event: string, payload: Record<string, unknown>) {
-  write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
-}
-
-function runHarness(
-  adapter: (typeof HARNESS_ADAPTERS)[HarnessId],
-  prompt: string,
-  write: SSEWriter,
-  signal: AbortSignal,
-  continuationNote?: string,
-): Promise<{ status: "done" | "limit" | "error"; limitReason?: LimitReason }> {
-  return new Promise((resolve) => {
-    const fullPrompt = continuationNote ? `${continuationNote}\n\n${prompt}` : prompt;
-
-    sendEvent(write, "status", { type: "harness_start", harness: adapter.id });
-
-    // opencode's `run` subcommand has no stdin-reading mode — the prompt must
-    // be a trailing positional arg there, vs. stdin for claude/codex
-    const args = adapter.promptViaArg ? [...adapter.args, fullPrompt] : adapter.args;
-
-    const child = spawn(adapter.command, args, {
-      cwd: REPO_ROOT,
-      stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env },
-      // on Windows the CLIs are .cmd/.ps1 shims that bare spawn can't resolve
-      // (ENOENT) — run through the shell so PATHEXT resolution applies
-      shell: process.platform === "win32",
-    });
-
-    if (adapter.promptViaArg) {
-      child.stdin.end();
-    } else {
-      child.stdin.write(fullPrompt);
-      child.stdin.end();
-    }
-
-    let limitReason: LimitReason = null;
-    let buffer = "";
-
-    function processLine(line: string) {
-      // Skip limit detection on frames carrying actual model/tool content —
-      // generated code can legitimately mention "rate limit", "overloaded",
-      // etc. as plain text, and checking the raw JSON-encoded line would fire
-      // a false positive switch. Covers all three adapters' content frames:
-      // claude (message.content), codex (item), opencode (part).
-      let isGeneratedContent = false;
-      try {
-        const f = JSON.parse(line);
-        isGeneratedContent = Boolean(f.message?.content) || Boolean(f.item) || Boolean(f.part);
-      } catch {}
-
-      if (!isGeneratedContent) {
-        const reason = lineSignalsLimit(line);
-        if (reason && !limitReason) limitReason = reason;
-        if (reason) return;
-      }
-      const text = adapter.parseChunk(line);
-      if (text) sendEvent(write, "chunk", { text });
-    }
-
-    child.stdout.on("data", (data: Buffer) => {
-      buffer += data.toString();
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? "";
-      for (const line of lines) processLine(line);
-    });
-
-    child.stderr.on("data", (data: Buffer) => {
-      const text = data.toString();
-      const reason = lineSignalsLimit(text);
-      if (reason && !limitReason) limitReason = reason;
-    });
-
-    child.on("close", () => {
-      if (buffer) processLine(buffer);
-      resolve(limitReason ? { status: "limit", limitReason } : { status: "done" });
-    });
-
-    child.on("error", (err) => {
-      const hint = (err as NodeJS.ErrnoException).code === "ENOENT"
-        ? ` — is the "${adapter.command}" CLI installed and on PATH?`
-        : "";
-      sendEvent(write, "error", { message: `Failed to start ${adapter.id}: ${err.message}${hint}` });
-      resolve({ status: "error" });
-    });
-
-    signal.addEventListener("abort", () => {
-      child.kill("SIGTERM");
-    });
-  });
-}
 
 export async function POST(req: Request) {
   // Clean up any stale entries (files deleted since last registration) before
@@ -291,10 +208,6 @@ export async function POST(req: Request) {
   const requestedHarness: HarnessId = bodyHarness ?? settings.harness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? settings.harnessChain ?? HARNESS_CHAIN_DEFAULT;
 
-  // build the ordered list starting from the requested harness
-  const startIdx = chain.indexOf(requestedHarness);
-  const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
-
   const encoder = new TextEncoder();
   const abortController = new AbortController();
 
@@ -308,71 +221,46 @@ export async function POST(req: Request) {
         }
       };
 
-      let continuationNote: string | undefined;
+      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal);
 
-      for (let i = 0; i < orderedChain.length; i++) {
-        const harnessId = orderedChain[i];
-        const adapter = HARNESS_ADAPTERS[harnessId];
-
-        if (!adapter) continue;
-
-        const { status, limitReason } = await runHarness(adapter, fullPrompt, write, abortController.signal, continuationNote);
-
-        if (status === "limit" || status === "error") {
-          // hit a limit/overload or failed to start — fall back to the next harness
-          const nextId = orderedChain[i + 1];
-          if (nextId) {
-            const reason = status === "limit" ? describeLimitReason(limitReason ?? null) : "failed to start";
-            sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-            // only a limited/overloaded run left partial work worth continuing
-            continuationNote =
-              status === "limit"
-                ? `The previous harness (${harnessId}) started but hit: ${describeLimitReason(limitReason ?? null)}. ` +
-                  `Inspect the partial output already written to disk and CONTINUE from where it stopped.`
-                : undefined;
-            continue;
+      if (outcome === "done") {
+        // done cleanly — the harness wrote the component + manifest.json.
+        // Whether to wire it into the registry now is driven by
+        // `existedBeforeThisRun` (actual prior registry state captured before
+        // any mutation), NOT `settings.editSlug` — a desynced/stale client
+        // flag must never be trusted here.
+        //
+        // - Already-committed widget (a real edit): re-register immediately.
+        //   This only rewrites customRegistry.json (JSON data), which Fast
+        //   Refresh hot-updates without a full reload, so it's safe to apply
+        //   mid-chat exactly like before.
+        // - Brand-new widget: do NOT register here. Wiring a new id into
+        //   customComponentMap.tsx is the one write Fast Refresh can't
+        //   hot-swap (full reload), which would tear down this SSE stream
+        //   before the "done" event below ever reaches the client — the
+        //   actual bug this split fixes. Registration for a new widget is
+        //   deferred to POST /api/widget-creator/register, fired by the
+        //   client's explicit "add to layout" click, so any number of
+        //   refinement turns in this chat can run reload-free first.
+        let ok = true;
+        if (existedBeforeThisRun) {
+          const wired = registerCustomWidget({
+            id: targetId!,
+            name: settings.name,
+            icon: settings.icon,
+            sizes: settings.sizes,
+            orientations: settings.orientations,
+          });
+          if (!wired.ok) {
+            sendEvent(write, "error", { message: `widget generated but registration failed: ${wired.error}` });
+            ok = false;
           }
-          // no fallback left — for a limit, say so; an error already emitted its message
-          if (status === "limit") {
-            sendEvent(write, "error", { message: `All harnesses hit a limit (${describeLimitReason(limitReason ?? null)}). Try again later.` });
-          }
-          break;
-        } else {
-          // done cleanly — the harness wrote the component + manifest.json.
-          // Whether to wire it into the registry now is driven by
-          // `existedBeforeThisRun` (actual prior registry state captured before
-          // any mutation), NOT `settings.editSlug` — a desynced/stale client
-          // flag must never be trusted here.
-          //
-          // - Already-committed widget (a real edit): re-register immediately.
-          //   This only rewrites customRegistry.json (JSON data), which Fast
-          //   Refresh hot-updates without a full reload, so it's safe to apply
-          //   mid-chat exactly like before.
-          // - Brand-new widget: do NOT register here. Wiring a new id into
-          //   customComponentMap.tsx is the one write Fast Refresh can't
-          //   hot-swap (full reload), which would tear down this SSE stream
-          //   before the "done" event below ever reaches the client — the
-          //   actual bug this split fixes. Registration for a new widget is
-          //   deferred to POST /api/widget-creator/register, fired by the
-          //   client's explicit "add to layout" click, so any number of
-          //   refinement turns in this chat can run reload-free first.
-          if (existedBeforeThisRun) {
-            const wired = registerCustomWidget({
-              id: targetId!,
-              name: settings.name,
-              icon: settings.icon,
-              sizes: settings.sizes,
-              orientations: settings.orientations,
-            });
-            if (!wired.ok) {
-              sendEvent(write, "error", { message: `widget generated but registration failed: ${wired.error}` });
-              break;
-            }
-          } else if (!findComponentModule(targetId!)) {
-            sendEvent(write, "error", { message: `widget generated but no component .tsx file was created in components/widgets/custom/${targetId}/` });
-            break;
-          }
+        } else if (!findComponentModule(targetId!)) {
+          sendEvent(write, "error", { message: `widget generated but no component .tsx file was created in components/widgets/custom/${targetId}/` });
+          ok = false;
+        }
 
+        if (ok) {
           sendEvent(write, "status", { type: "tsc_check" });
           const tscResult = await runTscCheck();
           if (tscResult.errors.length > 0) {
@@ -389,7 +277,6 @@ export async function POST(req: Request) {
             const doneSlug = settings.editSlug ?? settings.slug ?? null;
             sendEvent(write, "status", { type: "done", slug: doneSlug, registered: existedBeforeThisRun });
           }
-          break;
         }
       }
 

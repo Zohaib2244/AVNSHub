@@ -35,6 +35,9 @@ type Props = {
   onSettingsChange: (patch: Partial<GenerateSettings>) => void;
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
+  /** pre-fills the prompt textarea on mount (e.g. after finalizing an Ideate
+      mockup) — only read once via lazy useState init, not kept in sync */
+  initialPrompt?: string;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -104,7 +107,7 @@ function writeDoneRecord(record: DoneRecord | null) {
   } catch {}
 }
 
-export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessChain }: Props) {
+export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessChain, initialPrompt }: Props) {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -114,7 +117,7 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     }
     return [];
   });
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt ?? "");
   // restore done state from sessionStorage so HMR/reload doesn't lose it
   const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => readDoneRecord()?.slug ?? null);
   const [pendingRegistration, setPendingRegistration] = useState(() => {

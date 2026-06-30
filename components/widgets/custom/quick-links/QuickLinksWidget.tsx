@@ -363,6 +363,7 @@ interface LinkRowProps {
   showIcons: boolean;
   showDescriptions: boolean;
   showGroupTag: boolean;
+  showPinnedMarker: boolean;
   accentMode: AccentMode;
   showActions: boolean;
   allowManage: boolean;
@@ -380,6 +381,7 @@ function LinkRow({
   showIcons,
   showDescriptions,
   showGroupTag,
+  showPinnedMarker,
   accentMode,
   showActions,
   allowManage,
@@ -403,7 +405,7 @@ function LinkRow({
         <span className="ql-row-text">
           <span className="ql-title" style={monoStyle}>
             {link.title}
-            {link.pinned && <Star size={10} strokeWidth={2} className="ql-pin-mark" />}
+            {showPinnedMarker && link.pinned && <Star size={10} strokeWidth={2} className="ql-pin-mark" />}
           </span>
           {showDescriptions && link.description && (
             <span className="block-sub ql-desc">{link.description}</span>
@@ -687,11 +689,13 @@ function LinkForm({ editingId, initialDraft, groups, onCancel, onSave, onCreateG
 export function QuickLinksWidget() {
   const { size, settings } = useWidget();
 
+  const zenMode = settings.zenMode === true;
   const density: Density = settings.density === "comfy" ? "comfy" : "compact";
-  const layout: Layout = settings.layout === "grid" || settings.layout === "list" ? settings.layout : "grouped";
-  const showDescriptions = settings.showDescriptions !== false;
+  const configuredLayout: Layout = settings.layout === "grid" || settings.layout === "list" ? settings.layout : "grouped";
+  const layout: Layout = zenMode ? "grouped" : configuredLayout;
+  const showDescriptions = !zenMode && settings.showDescriptions !== false;
   const showIcons = settings.showIcons !== false;
-  const showSearch = settings.showSearch !== false;
+  const showSearch = !zenMode && settings.showSearch !== false;
   const openNewTab = settings.openNewTab !== false;
   const accentMode: AccentMode = settings.accentMode === "orange" || settings.accentMode === "cyan" ? settings.accentMode : "mixed";
   const maxVisible = typeof settings.maxVisible === "number" && settings.maxVisible > 0 ? settings.maxVisible : 6;
@@ -725,7 +729,15 @@ export function QuickLinksWidget() {
     };
   }, []);
 
-  const allowManage = size === "L";
+  useEffect(() => {
+    if (zenMode) {
+      setFormMode(null);
+      setEditingGroupId(null);
+      setGroupsExpanded(false);
+    }
+  }, [zenMode]);
+
+  const allowManage = !zenMode && size === "L";
   const groupNameById = useMemo(() => new Map(store.groups.map((g) => [g.id, g.name])), [store.groups]);
 
   const filteredLinks = useMemo(() => {
@@ -744,12 +756,12 @@ export function QuickLinksWidget() {
   }, [store.links, query, groupNameById]);
 
   const cappedAllowedIds = useMemo(() => {
-    if (size === "L") return null;
+    if (size === "L" || zenMode) return null;
     const ordered = [...filteredLinks].sort(
       (a, b) => Number(b.pinned) - Number(a.pinned) || b.createdAt - a.createdAt,
     );
     return new Set(ordered.slice(0, maxVisible).map((l) => l.id));
-  }, [filteredLinks, size, maxVisible]);
+  }, [filteredLinks, size, maxVisible, zenMode]);
 
   const visibleLinks = useMemo(
     () => (cappedAllowedIds ? filteredLinks.filter((l) => cappedAllowedIds.has(l.id)) : filteredLinks),
@@ -934,6 +946,7 @@ export function QuickLinksWidget() {
         showIcons={showIcons}
         showDescriptions={showDescriptions}
         showGroupTag={showGroupTag}
+        showPinnedMarker={!zenMode}
         accentMode={accentMode}
         showActions={showActions}
         allowManage={allowManage}
@@ -947,75 +960,141 @@ export function QuickLinksWidget() {
     );
   }
 
+  function renderGroupedLinks(showActions: boolean) {
+    return store.groups.map((group) => {
+      const groupLinks = visibleLinks.filter((l) => l.groupId === group.id);
+      if (groupLinks.length === 0) return null;
+      return (
+        <div className="ql-group-card" key={group.id}>
+          <div className="ql-group-header">
+            {editingGroupId === group.id ? (
+              <input
+                className="ql-input"
+                style={{ maxWidth: 160 }}
+                value={groupNameDraft}
+                autoFocus
+                onChange={(e) => setGroupNameDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    renameGroup(group.id, groupNameDraft);
+                    setEditingGroupId(null);
+                  } else if (e.key === "Escape") {
+                    setEditingGroupId(null);
+                  }
+                }}
+                onBlur={() => {
+                  renameGroup(group.id, groupNameDraft);
+                  setEditingGroupId(null);
+                }}
+              />
+            ) : (
+              <span className="ql-group-title">
+                <Folder size={12} strokeWidth={1.75} />
+                <span className="ql-group-name more-head">{group.name}</span>
+                <span className="ql-group-count" style={monoStyle}>
+                  {groupLinks.length}
+                </span>
+              </span>
+            )}
+            {allowManage && editingGroupId !== group.id && (
+              <span className="ql-group-actions">
+                <button
+                  type="button"
+                  className="ql-btn"
+                  title="rename group"
+                  aria-label="rename group"
+                  onClick={() => {
+                    setEditingGroupId(group.id);
+                    setGroupNameDraft(group.name);
+                  }}
+                >
+                  <Pencil size={12} strokeWidth={1.75} />
+                </button>
+              </span>
+            )}
+          </div>
+          <div className="ql-row-list">{groupLinks.map((link) => renderRow(link, showActions, false))}</div>
+        </div>
+      );
+    });
+  }
+
   return (
-    <div className="ql-root" data-size={size} data-density={density}>
+    <div className="ql-root" data-size={size} data-density={density} data-zen={zenMode ? "true" : "false"}>
       <style>{`
         .ql-root { display: flex; flex-direction: column; height: 100%; min-height: 0; gap: 8px; }
         .ql-toolbar { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
         .ql-search-wrap { position: relative; flex: 1 1 120px; min-width: 90px; }
         .ql-search-icon { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-        .ql-search-input { width: 100%; box-sizing: border-box; padding: 6px 8px 6px 26px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--bg-nested); color: var(--text-primary); font-size: 0.78rem; }
+        .ql-search-input { width: 100%; box-sizing: border-box; padding: 6px 8px 6px 26px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-nested); color: var(--text-primary); font-size: 0.78rem; }
         .ql-search-input:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 1px; }
-        .ql-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
-        .ql-section { display: flex; flex-direction: column; gap: 4px; }
+        .ql-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 2px; }
+        .ql-section { display: flex; flex-direction: column; gap: 6px; }
         .ql-section-title { display: flex; align-items: center; gap: 4px; color: var(--text-muted); }
-        .ql-row-list { display: flex; flex-direction: column; gap: 2px; }
-        .ql-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; }
-        .ql-row { display: flex; align-items: center; gap: 4px; border-radius: 10px; padding: 2px; }
-        [data-density="comfy"] .ql-row { padding: 4px 2px; }
+        .ql-row-list { display: flex; flex-direction: column; gap: 6px; }
+        .ql-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 8px; }
+        .ql-row { display: flex; align-items: center; gap: 6px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--bg-card); box-shadow: 1px 1px 0 var(--shadow); padding: 3px; }
+        [data-density="comfy"] .ql-row { padding: 5px; }
         .ql-row:hover, .ql-row:focus-within { background: var(--bg-nested); }
-        .ql-row-main { display: flex; align-items: center; gap: 7px; flex: 1 1 auto; min-width: 0; background: none; border: none; cursor: pointer; padding: 3px 4px; text-align: left; color: inherit; border-radius: 8px; }
+        .ql-row-main { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; background: none; border: none; cursor: pointer; padding: 5px 6px; text-align: left; color: inherit; border-radius: 12px; }
         .ql-row-main:focus-visible { outline: 1.5px solid var(--accent-orange); outline-offset: 1px; }
-        .ql-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-        .ql-row-text { display: flex; flex-direction: column; min-width: 0; gap: 1px; }
+        .ql-icon { display: flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 26px; height: 26px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--bg-nested); box-shadow: 1px 1px 0 var(--shadow); }
+        .ql-row-text { display: flex; flex-direction: column; min-width: 0; gap: 2px; }
         .ql-title { font-size: 0.78rem; font-weight: 500; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 4px; }
         .ql-pin-mark { color: var(--accent-orange); flex: 0 0 auto; }
         .ql-desc { font-size: 0.68rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ql-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 1px; }
-        .ql-tag { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); background: var(--bg-nested); border: 1px solid var(--border); border-radius: 6px; padding: 1px 5px; }
+        .ql-tag { font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); background: var(--bg-nested); border: 1px solid var(--border); border-radius: 10px; padding: 1px 5px; }
         .ql-tag-group { color: var(--text-primary); }
         .ql-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; flex-wrap: wrap; }
-        .ql-btn { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid transparent; background: none; color: var(--text-muted); cursor: pointer; }
-        .ql-btn:hover { color: var(--text-primary); border-color: var(--border); }
+        .ql-btn { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-muted); cursor: pointer; }
+        .ql-btn:hover { color: var(--text-primary); background: var(--bg-nested); }
         .ql-btn:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 1px; }
         .ql-btn-text { background: none; border: none; color: var(--text-muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; padding: 4px 6px; }
         .ql-btn-text:hover { color: var(--text-primary); }
         .ql-btn-text:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 1px; }
-        .ql-btn-primary { background: var(--accent-orange); color: var(--bg-card); border: 1.5px solid var(--border); border-radius: 10px; box-shadow: 2px 2px 0 var(--shadow); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 10px; cursor: pointer; font-family: var(--font-dot-gothic), monospace; }
+        .ql-btn-primary { background: var(--accent-orange); color: var(--bg-card); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 2px 2px 0 var(--shadow); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 5px 10px; cursor: pointer; font-family: var(--font-dot-gothic), monospace; }
         .ql-btn-primary:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 2px; }
-        .ql-card { display: flex; flex-direction: column; gap: 4px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 2px 2px 0 var(--shadow); padding: 8px; }
+        .ql-card { display: flex; flex-direction: column; gap: 4px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 2px 2px 0 var(--shadow); padding: 8px; }
         .ql-card .ql-row-main { padding: 0; flex-direction: column; align-items: flex-start; width: 100%; }
         .ql-card .ql-row { flex-direction: column; align-items: stretch; gap: 6px; padding: 0; }
         .ql-card .ql-actions { justify-content: flex-end; }
-        .ql-group-header { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 2px 2px; }
-        .ql-group-name { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.62rem; }
+        .ql-group-card { display: flex; flex-direction: column; gap: 8px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 16px; box-shadow: 3px 3px 0 var(--shadow); padding: 9px; }
+        .ql-group-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+        .ql-group-title { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--text-muted); }
+        .ql-group-name { color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.62rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ql-group-count { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 18px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--text-primary); font-size: 0.62rem; padding: 0 5px; }
         .ql-group-actions { display: flex; gap: 2px; }
         .ql-empty { color: var(--text-muted); font-size: 0.72rem; padding: 8px 2px; text-align: center; }
-        .ql-form { display: flex; flex-direction: column; gap: 8px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 12px; box-shadow: 3px 3px 0 var(--shadow); padding: 10px; }
+        .ql-form { display: flex; flex-direction: column; gap: 8px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 14px; box-shadow: 3px 3px 0 var(--shadow); padding: 10px; }
         .ql-form-head { display: flex; align-items: center; justify-content: space-between; }
         .ql-field { display: flex; flex-direction: column; gap: 3px; }
         .ql-field-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .ql-field-row .ql-field { flex: 1 1 120px; }
         .ql-field-label { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); }
-        .ql-input { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.76rem; font-family: var(--font-jetbrains-mono), monospace; }
+        .ql-input { width: 100%; box-sizing: border-box; padding: 6px 8px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--text-primary); font-size: 0.76rem; font-family: var(--font-jetbrains-mono), monospace; }
         .ql-input:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 1px; }
         .ql-icon-pick { display: flex; align-items: center; gap: 6px; }
-        .ql-icon-preview { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: 0 0 auto; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--accent-orange); }
+        .ql-icon-preview { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; flex: 0 0 auto; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-card); color: var(--accent-orange); }
         .ql-accent-pick { display: flex; gap: 4px; }
-        .ql-accent-swatch { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--bg-card); cursor: pointer; }
+        .ql-accent-swatch { display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--bg-card); cursor: pointer; }
         .ql-accent-swatch-active { border-color: currentColor; }
         .ql-checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 0.72rem; color: var(--text-primary); cursor: pointer; }
         .ql-error { font-size: 0.7rem; color: var(--accent-orange); }
         .ql-form-actions { display: flex; justify-content: flex-end; gap: 8px; }
-        .ql-groups-panel { display: flex; flex-direction: column; gap: 6px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 12px; padding: 8px; }
+        .ql-groups-panel { display: flex; flex-direction: column; gap: 6px; background: var(--bg-nested); border: 1.5px solid var(--border); border-radius: 14px; padding: 8px; }
         .ql-group-chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
-        .ql-group-chip { display: flex; align-items: center; gap: 4px; border: 1.5px solid var(--border); border-radius: 8px; padding: 2px 4px 2px 8px; font-size: 0.68rem; background: var(--bg-card); }
+        .ql-group-chip { display: flex; align-items: center; gap: 4px; border: 1.5px solid var(--border); border-radius: 12px; padding: 2px 4px 2px 8px; font-size: 0.68rem; background: var(--bg-card); }
         .ql-group-add-row { display: flex; gap: 6px; flex-wrap: wrap; }
         .ql-group-add-row .ql-input { flex: 1 1 120px; min-width: 0; }
         .ql-recents-row { display: flex; flex-wrap: wrap; gap: 6px; }
-        .ql-recent-chip { display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--border); border-radius: 8px; padding: 3px 8px; background: var(--bg-nested); cursor: pointer; font-size: 0.68rem; color: var(--text-primary); }
+        .ql-recent-chip { display: flex; align-items: center; gap: 5px; border: 1.5px solid var(--border); border-radius: 12px; padding: 3px 8px; background: var(--bg-nested); cursor: pointer; font-size: 0.68rem; color: var(--text-primary); }
         .ql-recent-chip:hover { border-color: var(--accent-cyan); }
         .ql-recent-chip:focus-visible { outline: 1.5px solid var(--accent-cyan); outline-offset: 1px; }
+        [data-zen="true"] .ql-scroll { gap: 8px; padding-right: 0; }
+        [data-zen="true"] .ql-group-card { background: var(--bg-card); box-shadow: 2px 2px 0 var(--shadow); }
+        [data-zen="true"] .ql-row { background: var(--bg-nested); box-shadow: none; }
+        [data-zen="true"] .ql-row:hover, [data-zen="true"] .ql-row:focus-within { background: var(--bg-card); }
         @container widget (max-width: 220px) {
           .ql-toolbar { flex-direction: column; align-items: stretch; }
           .ql-field-row { flex-direction: column; }
@@ -1051,7 +1130,7 @@ export function QuickLinksWidget() {
         </div>
       )}
 
-      {size === "L" && !showSearch && (
+      {size === "L" && !showSearch && !zenMode && (
         <div className="ql-toolbar">
           <button type="button" className="ql-btn-primary" onClick={startNew} title="add link">
             <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1061,7 +1140,7 @@ export function QuickLinksWidget() {
         </div>
       )}
 
-      {formMode && formDraft && (
+      {!zenMode && formMode && formDraft && (
         <LinkForm
           key={typeof formMode === "object" ? formMode.editId : "new"}
           editingId={typeof formMode === "object" ? formMode.editId : null}
@@ -1074,7 +1153,7 @@ export function QuickLinksWidget() {
       )}
 
       <div className="ql-scroll">
-        {size === "S" && (
+        {!zenMode && size === "S" && (
           <div className="ql-section">
             <div className="ql-section-title">
               <Star size={11} strokeWidth={1.75} />
@@ -1087,9 +1166,9 @@ export function QuickLinksWidget() {
           </div>
         )}
 
-        {size !== "S" && !formMode && (
+        {(zenMode || (size !== "S" && !formMode)) && (
           <>
-            {pinnedLinks.length > 0 && (
+            {!zenMode && pinnedLinks.length > 0 && (
               <div className="ql-section">
                 <div className="ql-section-title">
                   <Star size={11} strokeWidth={1.75} />
@@ -1101,7 +1180,7 @@ export function QuickLinksWidget() {
               </div>
             )}
 
-            {size === "L" && recentLinks.length > 0 && (
+            {!zenMode && size === "L" && recentLinks.length > 0 && (
               <div className="ql-section">
                 <div className="ql-section-title">
                   <Clock size={11} strokeWidth={1.75} />
@@ -1133,56 +1212,7 @@ export function QuickLinksWidget() {
               </div>
 
               {layout === "grouped" ? (
-                store.groups.map((group) => {
-                  const groupLinks = visibleLinks.filter((l) => l.groupId === group.id);
-                  if (groupLinks.length === 0) return null;
-                  return (
-                    <div className="ql-section" key={group.id}>
-                      <div className="ql-group-header">
-                        {editingGroupId === group.id ? (
-                          <input
-                            className="ql-input"
-                            style={{ maxWidth: 160 }}
-                            value={groupNameDraft}
-                            autoFocus
-                            onChange={(e) => setGroupNameDraft(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter") {
-                                renameGroup(group.id, groupNameDraft);
-                                setEditingGroupId(null);
-                              } else if (e.key === "Escape") {
-                                setEditingGroupId(null);
-                              }
-                            }}
-                            onBlur={() => {
-                              renameGroup(group.id, groupNameDraft);
-                              setEditingGroupId(null);
-                            }}
-                          />
-                        ) : (
-                          <span className="ql-group-name more-head">{group.name}</span>
-                        )}
-                        {allowManage && editingGroupId !== group.id && (
-                          <span className="ql-group-actions">
-                            <button
-                              type="button"
-                              className="ql-btn"
-                              title="rename group"
-                              aria-label="rename group"
-                              onClick={() => {
-                                setEditingGroupId(group.id);
-                                setGroupNameDraft(group.name);
-                              }}
-                            >
-                              <Pencil size={12} strokeWidth={1.75} />
-                            </button>
-                          </span>
-                        )}
-                      </div>
-                      <div className="ql-row-list">{groupLinks.map((link) => renderRow(link, true, false))}</div>
-                    </div>
-                  );
-                })
+                renderGroupedLinks(!zenMode)
               ) : layout === "grid" ? (
                 <div className="ql-grid">
                   {visibleLinks.map((link) => (
@@ -1198,7 +1228,7 @@ export function QuickLinksWidget() {
               {visibleLinks.length === 0 && <div className="ql-empty">no links match</div>}
             </div>
 
-            {size === "L" && (
+            {!zenMode && size === "L" && (
               <div className="ql-groups-panel">
                 <button
                   type="button"
@@ -1261,7 +1291,7 @@ export function QuickLinksWidget() {
               </div>
             )}
 
-            {size === "L" && (
+            {!zenMode && size === "L" && (
               <div className="ql-toolbar">
                 <button type="button" className="ql-btn-text" onClick={exportJson} title="export all links as json">
                   <span style={{ display: "flex", alignItems: "center", gap: 4 }}>

@@ -808,3 +808,165 @@
   flex-direction: column;
   padding: 8px;
 }
+
+/* ── ideate mode ────────────────────────────────────────────── */
+
+.wc-ideate-help {
+  margin: 0;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.wc-ideate-body {
+  gap: 14px;
+}
+
+.wc-ideate-round {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.wc-ideate-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.wc-ideate-card {
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1.5px solid var(--border);
+  box-shadow: 3px 3px 0 var(--shadow, var(--border));
+  overflow: hidden;
+  background: var(--bg-nested);
+}
+
+.wc-ideate-card-head {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 9px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.wc-ideate-frame {
+  width: 100%;
+  height: 200px;
+  border: none;
+  flex-shrink: 0;
+  background: var(--bg-page, #13100c);
+}
+
+.wc-ideate-card-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.wc-ideate-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.wc-ideate-action-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+.wc-ideate-action-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.wc-ideate-finalize-btn {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.wc-ideate-finalize-btn:hover:not(:disabled) {
+  color: var(--accent-cyan);
+  border-color: var(--accent-cyan);
+  filter: brightness(1.2);
+}
+
+.wc-ideate-regen-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+
+.wc-ideate-regen-row .wc-input {
+  flex: 1;
+  height: 24px;
+  font-size: 0.6rem;
+}
+
+.wc-ideate-footer {
+  flex-wrap: wrap;
+}
+
+.wc-ideate-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 2px;
+}
+
+.wc-ideate-count-btn {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.wc-ideate-count-btn:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--bg-nested);
+}
+
+.wc-ideate-count-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.wc-ideate-count-value {
+  min-width: 14px;
+  text-align: center;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.65rem;
+  color: var(--text-primary);
+}
