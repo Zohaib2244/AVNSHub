@@ -11,7 +11,11 @@
   gap: 12px;
   border: 1.5px solid var(--border);
   box-shadow: 3px 3px 0 var(--shadow);
-  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+  /* matches .block: transparent outline so the edit-mode ring can fade in */
+  outline: 1.5px dashed transparent;
+  outline-offset: 2px;
+  transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease,
+    outline-color 0.2s ease, outline-offset 0.2s ease;
 }
 
 .namecard-main {

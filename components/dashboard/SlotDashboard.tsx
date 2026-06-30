@@ -1,41 +1,29 @@
 "use client";
 
 // Slot Layout's top-level component (mirrors Dashboard.tsx for Graph Layout).
-// Renders the four-region composition — Left | Center (Terminal over Base) |
-// Right — inside the same .frame/.frame-inner bezel Graph Layout uses.
+// Renders the four-region composition — Left | Center (Central Base over
+// Base) | Right — inside the same .frame/.frame-inner bezel Graph Layout
+// uses. Central Base is a real region like any other (SlotRegion), just one
+// that defaults to a single undivided cell — see config/slotLayout.ts.
 //
 // The frame's macro proportions (.slot-frame's 3 columns, .slot-center's 2
 // rows) are persisted as `frameRatios` (lib/slotLayout.ts) and exposed as
 // --col-*/--row-* custom properties consumed by the CSS (styles/globals.css).
-// Drag handles on the terminal cell's W/E/S edges adjust those ratios —
-// growing the terminal reclaims space from the adjacent column/base and vice
-// versa — using the same local-preview-then-commit-on-release pattern as
-// SlotWidgetCell's per-widget resize handles.
+// Drag handles on Central Base's W/E/S edges adjust those ratios — growing it
+// reclaims space from the adjacent column/base and vice versa — using the
+// same local-preview-then-commit-on-release pattern as SlotWidgetCell's
+// per-widget resize handles.
 
 import { useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Settings2, X } from "lucide-react";
-import { getManifest } from "@/config/widgets";
 import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
-import {
-  getSlotLayout,
-  getServerSlotLayout,
-  subscribeSlotLayout,
-  setFrameRatios,
-  setTerminalWidget,
-  updateTerminalWidgetSettings,
-} from "@/lib/slotLayout";
-import type { WidgetInstance } from "@/lib/layout";
+import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios } from "@/lib/slotLayout";
 import { getCanvases, getServerCanvases, subscribeCanvases } from "@/lib/canvases";
-import { terminalSizeClass } from "@/lib/grid/sizeClass";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
-import { SlotPlacementPopover } from "@/components/framework/SlotPlacementPopover";
-import { WidgetSettingsPopover } from "@/components/framework/WidgetSettingsPopover";
-import { WidgetShell } from "@/components/framework/WidgetShell";
 
-/* canvas-switch entrance cascade — NutBot/terminal goes first (STAGGER_BASE,
+/* canvas-switch entrance cascade — Central Base (NutBot, by default) goes first (STAGGER_BASE,
    which matches the outer .slot-frame's exit-fade duration below so the new
    canvas only starts revealing itself once the old one has fully faded),
    then every other widget follows at increasing delays. Capped so a canvas
@@ -78,13 +66,7 @@ export function SlotDashboard() {
     () => getCanvases().activeId,
     () => getServerCanvases().activeId,
   );
-  const { editMode, activePopover, setActivePopover } = useLayout();
-  // shared so it can't stay open alongside another add menu / settings popover
-  const terminalPickerKey = "place:terminal";
-  const terminalPickerOpen = activePopover === terminalPickerKey;
-  const toggleTerminalPicker = () => setActivePopover(terminalPickerOpen ? null : terminalPickerKey);
-  const terminalSettingsKey = slotLayout.terminalWidgetId ? `settings:${slotLayout.terminalWidgetId}` : null;
-  const terminalSettingsOpen = terminalSettingsKey !== null && activePopover === terminalSettingsKey;
+  const { editMode } = useLayout();
 
   const frameRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
@@ -94,26 +76,17 @@ export function SlotDashboard() {
   const left = slotLayout.widgets.filter((w) => w.region === "left");
   const right = slotLayout.widgets.filter((w) => w.region === "right");
   const base = slotLayout.widgets.filter((w) => w.region === "base");
+  const center = slotLayout.widgets.filter((w) => w.region === "center");
 
-  const terminalManifest = slotLayout.terminalWidgetId ? (getManifest(slotLayout.terminalWidgetId) ?? null) : null;
-  const terminalConfig = terminalManifest ? terminalSizeClass(terminalManifest.sizes, terminalManifest.orientations) : null;
-  const terminalSettingsInstance: WidgetInstance | null =
-    terminalManifest && terminalConfig
-      ? {
-          id: terminalManifest.id,
-          size: terminalConfig.size,
-          orientation: terminalConfig.orientation,
-          hidden: false,
-          settings: slotLayout.terminalSettings,
-        }
-      : null;
-
-  // NutBot/terminal is always first in the cascade; every other widget
-  // follows in slotLayout.widgets order at increasing delays
+  // NutBot/Central Base is always first in the cascade (gets exactly
+  // STAGGER_BASE, no added step); every other widget follows in
+  // slotLayout.widgets order at increasing delays
   const entranceDelays: Record<string, number> = {};
-  slotLayout.widgets.forEach((w, i) => {
-    entranceDelays[w.id] = STAGGER_BASE + Math.min(i + 1, STAGGER_MAX_STEPS) * STAGGER_STEP;
-  });
+  let staggerStep = 0;
+  for (const w of slotLayout.widgets) {
+    entranceDelays[w.id] =
+      w.region === "center" ? STAGGER_BASE : STAGGER_BASE + Math.min(++staggerStep, STAGGER_MAX_STEPS) * STAGGER_STEP;
+  }
 
   const ratios = previewRatios ?? slotLayout.frameRatios;
   const frameStyle = {
@@ -122,7 +95,7 @@ export function SlotDashboard() {
     "--col-r": `${ratios.columns[2]}fr`,
   } as CSSProperties;
   const centerStyle = {
-    "--row-term": `${ratios.centerRows[0]}fr`,
+    "--row-center": `${ratios.centerRows[0]}fr`,
     "--row-base": `${ratios.centerRows[1]}fr`,
   } as CSSProperties;
 
@@ -235,70 +208,8 @@ export function SlotDashboard() {
             <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} entranceDelays={entranceDelays} />
 
             <div ref={centerRef} className="slot-center" style={centerStyle}>
-              <div className={`slot-terminal${editMode ? " editing" : ""}`}>
-                {terminalManifest && terminalConfig ? (
-                  <>
-                    {editMode && (
-                      <>
-                        <button
-                          type="button"
-                          className="slot-remove-btn"
-                          aria-label={`remove ${terminalManifest.id} from terminal`}
-                          onClick={() => setTerminalWidget(null)}
-                        >
-                          <X size={12} strokeWidth={1.75} />
-                        </button>
-                        <button
-                          type="button"
-                          className="slot-settings-btn"
-                          aria-label={`configure ${terminalManifest.id} widget`}
-                          onClick={() => setActivePopover(terminalSettingsOpen ? null : terminalSettingsKey)}
-                        >
-                          <Settings2 size={12} strokeWidth={1.75} />
-                        </button>
-                        <AnimatePresence>
-                          {terminalSettingsOpen && terminalSettingsInstance && (
-                            <WidgetSettingsPopover
-                              key="terminal-settings"
-                              manifest={terminalManifest}
-                              instance={terminalSettingsInstance}
-                              onUpdateSettings={updateTerminalWidgetSettings}
-                              onHide={() => setTerminalWidget(null)}
-                              onClose={() => setActivePopover(null)}
-                            />
-                          )}
-                        </AnimatePresence>
-                      </>
-                    )}
-                    <WidgetShell
-                      manifest={terminalManifest}
-                      config={{ ...terminalConfig, settings: slotLayout.terminalSettings }}
-                      entranceDelay={STAGGER_BASE}
-                    />
-                  </>
-                ) : (
-                  <div
-                    className={`slot-terminal-empty${editMode ? " editing" : ""}`}
-                    role={editMode ? "button" : undefined}
-                    tabIndex={editMode ? 0 : undefined}
-                    onClick={editMode ? toggleTerminalPicker : undefined}
-                    onKeyDown={
-                      editMode
-                        ? (e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              toggleTerminalPicker();
-                            }
-                          }
-                        : undefined
-                    }
-                  >
-                    {editMode ? "+ add terminal widget" : "no terminal widget"}
-                    {terminalPickerOpen && (
-                      <SlotPlacementPopover region="terminal" onClose={() => setActivePopover(null)} />
-                    )}
-                  </div>
-                )}
+              <div className="slot-center-region">
+                <SlotRegion region="center" instances={center} dims={slotLayout.regionDims.center} entranceDelays={entranceDelays} />
                 {editMode && (
                   <>
                     <div

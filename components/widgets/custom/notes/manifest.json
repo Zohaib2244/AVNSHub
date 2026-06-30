@@ -1,0 +1,9 @@
+{
+  "title": "notes",
+  "iconName": "HardDrive",
+  "sizes": ["M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [],
+  "flags": { "customHeader": true }
+}

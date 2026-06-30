@@ -30,6 +30,9 @@ yarn-error.log*
 # local WhatsApp Web bridge session
 .whatsapp-auth/
 
+# NutBot Ideate mode scratch mockups (HTML/CSS, never real source)
+.nutbot-ideate/
+
 # vercel
 .vercel
 

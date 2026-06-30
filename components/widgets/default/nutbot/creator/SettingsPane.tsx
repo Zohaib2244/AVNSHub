@@ -5,6 +5,7 @@ import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
 import { WidgetPicker } from "./WidgetPicker";
+import type { PanelMode } from "./WidgetCreatorPanel";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
@@ -13,6 +14,8 @@ import { renameWidgetPlacement } from "@/lib/slotLayout";
 type Props = {
   settings: GenerateSettings;
   onChange: (patch: Partial<GenerateSettings>) => void;
+  mode: PanelMode;
+  onModeChange: (mode: PanelMode) => void;
 };
 
 function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -229,9 +232,11 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
   );
 }
 
-export function SettingsPane({ settings, onChange }: Props) {
+export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
-  const isEditMode = Boolean(settings.editSlug);
+  const isCreateMode = mode === "create";
+  const isEditMode = mode === "edit";
+  const isIdeateMode = mode === "ideate";
   const customIds = Object.keys(CUSTOM_WIDGETS);
 
   function toggleSize(s: string) {
@@ -258,22 +263,43 @@ export function SettingsPane({ settings, onChange }: Props) {
           <div className="wc-toggle-group">
             <button
               type="button"
-              className={`wc-toggle-btn${!isEditMode ? " active" : ""}`}
-              onClick={() => onChange({ editSlug: undefined })}
+              className={`wc-toggle-btn${isCreateMode ? " active" : ""}`}
+              onClick={() => {
+                onChange({ editSlug: undefined });
+                onModeChange("create");
+              }}
             >create</button>
             <button
               type="button"
               className={`wc-toggle-btn${isEditMode ? " active" : ""}${customIds.length === 0 ? " disabled" : ""}`}
               onClick={() => {
-                const first = customIds[0];
+                const first = settings.editSlug && customIds.includes(settings.editSlug) ? settings.editSlug : customIds[0];
                 if (first) onChange({ editSlug: first });
+                onModeChange("edit");
               }}
               disabled={customIds.length === 0}
               title={customIds.length === 0 ? "no custom widgets yet" : "edit an existing widget"}
             >edit</button>
+            <button
+              type="button"
+              className={`wc-toggle-btn${isIdeateMode ? " active" : ""}`}
+              onClick={() => onModeChange("ideate")}
+              title="brainstorm HTML/CSS mockups before building"
+            >ideate</button>
           </div>
         </div>
       </Section>
+
+      {isIdeateMode && (
+        <Section title="about ideate mode">
+          <p className="wc-ideate-help">
+            Describe a widget concept and how many variations to brainstorm. Each
+            variation renders live as an HTML/CSS mockup (animations included) —
+            no real component yet. Regenerate one in place, or finalize a design
+            to switch into create mode with it as the build reference.
+          </p>
+        </Section>
+      )}
 
       {isEditMode && customIds.length > 0 && (
         <Section title="target widget">
@@ -289,7 +315,7 @@ export function SettingsPane({ settings, onChange }: Props) {
         <EditMetaForm id={settings.editSlug} onIdChange={(newId) => onChange({ editSlug: newId })} />
       )}
 
-      {!isEditMode && (
+      {isCreateMode && (
         <Section title="identity">
           <div className="wc-row-pair">
             <div className="wc-field">
@@ -330,7 +356,7 @@ export function SettingsPane({ settings, onChange }: Props) {
         </Section>
       )}
 
-      {!isEditMode && (
+      {isCreateMode && (
         <Section title="sizes & layout">
           <div className="wc-row wc-row-spread">
             <div className="wc-inline-label">sizes</div>
@@ -379,7 +405,7 @@ export function SettingsPane({ settings, onChange }: Props) {
         </Section>
       )}
 
-      {!isEditMode && (
+      {isCreateMode && (
         <Section title="per-size content">
           <div className="wc-size-tabs">
             {(["S", "M", "L"] as const).map((s) => (
@@ -406,7 +432,7 @@ export function SettingsPane({ settings, onChange }: Props) {
         </Section>
       )}
 
-      {!isEditMode && (
+      {isCreateMode && (
         <Section title="data source" defaultOpen={false}>
           <div className="wc-field">
             <span className="wc-field-label">endpoint url</span>

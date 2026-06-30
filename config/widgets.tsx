@@ -10,7 +10,6 @@ import {
   GitCommitHorizontal,
   HardDrive,
   IdCard,
-  Link2,
   Music,
   Network,
   Server,
@@ -19,7 +18,6 @@ import {
   Tv,
 } from "lucide-react";
 import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
-import { QuickLinks } from "@/components/widgets/default/identity/QuickLinks";
 import { UptimeMilestones } from "@/components/widgets/default/identity/UptimeMilestones";
 import { HomelabStatus, HomelabStatusMore } from "@/components/widgets/default/homelab/HomelabStatus";
 import { ServerStats, ServerStatsMore } from "@/components/widgets/default/homelab/ServerStats";
@@ -89,6 +87,7 @@ export const FRAMEWORK_SETTINGS: SettingsField[] = [
       { value: "solid", label: "solid" },
       { value: "blur", label: "blur" },
       { value: "transparent", label: "transparent" },
+      { value: "glass", label: "glass" },
     ],
   },
   { key: "showHeader", label: "show name & icon", type: "toggle", default: true },
@@ -168,16 +167,6 @@ export const WIDGETS = {
       { key: "showCalendar", label: "mini calendar", type: "toggle", default: true },
       { key: "showLofi", label: "lofi radio", type: "toggle", default: true },
     ],
-  },
-  quicklinks: {
-    id: "quicklinks",
-    title: "quicklinks",
-    icon: Link2,
-    component: QuickLinks,
-    sizes: ["S", "M"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "h" },
-    flags: { className: "quicklinks-compact" },
   },
   milestones: {
     id: "milestones",
@@ -394,7 +383,6 @@ export const DEFAULT_ORDER: string[] = [
   "jellyfin",
   "arr-stack",
   "storage-apps",
-  "quicklinks",
   "milestones",
   "tracker",
   ...CUSTOM_DEFAULT_ORDER,

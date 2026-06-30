@@ -357,7 +357,7 @@ body {
   border-radius: 22px;
   padding: 16px;
   box-shadow: 4px 4px 0 var(--shadow);
-  transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+  transition: background-color 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* canvas backdrop mode (Hub Core -> appearance) — controls the .frame layer
@@ -370,6 +370,20 @@ html[data-backdrop="blur"] .frame {
 
 html[data-backdrop="transparent"] .frame {
   background: transparent;
+}
+
+/* "glass" — a frosted, Liquid-Glass-style read: more transparent and more
+   blurred than plain `blur` (saturate() keeps whatever shows through from
+   washing out), plus an inset top-edge highlight for the glossy rim-light
+   look. The outer hard-offset sticker shadow is kept (CSS var, not
+   overridden) rather than replaced — every backdrop mode keeps it, so glass
+   stays a translucency variant of the same sticker chrome, not a different
+   card style. .frame has no :hover rule to fight with, so the highlight is
+   safe to add here; see the .block version below for why it's skipped there. */
+html[data-backdrop="glass"] .frame {
+  background: color-mix(in srgb, var(--bg-page) 35%, transparent);
+  backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow: 4px 4px 0 var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 22%, transparent);
 }
 
 @media (min-width: 1024px) {
@@ -431,17 +445,18 @@ html[data-backdrop="transparent"] .frame {
 }
 
 /* ─── slot layout (region-based grid, "Preferred Layout") ──────────
-   Three-column frame: Left | Center | Right. Center stacks a single
-   Terminal slot above the 3x2 Base grid. Left/Right are 2x8 grids.
+   Three-column frame: Left | Center | Right. Center stacks Central Base (a
+   region like any other, defaulting to a single undivided cell — see
+   config/slotLayout.ts) above the 3x2 Base grid. Left/Right are 2x8 grids.
    Column/row ratios default to 2fr 3fr 2fr / 7fr 3fr, which keeps a
    cell roughly the same size across regions — Left/Right are 2 cols /
    8 rows, Base is 3 cols / 2 rows, so Center starts 1.5x a column wide
    and Base starts at ~30% of the height (enough for two M-size rows
    without overflow). These ratios are user-adjustable (lib/slotLayout.ts
-   frameRatios, persisted) via drag handles on the terminal cell's
-   edges — SlotDashboard sets the --col-l/--col-c/--col-r and
-   --row-term/--row-base custom properties below from that state; the
-   var() fallbacks are the defaults above.
+   frameRatios, persisted) via drag handles on Central Base's edges —
+   SlotDashboard sets the --col-l/--col-c/--col-r and --row-center/--row-base
+   custom properties below from that state; the var() fallbacks are the
+   defaults above.
    Placement within each region is separately manual; each .slot-cell's
    gridColumn/gridRow comes from its persisted rect. */
 
@@ -453,7 +468,7 @@ html[data-backdrop="transparent"] .frame {
 
 .slot-center {
   display: grid;
-  grid-template-rows: var(--row-term, 7fr) var(--row-base, 3fr);
+  grid-template-rows: var(--row-center, 7fr) var(--row-base, 3fr);
   gap: 12px;
   min-height: 0;
 }
@@ -522,52 +537,26 @@ html[data-backdrop="transparent"] .frame {
 /* dashed outline on every placed widget while editing — mirrors
    .widget-slot.editing in Graph Layout */
 .slot-cell.editing .block,
-.slot-cell.editing .namecard,
-.slot-terminal.editing .block,
-.slot-terminal.editing .namecard {
+.slot-cell.editing .namecard {
   outline: 1.5px dashed var(--accent-cyan);
   outline-offset: 3px;
   /* block clicks/interactions on widget content in edit mode */
   pointer-events: none;
 }
 
-
-.slot-terminal {
+/* wraps Central Base's SlotRegion — exists only as the positioning anchor
+   for the W/E/S frame-ratio drag handles (SlotDashboard); the region itself
+   (.slot-region, .slot-cell, .slot-cell-empty) is otherwise identical to
+   left/right/base */
+.slot-center-region {
   position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-.slot-terminal > .capsule {
+.slot-center-region > .slot-region {
   flex: 1;
-}
-
-.slot-terminal-empty {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px dashed var(--border);
-  border-radius: 12px;
-  color: var(--text-muted);
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.slot-terminal-empty.editing {
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-
-.slot-terminal-empty.editing:hover,
-.slot-terminal-empty.editing:focus-visible {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-  outline: none;
 }
 
 /* empty placement cell — click target for SlotPlacementPopover */
@@ -719,6 +708,42 @@ html[data-backdrop="transparent"] .frame {
   left: -4px;
 }
 
+/* Edit-mode affordances (move/remove/settings buttons + resize handles) are
+   always mounted but kept inert and invisible until the cell enters .editing,
+   then fade — buttons also lift slightly — in/out. Animating the toggle this
+   way needs them mounted in both states (a mount/unmount can't be CSS-
+   transitioned), which is why SlotWidgetCell renders them unconditionally and
+   leans on these rules. Resize handles keep their per-edge centering transform,
+   so only their opacity animates. */
+.slot-cell .slot-move-btn,
+.slot-cell .slot-remove-btn,
+.slot-cell .slot-settings-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.15s ease, border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.slot-cell .resize-handle {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.slot-cell.editing .slot-move-btn,
+.slot-cell.editing .slot-remove-btn,
+.slot-cell.editing .slot-settings-btn {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.slot-cell.editing .resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* placement popover — extends .wset-panel */
 .slot-popover-empty {
   padding: 10px 4px;
@@ -803,10 +828,10 @@ html[data-backdrop="transparent"] .frame {
     grid-template-columns: 1fr;
   }
 
-  /* frameRatios only affect the desktop 3-column/2-row split — hide the
-     terminal's resize handles on the single-column mobile layout where
+  /* frameRatios only affect the desktop 3-column/2-row split — hide
+     Central Base's resize handles on the single-column mobile layout where
      they'd have no visible effect */
-  .slot-terminal .resize-handle {
+  .slot-center-region .resize-handle {
     display: none;
   }
 }
@@ -822,40 +847,30 @@ html[data-backdrop="transparent"] .frame {
    hovered, so cells that happen to overflow don't show a permanent
    scrollbar track. */
 .slot-cell .block,
-.slot-cell .namecard,
-.slot-terminal .block,
-.slot-terminal .namecard {
+.slot-cell .namecard {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
 }
 
 .slot-cell .block:hover,
-.slot-cell .namecard:hover,
-.slot-terminal .block:hover,
-.slot-terminal .namecard:hover {
+.slot-cell .namecard:hover {
   scrollbar-color: var(--border) transparent;
 }
 
 .slot-cell .block::-webkit-scrollbar,
-.slot-cell .namecard::-webkit-scrollbar,
-.slot-terminal .block::-webkit-scrollbar,
-.slot-terminal .namecard::-webkit-scrollbar {
+.slot-cell .namecard::-webkit-scrollbar {
   width: 6px;
 }
 
 .slot-cell .block::-webkit-scrollbar-thumb,
-.slot-cell .namecard::-webkit-scrollbar-thumb,
-.slot-terminal .block::-webkit-scrollbar-thumb,
-.slot-terminal .namecard::-webkit-scrollbar-thumb {
+.slot-cell .namecard::-webkit-scrollbar-thumb {
   background: transparent;
   border-radius: 3px;
 }
 
 .slot-cell .block:hover::-webkit-scrollbar-thumb,
-.slot-cell .namecard:hover::-webkit-scrollbar-thumb,
-.slot-terminal .block:hover::-webkit-scrollbar-thumb,
-.slot-terminal .namecard:hover::-webkit-scrollbar-thumb {
+.slot-cell .namecard:hover::-webkit-scrollbar-thumb {
   background: var(--border);
 }
 
@@ -866,6 +881,17 @@ html[data-backdrop="transparent"] .frame {
   }
 
   .size-l-more-hoe {
+    transition: none;
+  }
+
+  /* edit-mode controls + outline still toggle instantly when motion is reduced
+     (or on touch/coarse pointers, where the fade reads as lag) */
+  .slot-cell .slot-move-btn,
+  .slot-cell .slot-remove-btn,
+  .slot-cell .slot-settings-btn,
+  .slot-cell .resize-handle,
+  .slot-cell .block,
+  .slot-cell .namecard {
     transition: none;
   }
 }
@@ -966,7 +992,12 @@ html[data-backdrop="transparent"] .frame {
   border: 1.5px solid var(--border);
   box-shadow: 3px 3px 0 var(--shadow);
   overflow: hidden;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.3s ease;
+  /* always-present transparent outline so the edit-mode dashed ring can fade +
+     grow in via outline-color/outline-offset instead of snapping on/off */
+  outline: 1.5px dashed transparent;
+  outline-offset: 2px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.3s ease,
+    outline-color 0.2s ease, outline-offset 0.2s ease;
 }
 
 .block.accent-left {
@@ -993,6 +1024,18 @@ html[data-widget-backdrop="transparent"] .block:not([data-backdrop]) {
   background: transparent;
 }
 
+/* "glass" — same frosted/saturated treatment as .frame's glass mode above,
+   minus the inset rim-light highlight: .block:hover already owns box-shadow
+   (the bigger sticker-shadow-on-hover grow, just below), and equal-specificity
+   selectors resolve by source order, so a box-shadow override here would win
+   over hover and silently kill that grow effect while glass is active. Skipping
+   it keeps hover identical across every backdrop mode, same as blur/transparent
+   already do (they don't touch box-shadow either, for the same reason). */
+html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
+  background: color-mix(in srgb, var(--bg-card) 35%, transparent);
+  backdrop-filter: blur(16px) saturate(1.7);
+}
+
 /* explicit per-widget override — always wins over the widget-default cascade */
 .block[data-backdrop="solid"] {
   background: var(--bg-card);
@@ -1007,6 +1050,11 @@ html[data-widget-backdrop="transparent"] .block:not([data-backdrop]) {
 .block[data-backdrop="transparent"] {
   background: transparent;
   backdrop-filter: none;
+}
+
+.block[data-backdrop="glass"] {
+  background: color-mix(in srgb, var(--bg-card) 35%, transparent);
+  backdrop-filter: blur(16px) saturate(1.7);
 }
 
 /* ─── block typography ───────────────────────────────────────── */

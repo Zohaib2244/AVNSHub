@@ -169,8 +169,10 @@ export function SlotWidgetCell({
   const effectiveHoverEffect = activeHoverEffect ?? flip?.effect;
   const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
 
+  const regionDims = getSlotLayout().regionDims[instance.region];
   const { size, orientation } = sizeClassForFootprint(
     { colSpan: rect.colSpan, rowSpan: rect.rowSpan },
+    regionDims,
     manifest.sizes,
     manifest.orientations,
   );
@@ -290,6 +292,14 @@ export function SlotWidgetCell({
 
   const hoverStyle = flip && effectiveHoverMetrics ? hoverBoxStyle(flip.rect, effectiveHoverMetrics) : null;
 
+  // clamp the grid placement to the region's track count so a stale/oversized
+  // rect (e.g. left over from a region shrink or an interrupted resize) can
+  // never reference an implicit track outside the region and overflow it
+  const safeColSpan = Math.max(1, Math.min(rect.colSpan, regionDims.cols));
+  const safeRowSpan = Math.max(1, Math.min(rect.rowSpan, regionDims.rows));
+  const safeCol = Math.min(Math.max(0, rect.col), regionDims.cols - safeColSpan);
+  const safeRow = Math.min(Math.max(0, rect.row), regionDims.rows - safeRowSpan);
+
   return (
     <div
       ref={cellRef}
@@ -298,66 +308,73 @@ export function SlotWidgetCell({
       }`}
       data-hover-expand={effectiveHoverEffect?.state}
       style={{
-        gridColumn: hoverStyle ? undefined : `${rect.col + 1} / span ${rect.colSpan}`,
-        gridRow: hoverStyle ? undefined : `${rect.row + 1} / span ${rect.rowSpan}`,
+        gridColumn: hoverStyle ? undefined : `${safeCol + 1} / span ${safeColSpan}`,
+        gridRow: hoverStyle ? undefined : `${safeRow + 1} / span ${safeRowSpan}`,
         ...hoverStyle,
       }}
       onPointerEnter={handleHoverPointerEnter}
     >
-      {editMode && (
-        <>
-          <button
-            type="button"
-            className="slot-move-btn"
-            aria-label={`move ${instance.id} widget`}
-            title="move widget"
-            onPointerDown={(e) => startDrag("move", e)}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-          >
-            <Move size={12} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            className="slot-remove-btn"
-            aria-label={`remove ${instance.id} widget`}
-            onClick={() => removeWidget(instance.id)}
-          >
-            <X size={12} strokeWidth={1.75} />
-          </button>
-          <button
-            type="button"
-            className="slot-settings-btn"
-            aria-label={`configure ${instance.id} widget`}
-            onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
-          >
-            <Settings2 size={12} strokeWidth={1.75} />
-          </button>
-          <AnimatePresence>
-            {settingsOpen && (
-              <WidgetSettingsPopover
-                key="slot-settings"
-                manifest={manifest}
-                instance={settingsInstance}
-                onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
-                onHide={() => removeWidget(instance.id)}
-                onClose={() => setActivePopover(null)}
-              />
-            )}
-          </AnimatePresence>
-          {DIRECTIONS.map((dir) => (
-            <div
-              key={dir}
-              className={`resize-handle resize-handle-${dir}`}
-              onPointerDown={(e) => startDrag("resize", e, dir)}
-              onPointerMove={handlePointerMove}
-              onPointerUp={handlePointerUp}
-              onPointerCancel={handlePointerUp}
-            />
-          ))}
-        </>
-      )}
+      {/* Edit-mode controls stay mounted but inert (CSS hides them and turns
+          off pointer-events until .slot-cell.editing) so entering/leaving edit
+          mode can fade them in/out instead of popping — a mount/unmount can't
+          be CSS-transitioned. tabIndex tracks editMode so they leave the tab
+          order when hidden. */}
+      <button
+        type="button"
+        className="slot-move-btn"
+        aria-label={`move ${instance.id} widget`}
+        title="move widget"
+        tabIndex={editMode ? 0 : -1}
+        aria-hidden={!editMode}
+        onPointerDown={(e) => startDrag("move", e)}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <Move size={12} strokeWidth={1.75} />
+      </button>
+      <button
+        type="button"
+        className="slot-remove-btn"
+        aria-label={`remove ${instance.id} widget`}
+        tabIndex={editMode ? 0 : -1}
+        aria-hidden={!editMode}
+        onClick={() => removeWidget(instance.id)}
+      >
+        <X size={12} strokeWidth={1.75} />
+      </button>
+      <button
+        type="button"
+        className="slot-settings-btn"
+        aria-label={`configure ${instance.id} widget`}
+        tabIndex={editMode ? 0 : -1}
+        aria-hidden={!editMode}
+        onClick={() => setActivePopover(settingsOpen ? null : popoverKey)}
+      >
+        <Settings2 size={12} strokeWidth={1.75} />
+      </button>
+      <AnimatePresence>
+        {editMode && settingsOpen && (
+          <WidgetSettingsPopover
+            key="slot-settings"
+            manifest={manifest}
+            instance={settingsInstance}
+            onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
+            onHide={() => removeWidget(instance.id)}
+            onClose={() => setActivePopover(null)}
+          />
+        )}
+      </AnimatePresence>
+      {DIRECTIONS.map((dir) => (
+        <div
+          key={dir}
+          className={`resize-handle resize-handle-${dir}`}
+          onPointerDown={(e) => startDrag("resize", e, dir)}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+        />
+      ))}
       <WidgetShell
         manifest={manifest}
         config={{

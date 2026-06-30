@@ -1,0 +1,11 @@
+{
+  "title": "cookie clicker",
+  "iconName": "Globe",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "clickPower", "label": "click power", "type": "number", "default": 1, "min": 1, "max": 1000 },
+    { "key": "showUpgrades", "label": "show upgrades", "type": "toggle", "default": true }
+  ]
+}

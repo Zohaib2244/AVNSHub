@@ -1,0 +1,8 @@
+{
+  "title": "office game dev",
+  "iconName": "Zap",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": []
+}
