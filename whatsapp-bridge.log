@@ -1,0 +1,116 @@
+
+> avn-hub@2.1.0 whatsapp:bridge
+> node scripts/whatsapp-bridge.mjs
+
+[whatsapp-bridge] starting on http://127.0.0.1:3333
+[whatsapp-bridge] auth directory: F:\Dev\AVNSHub\.whatsapp-auth
+[whatsapp-bridge] connected on http://127.0.0.1:3333
+{"level":50,"time":1782836347151,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836347152,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"120363390600403985@g.us","fromMe":false,"id":"A56D87C42B8571003116638B959DB456","participant":"61439658197046@lid","participantAlt":"923124362458@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"120363390600403985@g.us","author":"61439658197046@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":50,"time":1782836347428,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836347428,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"120363390600403985@g.us","fromMe":false,"id":"A512BFD746AB657987C401F783506853","participant":"61439658197046@lid","participantAlt":"923124362458@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"120363390600403985@g.us","author":"61439658197046@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":50,"time":1782836347773,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836347773,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"120363390600403985@g.us","fromMe":false,"id":"A51C6734C59F53BF806A871909CEB424","participant":"61439658197046@lid","participantAlt":"923124362458@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"120363390600403985@g.us","author":"61439658197046@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":50,"time":1782836348052,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836348052,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"120363390600403985@g.us","fromMe":false,"id":"A523375D95668D3C1AB59733CE9B98AC","participant":"61439658197046@lid","participantAlt":"923124362458@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"120363390600403985@g.us","author":"61439658197046@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":40,"time":1782836374765,"pid":26308,"hostname":"NutsMagchine","msg":"Buffer timeout reached, auto-flushing"}
+{"level":50,"time":1782836378529,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836378529,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"923334615345-1509121503@g.us","fromMe":false,"id":"AC535D4782CFDA8EF62A75A4B2FA26DA","participant":"65622905991256@lid","participantAlt":"923214444100@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"923334615345-1509121503@g.us","author":"65622905991256@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":50,"time":1782836378789,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782836378789,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"923334615345-1509121503@g.us","fromMe":false,"id":"AC18DA08CCFEF816B1120523FA812FDD","participant":"65622905991256@lid","participantAlt":"923214444100@s.whatsapp.net","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"923334615345-1509121503@g.us","author":"65622905991256@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
+{"level":50,"time":1782836389569,"pid":26308,"hostname":"NutsMagchine","err":{"type":"SyntaxError","message":"Unexpected non-whitespace character after JSON at position 13 (line 1 column 14)","stack":"SyntaxError: Unexpected non-whitespace character after JSON at position 13 (line 1 column 14)\n    at JSON.parse (<anonymous>)\n    at file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/process-message.js:510:78\n    at Array.map (<anonymous>)\n    at processMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/process-message.js:510:62)\n    at file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/chats.js:1008:13\n    at file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/event-buffer.js:145:42\n    at file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-recv.js:1257:31"},"msg":"unexpected error in 'processing offline notification'"}
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] disconnected: 428
+[whatsapp-bridge] connected on http://127.0.0.1:3333
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+[whatsapp-bridge] @nutbot mention from shahwaiz; asking NutBot...
+[whatsapp-bridge] NutBot mention reply failed: TypeError: Cannot read properties of undefined (reading 'undefined')
+    at generateWAMessageFromContent (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:568:64)
+    at generateWAMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/messages.js:622:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async Object.sendMessage (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Socket/messages-send.js:1068:33)
+    at async replyToMention (file:///F:/Dev/AVNSHub/scripts/whatsapp-bridge.mjs:267:18)
+{"level":50,"time":1782838450020,"pid":26308,"hostname":"NutsMagchine","error":{},"msg":"transaction failed, rolling back"}
+{"level":50,"time":1782838450020,"pid":26308,"hostname":"NutsMagchine","key":{"remoteJid":"120363426930987160@g.us","fromMe":true,"id":"3EB07A5A9691036BACE9AA","participant":"266743255720156:83@lid","addressingMode":"lid"},"err":{"type":"Error","message":"No session found to decrypt message","stack":"Error: No session found to decrypt message\n    at GroupCipher.decrypt (file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Signal/Group/group_cipher.js:35:19)\n    at async file:///F:/Dev/AVNSHub/node_modules/@whiskeysockets/baileys/lib/Utils/auth-utils.js:250:40"},"messageType":"skmsg","sender":"120363426930987160@g.us","author":"266743255720156:83@lid","isSessionRecordError":false,"msg":"failed to decrypt message"}
