@@ -5,7 +5,13 @@ import { Send, Square, PlusCircle } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
-import { placeWidgetAuto, unplaceWidgetTemporarily, restorePlacementSnapshot, type PlacementSnapshot } from "@/lib/slotLayout";
+import {
+  placeWidgetAuto,
+  unplaceWidgetTemporarily,
+  restorePlacementSnapshot,
+  getPlacementSnapshot,
+  type PlacementSnapshot,
+} from "@/lib/slotLayout";
 import { isValidSlug } from "@/lib/widget-creator/slug";
 
 type Phase =
@@ -55,7 +61,7 @@ function StatusBar({ phase }: { phase: Phase }) {
   );
 }
 
-// Mirrors the registration check in writeWidgetConfig() (generate/route.ts) —
+// Mirrors the slug check in registerCustomWidget() (lib/widget-creator/customRegistry.ts) —
 // catch a missing/invalid slug here, before spawning a harness, instead of
 // after a full generation run completes.
 function validateSettings(settings: GenerateSettings): string | null {
@@ -67,6 +73,36 @@ function validateSettings(settings: GenerateSettings): string | null {
 }
 
 const MESSAGES_KEY = "nutmag-creator-messages";
+// `registered` distinguishes "already wired into customComponentMap.tsx /
+// customRegistry.json" (an edit to a pre-existing widget — the generate route
+// applies that immediately) from "still needs the explicit add-to-layout
+// commit" (a brand-new widget — see registerCustomWidget()'s doc comment).
+const DONE_KEY = "nutmag-creator-done";
+// set right before the add-to-layout click's register fetch, so a full reload
+// triggered by that commit (Fast Refresh can't hot-swap customComponentMap.tsx)
+// doesn't strand the user on a finished widget with no visible next step
+const PENDING_ADD_KEY = "nutmag-creator-pending-add";
+
+type DoneRecord = { slug: string; registered: boolean };
+
+function readDoneRecord(): DoneRecord | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(DONE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<DoneRecord>;
+    return typeof parsed.slug === "string" ? { slug: parsed.slug, registered: Boolean(parsed.registered) } : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeDoneRecord(record: DoneRecord | null) {
+  try {
+    if (record) sessionStorage.setItem(DONE_KEY, JSON.stringify(record));
+    else sessionStorage.removeItem(DONE_KEY);
+  } catch {}
+}
 
 export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessChain }: Props) {
   const [messages, setMessages] = useState<Message[]>(() => {
@@ -79,19 +115,16 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     return [];
   });
   const [prompt, setPrompt] = useState("");
-  // restore done state from sessionStorage so HMR doesn't lose it
-  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("nutmag-creator-done") ?? null;
-    }
-    return null;
+  // restore done state from sessionStorage so HMR/reload doesn't lose it
+  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => readDoneRecord()?.slug ?? null);
+  const [pendingRegistration, setPendingRegistration] = useState(() => {
+    const done = readDoneRecord();
+    return done ? !done.registered : false;
   });
-  const [phase, setPhase] = useState<Phase>(() => {
-    if (typeof window !== "undefined" && sessionStorage.getItem("nutmag-creator-done")) {
-      return { id: "done" };
-    }
-    return { id: "idle" };
-  });
+  const [phase, setPhase] = useState<Phase>(() => (readDoneRecord() ? { id: "done" } : { id: "idle" }));
+  // a widget is only "added" once it's actually confirmed placed on the
+  // canvas — for a brand-new widget that's after the register+place click; for
+  // an edit it's set from restorePlacementSnapshot()'s return value below
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   // tracks a widget pulled off the canvas for the duration of an edit-mode run
@@ -145,7 +178,8 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     // clear any prior run's result so retrying after done/error starts clean
     setDoneWidgetId(null);
     setAdded(false);
-    try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
+    setPendingRegistration(false);
+    writeDoneRecord(null);
 
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
@@ -216,6 +250,11 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
               setPhase({ id: "tsc" });
             } else if (type === "done") {
               const slug = (payload.slug as string | null) ?? null;
+              // true only for an edit to an already-committed widget — the
+              // generate route wired it into the registry immediately (see
+              // registerCustomWidget()'s doc comment). false means a brand-new
+              // widget that still needs the explicit "add to layout" commit.
+              const registered = Boolean(payload.registered);
               setPhase({ id: "done" });
               setMessages((prev) => {
                 const updated = [...prev];
@@ -225,22 +264,31 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
                 }
                 return [
                   ...updated,
-                  { role: "ok", text: "[ok] widget written — click '+ add to layout' below. keep chatting here to iterate on it." },
+                  {
+                    role: "ok",
+                    text: registered
+                      ? "[ok] widget updated. keep chatting here to iterate on it."
+                      : "[ok] widget written — click '+ add to layout' below. keep chatting here to iterate on it.",
+                  },
                 ];
               });
               clearSignal();
               // the run finished cleanly (no tsc errors, or we wouldn't be in this
-              // branch) — safe to put an edited widget back where it was
+              // branch) — safe to put an edited widget back where it was; only
+              // true if it was actually pulled off the canvas at the start (it
+              // may not have been, e.g. editing a widget that wasn't placed)
+              let restoredOk = false;
               if (slug && hiddenEditRef.current?.slug === slug) {
-                restorePlacementSnapshot(slug, hiddenEditRef.current.snapshot);
+                restoredOk = restorePlacementSnapshot(slug, hiddenEditRef.current.snapshot);
                 hiddenEditRef.current = null;
                 setEditHidden(false);
               }
               if (slug) {
                 setDoneWidgetId(slug);
-                setAdded(false);
+                setAdded(restoredOk);
+                setPendingRegistration(!registered);
                 emitWidgetCreated(slug);
-                try { sessionStorage.setItem("nutmag-creator-done", slug); } catch {}
+                writeDoneRecord({ slug, registered });
                 // switch this session into edit mode targeting the widget we just
                 // wrote, so a follow-up message in the same chat naturally edits
                 // it instead of erroring out or trying to recreate it
@@ -331,39 +379,154 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     setPhase({ id: "idle" });
     setDoneWidgetId(null);
     setAdded(false);
+    setPendingRegistration(false);
     // a finished session may have auto-switched into edit mode and accumulated
     // identity fields for the widget it was targeting — starting a new chat
     // must reset all of it, or a stale slug surviving into the next message
     // could get misread as "create" for a widget that already exists (the
     // exact desync that let an edit-mode run delete a working widget)
     onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
-    try { sessionStorage.removeItem("nutmag-creator-done"); } catch {}
+    writeDoneRecord(null);
+    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
     try { sessionStorage.removeItem(MESSAGES_KEY); } catch {}
   }
 
-  // placeWidgetAuto can fail right after a "done" event because the registry
-  // module the dashboard reads from (CUSTOM_WIDGETS) hasn't picked up the
-  // dev-server's file-watcher/HMR update yet — retry briefly instead of
-  // reporting success regardless of whether the placement actually happened.
+  // placeWidgetAuto can fail right after registration because the dashboard's
+  // CUSTOM_WIDGETS module hasn't picked up the dev-server's file-watcher/HMR
+  // update yet — retry briefly instead of reporting success regardless of
+  // whether the placement actually happened. Already-placed counts as success
+  // (rather than retrying to exhaustion) so this is safe to re-enter after the
+  // mount-effect below has already finished the job across a reload.
+  async function placeWithRetry(slug: string, attempts: number, delayMs: number): Promise<boolean> {
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      if (getPlacementSnapshot(slug).kind !== "none" || placeWidgetAuto(slug)) return true;
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    return false;
+  }
+
+  // Resume an "add to layout" commit that was in flight when a reload hit —
+  // registering a brand-new widget appends to customComponentMap.tsx, which
+  // Fast Refresh can't hot-swap, so the dev server typically force-reloads the
+  // page right as (or just after) the register fetch resolves. PENDING_ADD_KEY
+  // survives that reload; this picks the placement back up once the new
+  // widget's lazy entry is actually live. If no reload happened (Fast Refresh
+  // handled it gracefully), handleAddToLayout's own inline retry below already
+  // finished the job and cleared the marker before this could ever run.
+  useEffect(() => {
+    let pendingSlug: string | null = null;
+    try {
+      pendingSlug = sessionStorage.getItem(PENDING_ADD_KEY);
+    } catch {}
+    if (!pendingSlug) return;
+
+    let cancelled = false;
+    const slug = pendingSlug;
+    (async () => {
+      const ok = await placeWithRetry(slug, 16, 300);
+      if (cancelled) return;
+      try {
+        sessionStorage.removeItem(PENDING_ADD_KEY);
+      } catch {}
+      if (ok) {
+        const done = readDoneRecord();
+        if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+        if (doneWidgetId === slug) {
+          setAdded(true);
+          setPendingRegistration(false);
+          setAdding(false);
+        }
+      } else {
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "error",
+            text: `"${slug}" was registered but couldn't be auto-placed after the reload — every region may be full. Try the Widget Manager.`,
+          },
+        ]);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // mount-only: this resumes whatever was pending when the component last
+    // unmounted (e.g. via reload), not something that should re-run per render
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleAddToLayout() {
     if (!doneWidgetId || adding) return;
+    const slug = doneWidgetId;
     setAdding(true);
-    for (let attempt = 0; attempt < 12; attempt++) {
-      if (placeWidgetAuto(doneWidgetId)) {
+
+    if (pendingRegistration) {
+      try {
+        sessionStorage.setItem(PENDING_ADD_KEY, slug);
+      } catch {}
+      setMessages((prev) => [
+        ...prev,
+        { role: "ok", text: `[info] adding "${slug}" to the layout — the page will refresh once to pick up the new widget.` },
+      ]);
+      try {
+        const res = await fetch("/api/widget-creator/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            slug,
+            name: settings.name,
+            icon: settings.icon,
+            sizes: settings.sizes,
+            orientations: settings.orientations,
+          }),
+        });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        if (!res.ok || !body.ok) {
+          try {
+            sessionStorage.removeItem(PENDING_ADD_KEY);
+          } catch {}
+          setAdding(false);
+          setMessages((prev) => [
+            ...prev,
+            { role: "error", text: `couldn't register "${slug}": ${body.error ?? `server error ${res.status}`}` },
+          ]);
+          return;
+        }
+      } catch (err) {
+        try {
+          sessionStorage.removeItem(PENDING_ADD_KEY);
+        } catch {}
         setAdding(false);
-        setAdded(true);
+        setMessages((prev) => [...prev, { role: "error", text: `couldn't register "${slug}": ${(err as Error).message}` }]);
         return;
       }
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      setPendingRegistration(false);
+      const done = readDoneRecord();
+      if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+      // registration write may have just triggered (or be about to trigger) a
+      // full reload — if it did, this component is about to unmount and
+      // everything below is abandoned harmlessly; the mount-effect above picks
+      // up PENDING_ADD_KEY and finishes the job on the other side. If it
+      // didn't (Fast Refresh handled it without a reload), we just fall
+      // through and finish placement ourselves right here.
     }
+
+    const ok = await placeWithRetry(slug, 12, 250);
+    try {
+      sessionStorage.removeItem(PENDING_ADD_KEY);
+    } catch {}
     setAdding(false);
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "error",
-        text: `couldn't place "${doneWidgetId}" on the canvas — every region may be full, or the dashboard hasn't picked up the new widget yet. Try the Widget Manager, or reload the page.`,
-      },
-    ]);
+    if (ok) {
+      setAdded(true);
+    } else {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "error",
+          text: `couldn't place "${slug}" on the canvas — every region may be full, or the dashboard hasn't picked up the new widget yet. Try the Widget Manager, or reload the page.`,
+        },
+      ]);
+    }
   }
 
   function restoreHiddenEditWidget() {
@@ -453,7 +616,13 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
               new
             </button>
             {doneWidgetId && !added && (
-              <button type="button" className="wc-add-btn" onClick={handleAddToLayout} disabled={adding}>
+              <button
+                type="button"
+                className="wc-add-btn"
+                onClick={handleAddToLayout}
+                disabled={adding}
+                title={pendingRegistration ? "commits the widget and refreshes the page once" : undefined}
+              >
                 <PlusCircle size={11} strokeWidth={2} />
                 {adding ? "adding..." : "add to layout"}
               </button>

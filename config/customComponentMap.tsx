@@ -18,6 +18,7 @@ const _atom_bomb = lazy(() => import("@/components/widgets/custom/atom-bomb/Atom
 const _diss_glade = lazy(() => import("@/components/widgets/custom/diss-glade/DissGladeWidget").then((m) => ({ default: m.DissGladeWidget })));
 const _dot_matrix = lazy(() => import("@/components/widgets/custom/dot-matrix/DotMatrixWidget").then((m) => ({ default: m.DotMatrixWidget })));
 const _whatsapp = lazy(() => import("@/components/widgets/custom/whatsapp/WhatsappWidget").then((m) => ({ default: m.WhatsappWidget })));
+const _cookie_clicker = lazy(() => import("@/components/widgets/custom/cookie-clicker/CookieClickerWidget").then((m) => ({ default: m.CookieClickerWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -30,5 +31,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "diss-glade": _diss_glade,
   "dot-matrix": _dot_matrix,
   "whatsapp": _whatsapp,
+  "cookie-clicker": _cookie_clicker,
 // --- custom-map end ---
 };

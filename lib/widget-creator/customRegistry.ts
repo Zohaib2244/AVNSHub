@@ -106,7 +106,7 @@ export function pruneOrphanCustomWidgetFiles(): string[] {
 const SIZES = new Set(["S", "M", "L"]);
 const ORIENTATIONS = new Set(["h", "v"]);
 
-type EntryInput = {
+export type EntryInput = {
   id: string;
   name?: string;
   icon?: string;
@@ -222,6 +222,50 @@ export function addToComponentMap(id: string, mod?: ComponentModule): void {
   content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
   writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");
+}
+
+/** Wire an already-on-disk component + manifest.json into the split config:
+    build the entry from the creator's structured settings, overlay the
+    LLM-authored manifest.json, write it into customRegistry.json, and append
+    the one lazy line to customComponentMap.tsx (addToComponentMap() no-ops if
+    that line already exists, e.g. on a repeat edit).
+    Shared by two call sites with very different reload tolerance:
+      - the generate route auto-calls this for an edit to an *already-committed*
+        widget — customRegistry.json is the only file that changes (JSON-only,
+        Fast Refresh hot-updates it fine), so it's safe to apply immediately.
+      - the register route calls this for a brand-new widget's first commit —
+        appending to customComponentMap.tsx is the one write Next's Fast Refresh
+        can't hot-swap (it's a .tsx file that exports data, not a component, so
+        a change there forces a full reload). That write is deliberately
+        deferred until the user explicitly clicks "add to layout", instead of
+        happening mid-generation where the reload would tear down the SSE
+        stream before the "done" event ever reaches the client. */
+export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: string } {
+  if (!isValidCustomWidgetId(input.id)) return { ok: false, error: `invalid slug "${input.id}"` };
+
+  const dir = join(CUSTOM_WIDGETS_DIR, input.id);
+  const mod = findComponentModule(input.id);
+  if (!mod) {
+    return { ok: false, error: `no component .tsx file was created in components/widgets/custom/${input.id}/` };
+  }
+
+  const existing = readRegistry()[input.id];
+  let entry = buildRegistryEntry(input, existing);
+
+  // overlay the LLM-authored per-widget manifest.json when it parses cleanly;
+  // a malformed manifest is ignored so it can never corrupt the registry
+  const manifestPath = join(dir, "manifest.json");
+  if (existsSync(manifestPath)) {
+    try {
+      entry = mergeWidgetManifest(entry, JSON.parse(readFileSync(manifestPath, "utf-8")));
+    } catch {
+      /* keep the settings-derived entry */
+    }
+  }
+
+  upsertRegistryEntry(input.id, entry);
+  addToComponentMap(input.id, mod);
+  return { ok: true };
 }
 
 /** remove this widget's declaration + map entry by id — line-based so it works

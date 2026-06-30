@@ -433,24 +433,46 @@ export function getRegionDims(region: SlotRegionId): RegionDims {
   return getSlotLayout().regionDims[region];
 }
 
-/** resize a region's grid (clamped to REGION_DIMS_BOUNDS); widgets in that
-    region that no longer fit (e.g. after a shrink) are dropped back to the
-    unplaced pool — same "drop, don't auto-correct" rule sanitize() applies
-    to a corrupted stored layout */
+/** resize a region's grid (clamped to REGION_DIMS_BOUNDS). Widgets in the
+    resized region are *refitted* rather than dropped: each one's span is
+    clamped to the new bounds, it keeps its current cell if that still fits,
+    otherwise it relocates to the first free spot (reading order). Only a
+    widget that can't fit at all — i.e. the region is genuinely full — falls
+    back to the unplaced pool. This avoids the old "drop-or-keep" behavior,
+    where a shrink either left a widget exactly in place or made it vanish,
+    and could strand a cell referencing a grid track outside the resized
+    region (an implicit-track overflow that "sticks" and clips). */
 export function setRegionDims(region: SlotRegionId, dims: RegionDims) {
   const current = getSlotLayout();
   const clamped = clampRegionDims({ cols: Math.round(dims.cols), rows: Math.round(dims.rows) });
   const existing = current.regionDims[region];
   if (clamped.cols === existing.cols && clamped.rows === existing.rows) return;
 
-  const regionRects: Rect[] = [];
-  const widgets = current.widgets.filter((w) => {
-    if (w.region !== region) return true;
-    const rect = rectOf(w);
-    if (!isValidPlacement(clamped, [...regionRects, rect])) return false;
-    regionRects.push(rect);
-    return true;
-  });
+  const widgets: SlotWidgetInstance[] = [];
+  for (const w of current.widgets) {
+    if (w.region !== region) {
+      widgets.push(w);
+      continue;
+    }
+
+    const min = minFootprint(w.id);
+    const colSpan = Math.max(min.colSpan, Math.min(w.colSpan, clamped.cols));
+    const rowSpan = Math.max(min.rowSpan, Math.min(w.rowSpan, clamped.rows));
+    // even the minimum footprint is wider/taller than the region → drop it
+    if (colSpan > clamped.cols || rowSpan > clamped.rows) continue;
+
+    const footprint = { colSpan, rowSpan };
+    const occupancy = buildOccupancy(clamped, widgets.filter((p) => p.region === region).map(rectOf));
+    // clamp the existing cell in-bounds, prefer keeping it, else relocate
+    const col = Math.min(Math.max(0, w.col), clamped.cols - colSpan);
+    const row = Math.min(Math.max(0, w.row), clamped.rows - rowSpan);
+    const spot = canPlace({ col, row, ...footprint }, clamped, occupancy)
+      ? { col, row }
+      : findFit(clamped, occupancy, footprint);
+    if (!spot) continue; // region full → return to unplaced pool
+
+    widgets.push({ ...w, col: spot.col, row: spot.row, colSpan, rowSpan });
+  }
 
   commit({ ...current, regionDims: { ...current.regionDims, [region]: clamped }, widgets });
 }

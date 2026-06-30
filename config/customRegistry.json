@@ -474,8 +474,14 @@
         "type": "select",
         "default": "mention",
         "options": [
-          { "value": "mention", "label": "only when @nutbot is tagged" },
-          { "value": "latest", "label": "every latest message" }
+          {
+            "value": "mention",
+            "label": "only when @nutbot is tagged"
+          },
+          {
+            "value": "latest",
+            "label": "every latest message"
+          }
         ]
       },
       {
@@ -504,10 +510,22 @@
         "type": "select",
         "default": "bonfire",
         "options": [
-          { "value": "bonfire", "label": "bonfire (local llm)" },
-          { "value": "claude", "label": "claude" },
-          { "value": "codex", "label": "codex" },
-          { "value": "opencode", "label": "opencode" }
+          {
+            "value": "bonfire",
+            "label": "bonfire (local llm)"
+          },
+          {
+            "value": "claude",
+            "label": "claude"
+          },
+          {
+            "value": "codex",
+            "label": "codex"
+          },
+          {
+            "value": "opencode",
+            "label": "opencode"
+          }
         ]
       },
       {
@@ -515,6 +533,38 @@
         "label": "bonfire nsfw mode",
         "type": "toggle",
         "default": false
+      }
+    ]
+  },
+  "cookie-clicker": {
+    "title": "cookie clicker",
+    "iconName": "Globe",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "clickPower",
+        "label": "click power",
+        "type": "number",
+        "default": 1,
+        "min": 1,
+        "max": 1000
+      },
+      {
+        "key": "showUpgrades",
+        "label": "show upgrades",
+        "type": "toggle",
+        "default": true
       }
     ]
   }

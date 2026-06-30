@@ -694,6 +694,42 @@ html[data-backdrop="transparent"] .frame {
   left: -4px;
 }
 
+/* Edit-mode affordances (move/remove/settings buttons + resize handles) are
+   always mounted but kept inert and invisible until the cell enters .editing,
+   then fade — buttons also lift slightly — in/out. Animating the toggle this
+   way needs them mounted in both states (a mount/unmount can't be CSS-
+   transitioned), which is why SlotWidgetCell renders them unconditionally and
+   leans on these rules. Resize handles keep their per-edge centering transform,
+   so only their opacity animates. */
+.slot-cell .slot-move-btn,
+.slot-cell .slot-remove-btn,
+.slot-cell .slot-settings-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, color 0.15s ease, border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.slot-cell .resize-handle {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.slot-cell.editing .slot-move-btn,
+.slot-cell.editing .slot-remove-btn,
+.slot-cell.editing .slot-settings-btn {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.slot-cell.editing .resize-handle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 /* placement popover — extends .wset-panel */
 .slot-popover-empty {
   padding: 10px 4px;
@@ -833,6 +869,17 @@ html[data-backdrop="transparent"] .frame {
   .size-l-more-hoe {
     transition: none;
   }
+
+  /* edit-mode controls + outline still toggle instantly when motion is reduced
+     (or on touch/coarse pointers, where the fade reads as lag) */
+  .slot-cell .slot-move-btn,
+  .slot-cell .slot-remove-btn,
+  .slot-cell .slot-settings-btn,
+  .slot-cell .resize-handle,
+  .slot-cell .block,
+  .slot-cell .namecard {
+    transition: none;
+  }
 }
 
 /* ─── narrow / mobile: collapse Slot Layout to a single stacked flow ──────
@@ -931,7 +978,12 @@ html[data-backdrop="transparent"] .frame {
   border: 1.5px solid var(--border);
   box-shadow: 3px 3px 0 var(--shadow);
   overflow: hidden;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.3s ease;
+  /* always-present transparent outline so the edit-mode dashed ring can fade +
+     grow in via outline-color/outline-offset instead of snapping on/off */
+  outline: 1.5px dashed transparent;
+  outline-offset: 2px;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease, background-color 0.3s ease,
+    outline-color 0.2s ease, outline-offset 0.2s ease;
 }
 
 .block.accent-left {
