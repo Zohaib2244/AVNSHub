@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Search,
   Settings,
+  Sparkles,
   Square,
   Sun,
   SunMoon,
@@ -302,6 +303,7 @@ const BACKDROP_OPTIONS: { mode: BackdropMode; Icon: typeof Square; label: string
   { mode: "solid", Icon: Square, label: "solid" },
   { mode: "blur", Icon: Droplets, label: "blur" },
   { mode: "transparent", Icon: Ghost, label: "transparent" },
+  { mode: "glass", Icon: Sparkles, label: "glass" },
 ];
 
 function BackdropModeRow({

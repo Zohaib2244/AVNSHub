@@ -14,7 +14,6 @@ import { useEffect, useSyncExternalStore } from "react";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
 import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
-import { QuickLinks } from "@/components/widgets/default/identity/QuickLinks";
 import { SessionTracker } from "@/components/widgets/default/identity/SessionTracker";
 import { UptimeMilestonesStatic } from "@/components/widgets/default/identity/UptimeMilestonesStatic";
 import { AmbientSoundWidget } from "@/components/widgets/default/ambient/AmbientSoundWidget";
@@ -145,9 +144,6 @@ export function WallpaperDashboard() {
 
         <Card id="milestones" size="M" span="span 3">
           <UptimeMilestonesStatic />
-        </Card>
-        <Card id="quicklinks" size="M" span="span 1">
-          <QuickLinks />
         </Card>
         <Card id="tracker" size="M" span="span 2">
           <SessionTracker />

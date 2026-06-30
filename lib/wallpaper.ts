@@ -24,7 +24,7 @@
 import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
 import { idbDelete, idbGet, idbSet } from "@/lib/idb";
 
-export type BackdropMode = "solid" | "blur" | "transparent";
+export type BackdropMode = "solid" | "blur" | "transparent" | "glass";
 export type WallpaperKind = "image" | "video";
 
 const CANVAS_MODE_KEY = "nutmag-backdrop";
@@ -124,7 +124,7 @@ export function setParallax(canvasId: string, enabled: boolean) {
 
 function readMode(key: string): BackdropMode {
   const stored = localStorage.getItem(key);
-  return stored === "blur" || stored === "transparent" ? stored : "solid";
+  return stored === "blur" || stored === "transparent" || stored === "glass" ? stored : "solid";
 }
 
 function applyMode(attr: "backdrop" | "widgetBackdrop", mode: BackdropMode) {

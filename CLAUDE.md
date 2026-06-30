@@ -1,7 +1,7 @@
 ﻿# CLAUDE.md â€” AVN Hub
 
 ## What this is
-A living personal dashboard for what I'm listening to, what game I'm playing, whether my homelab is alive, and what I'm currently building. Not a portfolio. Not a resume. A living dashboard.
+AVN Hub is a self-hosted, infinitely extensible dashboard framework - an empty canvas you fill with whatever you want. It started as a personal dashboard (Spotify, Steam, homelab status, GitHub activity) and that starter set still ships, but those are example widgets, not the point of the project. The point is the framework underneath: a widget system anyone can host on their own machine, plus a NutBot-powered chat tool that scaffolds brand-new widgets from a single prompt - so the canvas can become a homelab monitor, a creative-coding sketchpad, a trading dashboard, a household chore board, or anything else, without anyone touching the framework code. Not a portfolio. Not a resume. Not a homelab accessory. An empty canvas, and the tools to fill it.
 
 ---
 
@@ -9,7 +9,7 @@ A living personal dashboard for what I'm listening to, what game I'm playing, wh
 - **Framework**: Next.js (App Router)
 - **Styling**: Tailwind CSS + custom CSS variables
 - **Animations**: Framer Motion
-- **Deployment**: Self-hosted Docker (runs on the homelab â€” thematically fitting since the card reports on the same infra it lives on). Accessed via **Tailscale** (MagicDNS hostname + `tailscale serve` for automatic HTTPS within the tailnet) â€” no public domain purchase, no separate reverse proxy/Let's Encrypt setup, fully free and private
+- **Deployment**: Self-hosted Docker - run it anywhere: a homelab box, a NAS, a spare laptop, a VPS, whatever's around. Accessed via **Tailscale** (MagicDNS hostname + `tailscale serve` for automatic HTTPS within the tailnet) â€” no public domain purchase, no separate reverse proxy/Let's Encrypt setup, fully free and private, regardless of where the container actually lives
 - **Language**: TypeScript throughout
 
 ---
@@ -38,7 +38,7 @@ A living personal dashboard for what I'm listening to, what game I'm playing, wh
 - **Motion**: Subtle data transitions and per-size content swaps. No scanlines, no grain, no phosphor glow.
 - **Theme packs**: the token table above is the default **ember** palette. Alternate packs (slate, moss, plum, reef, raspberry, circuit, graphite â€” each with dark+light variants) live as `[data-palette="â€¦"]` blocks in `globals.css` with metadata in `config/themes.ts`; picked from Hub Core settings, persisted to `localStorage["nutmag-palette"]`, applied pre-paint by the inline script in `app/layout.tsx` and re-applied at runtime by `ThemeRuntimeSync`. New packs must define the full 14-token set for both modes and respect every other rule in this section
 - **Never use**: Inter, Roboto, Arial, system fonts, purple gradients, centered portfolio layouts, pure black/white, neon glow, CRT scanlines/grain, blurred shadows
-- **Wallpaper + backdrop modes** (`lib/wallpaper.ts`): three stacked layers — **BG** (an optional per-canvas wallpaper image, stored in IndexedDB via `lib/idb.ts`'s generic blob store, rendered by `WallpaperLayer`; has no mode of its own), **canvas** (`.frame`, the bezel holding the grid), **widgets** (`.block`). Canvas and widgets each get their own independent solid/blur/transparent dial in Hub Core's Appearance settings (`data-backdrop` / `data-widget-backdrop` on `<html>`) — the widget dial is a *global default* every widget inherits via "auto", separate from each widget's own per-instance override in its gear popover; it does not cascade from the canvas dial. `blur` uses `backdrop-filter: blur()` for frosted-glass translucency over BG — a distinct, deliberate exception from the "blurred shadows" rule above, which still refers only to `box-shadow` (sticker shadows stay hard-offset, zero-blur, unchanged)
+- **Wallpaper + backdrop modes** (`lib/wallpaper.ts`): three stacked layers — **BG** (an optional per-canvas wallpaper image, stored in IndexedDB via `lib/idb.ts`'s generic blob store, rendered by `WallpaperLayer`; has no mode of its own), **canvas** (`.frame`, the bezel holding the grid), **widgets** (`.block`). Canvas and widgets each get their own independent solid/blur/transparent/glass dial in Hub Core's Appearance settings (`data-backdrop` / `data-widget-backdrop` on `<html>`) — the widget dial is a *global default* every widget inherits via "auto", separate from each widget's own per-instance override in its gear popover; it does not cascade from the canvas dial. `blur` uses `backdrop-filter: blur()` for frosted-glass translucency over BG — a distinct, deliberate exception from the "blurred shadows" rule above, which still refers only to `box-shadow` (sticker shadows stay hard-offset, zero-blur, unchanged). `glass` is a Liquid-Glass-style approximation: a more transparent fill, a stronger `blur()` paired with `saturate()` so colors behind it don't wash out, and (on `.frame` only, not `.block` - see the CSS comment by `.block[data-backdrop="glass"]` for why) an inset top-edge highlight for the glossy rim-light read. It does not attempt true specular refraction/distortion (would need SVG `feDisplacementMap` or WebGL) - this is a CSS-only approximation, not the real Apple effect
 
 ---
 
@@ -80,7 +80,6 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 ### 1. Identity Block
 - Display name, tagline, and initials are configurable in the widget settings.
 - Links: GitHub, homelab status
-- Quicklinks: extensible row of icon links (`/config/links.ts`) â€” currently YouTube, LinkedIn, ChatGPT
 - Mark: compact identity mark with icon and configurable initials inside the card
 
 ### 2. Now Playing ðŸŽµ
@@ -159,8 +158,7 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 â”œâ”€â”€ config/
 â”‚   â”œâ”€â”€ widgets.tsx           # WIDGETS manifest registry + SPAN_MAP + DEFAULT_ORDER
 â”‚   â”œâ”€â”€ themes.ts             # theme pack metadata (tokens live in globals.css)
-â”‚   â”œâ”€â”€ canvasIcons.ts        # curated Lucide set for canvas pill icons
-â”‚   â””â”€â”€ links.ts              # Identity block quicklinks (extensible)
+â”‚   â””â”€â”€ canvasIcons.ts        # curated Lucide set for canvas pill icons
 â”œâ”€â”€ lib/
 â”‚   â”œâ”€â”€ layout.ts             # layout store v2 (instances, sanitize, v1 migration)
 â”‚   â”œâ”€â”€ slotLayout.ts         # Slot Layout region/placement store
@@ -228,7 +226,7 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > **AVN Hub Canvases** (âœ… shipped â€” see "AVN Hub Canvases" under Widget Framework above)
 
 > **Personalization layer** (âœ… shipped)
-> - Per-canvas wallpaper (image or short looping video, stored in IndexedDB) + independent canvas/widget backdrop modes (solid/blur/transparent) + opt-in mouse parallax â€” see `lib/wallpaper.ts`
+> - Per-canvas wallpaper (image or short looping video, stored in IndexedDB) + independent canvas/widget backdrop modes (solid/blur/transparent/glass) + opt-in mouse parallax â€” see `lib/wallpaper.ts`
 > - Ambient Sound widget â€” synthesized presets + user-uploaded clips, real-time visualizer â€” see `lib/ambient.ts`
 
 > **NutBot chat** (âœ… shipped)

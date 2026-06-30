@@ -105,7 +105,7 @@ The Widget Manager lists placed widgets and available widgets, supports search a
 
 Bundled widgets make the hub useful immediately and serve as reference implementations:
 
-- Identity card, quicklinks, clock/date
+- Identity card, clock/date
 - Spotify/now playing
 - Steam/currently playing
 - Homelab status and host telemetry

@@ -567,5 +567,147 @@
         "default": true
       }
     ]
+  },
+  "office-game-dev": {
+    "title": "office game dev",
+    "iconName": "Zap",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": []
+  },
+  "notes": {
+    "title": "notes",
+    "iconName": "HardDrive",
+    "sizes": [
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [],
+    "flags": {
+      "customHeader": true
+    }
+  },
+  "quick-links": {
+    "title": "quick links",
+    "iconName": "Server",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "density",
+        "label": "density",
+        "type": "select",
+        "default": "compact",
+        "options": [
+          {
+            "value": "compact",
+            "label": "compact"
+          },
+          {
+            "value": "comfy",
+            "label": "comfy"
+          }
+        ]
+      },
+      {
+        "key": "layout",
+        "label": "layout",
+        "type": "select",
+        "default": "grouped",
+        "options": [
+          {
+            "value": "grid",
+            "label": "grid"
+          },
+          {
+            "value": "list",
+            "label": "list"
+          },
+          {
+            "value": "grouped",
+            "label": "grouped"
+          }
+        ]
+      },
+      {
+        "key": "showDescriptions",
+        "label": "show descriptions",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "showIcons",
+        "label": "show icons",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "showSearch",
+        "label": "show search",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "openNewTab",
+        "label": "open in new tab",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "accentMode",
+        "label": "accent mode",
+        "type": "select",
+        "default": "mixed",
+        "options": [
+          {
+            "value": "orange",
+            "label": "orange"
+          },
+          {
+            "value": "cyan",
+            "label": "cyan"
+          },
+          {
+            "value": "mixed",
+            "label": "mixed"
+          }
+        ]
+      },
+      {
+        "key": "maxVisible",
+        "label": "max visible (small sizes)",
+        "type": "number",
+        "default": 6,
+        "min": 2,
+        "max": 20
+      }
+    ]
   }
 }

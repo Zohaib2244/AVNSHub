@@ -357,7 +357,7 @@ body {
   border-radius: 22px;
   padding: 16px;
   box-shadow: 4px 4px 0 var(--shadow);
-  transition: background-color 0.3s ease, backdrop-filter 0.3s ease;
+  transition: background-color 0.3s ease, backdrop-filter 0.3s ease, box-shadow 0.3s ease;
 }
 
 /* canvas backdrop mode (Hub Core -> appearance) — controls the .frame layer
@@ -370,6 +370,20 @@ html[data-backdrop="blur"] .frame {
 
 html[data-backdrop="transparent"] .frame {
   background: transparent;
+}
+
+/* "glass" — a frosted, Liquid-Glass-style read: more transparent and more
+   blurred than plain `blur` (saturate() keeps whatever shows through from
+   washing out), plus an inset top-edge highlight for the glossy rim-light
+   look. The outer hard-offset sticker shadow is kept (CSS var, not
+   overridden) rather than replaced — every backdrop mode keeps it, so glass
+   stays a translucency variant of the same sticker chrome, not a different
+   card style. .frame has no :hover rule to fight with, so the highlight is
+   safe to add here; see the .block version below for why it's skipped there. */
+html[data-backdrop="glass"] .frame {
+  background: color-mix(in srgb, var(--bg-page) 35%, transparent);
+  backdrop-filter: blur(26px) saturate(1.7);
+  box-shadow: 4px 4px 0 var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 22%, transparent);
 }
 
 @media (min-width: 1024px) {
@@ -1010,6 +1024,18 @@ html[data-widget-backdrop="transparent"] .block:not([data-backdrop]) {
   background: transparent;
 }
 
+/* "glass" — same frosted/saturated treatment as .frame's glass mode above,
+   minus the inset rim-light highlight: .block:hover already owns box-shadow
+   (the bigger sticker-shadow-on-hover grow, just below), and equal-specificity
+   selectors resolve by source order, so a box-shadow override here would win
+   over hover and silently kill that grow effect while glass is active. Skipping
+   it keeps hover identical across every backdrop mode, same as blur/transparent
+   already do (they don't touch box-shadow either, for the same reason). */
+html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
+  background: color-mix(in srgb, var(--bg-card) 35%, transparent);
+  backdrop-filter: blur(16px) saturate(1.7);
+}
+
 /* explicit per-widget override — always wins over the widget-default cascade */
 .block[data-backdrop="solid"] {
   background: var(--bg-card);
@@ -1024,6 +1050,11 @@ html[data-widget-backdrop="transparent"] .block:not([data-backdrop]) {
 .block[data-backdrop="transparent"] {
   background: transparent;
   backdrop-filter: none;
+}
+
+.block[data-backdrop="glass"] {
+  background: color-mix(in srgb, var(--bg-card) 35%, transparent);
+  backdrop-filter: blur(16px) saturate(1.7);
 }
 
 /* ─── block typography ───────────────────────────────────────── */
