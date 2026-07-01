@@ -5,9 +5,8 @@
 // see lib/wallpaperEngineBridge.ts). Outside Wallpaper Engine the audio array
 // stays all-zero, so this just idles at its baseline glow — never throws.
 //
-// Mirrors AmbientSoundWidget's bar visualizer technique (direct DOM mutation
-// per animation frame via a ref, not React state) so the pulse never
-// triggers a re-render.
+// Uses direct DOM mutation per animation frame via a ref, not React state, so
+// the pulse never triggers a re-render.
 
 import { useEffect, useRef } from "react";
 import { AudioLines } from "lucide-react";

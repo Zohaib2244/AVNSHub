@@ -4,8 +4,7 @@
 // AudioPulse but a fuller display, driven by the same system-wide audio feed
 // (window.wallpaperRegisterAudioListener via lib/wallpaperEngineBridge.ts).
 // Buckets the 128-float left/right band array into N bars and mutates bar
-// heights directly per animation frame (no React state), mirroring
-// AmbientSoundWidget's VisualizerBars/startVisualizer technique.
+// heights directly per animation frame (no React state).
 
 import { useEffect, useRef } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";

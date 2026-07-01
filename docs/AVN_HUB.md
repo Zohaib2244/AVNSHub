@@ -399,8 +399,6 @@ layouts and preferences.
 | `nutmag-widget-backdrop` | Global widget backdrop default |
 | `nutmag-parallax` | Mouse parallax on/off |
 | `nutmag-prefs` | Global prefs (polling, boot sequence, NutBot chat backend, Widget Creator enabled flag, shared harness choice/chain) |
-| `nutmag-sessions` | Session tracker (uptime stats) |
-| `nutmag-ambient-tracks` / `-selected` / `-volume` | Ambient Sound custom track registry, selected track, volume (global, not per-canvas) |
 
 Every key from `nutmag-slot-layout` through `nutmag-parallax` is **per-canvas**:
 the original/default canvas keeps the bare key above (so existing users need
@@ -408,10 +406,9 @@ no migration); every canvas created after Canvases shipped gets a
 `<key>::<canvasId>` suffixed key instead. See `lib/canvases.ts`'s
 `canvasScopedKey()`.
 
-Wallpaper images/videos and user-uploaded ambient clips are too large for
-`localStorage`'s quota, so those live in **IndexedDB** instead (database
-`nutmag-db`, object store `blobs`, keyed `wallpaper:<canvasId>` /
-`ambient:<trackId>`) — see `lib/idb.ts`.
+Wallpaper images/videos are too large for `localStorage`'s quota, so those
+live in **IndexedDB** instead (database `nutmag-db`, object store `blobs`,
+keyed `wallpaper:<canvasId>`) — see `lib/idb.ts`.
 
 All keys are written immediately on change and read on mount. Corrupted or
 missing keys fall back to sensible defaults automatically.

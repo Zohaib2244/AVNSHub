@@ -1,12 +1,9 @@
 import type { ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  AudioWaveform,
+  BookOpen,
   Clock,
   Cpu,
-  Database,
-  Download,
-  Gamepad2,
   GitCommitHorizontal,
   HardDrive,
   IdCard,
@@ -14,25 +11,21 @@ import {
   Network,
   Server,
   SquareTerminal,
-  Trophy,
-  Tv,
+  Star,
+  StickyNote,
 } from "lucide-react";
 import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
-import { UptimeMilestones } from "@/components/widgets/default/identity/UptimeMilestones";
 import { HomelabStatus, HomelabStatusMore } from "@/components/widgets/default/homelab/HomelabStatus";
 import { ServerStats, ServerStatsMore } from "@/components/widgets/default/homelab/ServerStats";
 import { DiskStorage, DiskStorageMore } from "@/components/widgets/default/homelab/DiskStorage";
 import { NetworkStats, NetworkStatsMore } from "@/components/widgets/default/homelab/NetworkStats";
-import { Jellyfin, JellyfinMore } from "@/components/widgets/default/homelab/Jellyfin";
-import { ArrStack, ArrStackMore } from "@/components/widgets/default/homelab/ArrStack";
-import { StorageApps } from "@/components/widgets/default/homelab/StorageApps";
 import { NutBotFaceWidget } from "@/components/widgets/default/nutbot/NutBotFaceWidget";
 import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
 import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
-import { CurrentlyPlaying } from "@/components/widgets/default/media/CurrentlyPlaying";
 import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
-import { SessionTracker, SessionTrackerMore } from "@/components/widgets/default/identity/SessionTracker";
-import { AmbientSoundWidget } from "@/components/widgets/default/ambient/AmbientSoundWidget";
+import { NotesWidget } from "@/components/widgets/default/notes/NotesWidget";
+import { DotMatrixWidget } from "@/components/widgets/default/dot-matrix/DotMatrixWidget";
+import { DictionaryWidget } from "@/components/widgets/default/dictionary/DictionaryWidget";
 import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
 
 /* ─── widget framework contracts ─────────────────────────────────────
@@ -168,15 +161,6 @@ export const WIDGETS = {
       { key: "showLofi", label: "lofi radio", type: "toggle", default: true },
     ],
   },
-  milestones: {
-    id: "milestones",
-    title: "uptime milestones",
-    icon: Trophy,
-    component: UptimeMilestones,
-    sizes: ["S", "M"],
-    orientations: ["v"],
-    defaults: { size: "S", orientation: "v" },
-  },
   homelab: {
     id: "homelab",
     title: "a very nutty home server",
@@ -230,36 +214,6 @@ export const WIDGETS = {
     orientations: ["h", "v"],
     defaults: { size: "S", orientation: "h" },
   },
-  jellyfin: {
-    id: "jellyfin",
-    title: "jellyfin",
-    icon: Tv,
-    component: Jellyfin,
-    detail: JellyfinMore,
-    sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "h" },
-    flags: { accent: true },
-  },
-  "arr-stack": {
-    id: "arr-stack",
-    title: "arr stack",
-    icon: Download,
-    component: ArrStack,
-    detail: ArrStackMore,
-    sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "h" },
-  },
-  "storage-apps": {
-    id: "storage-apps",
-    title: "storage apps",
-    icon: Database,
-    component: StorageApps,
-    sizes: ["S", "M"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "h" },
-  },
   nutbot: {
     id: "nutbot",
     title: "nutbot v2.2",
@@ -303,31 +257,6 @@ export const WIDGETS = {
     ],
     flags: { customHeader: true, className: "spotify-capsule" },
   },
-  "ambient-sound": {
-    id: "ambient-sound",
-    title: "ambient sound",
-    icon: AudioWaveform,
-    component: AmbientSoundWidget,
-    sizes: ["S", "M", "L"],
-    orientations: ["h"],
-    defaults: { size: "M", orientation: "h" },
-  },
-  "currently-playing": {
-    id: "currently-playing",
-    title: "currently playing",
-    icon: Gamepad2,
-    component: CurrentlyPlaying,
-    sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "M", orientation: "v" },
-    // Steam credentials — the server route falls back to STEAM_* env vars when
-    // blank. Profile must be public; the id is the 17-digit SteamID64.
-    settings: [
-      { key: "steamApiKey", label: "steam api key", type: "password", default: "", placeholder: "api key" },
-      { key: "steamProfileId", label: "steam profile id", type: "text", default: "", placeholder: "76561199…" },
-    ],
-    flags: { customHeader: true, className: "steam-card" },
-  },
   github: {
     id: "github",
     title: "github activity",
@@ -347,15 +276,61 @@ export const WIDGETS = {
     ],
     flags: { customHeader: true, accent: true },
   },
-  tracker: {
-    id: "tracker",
-    title: "session tracker",
-    icon: Gamepad2,
-    component: SessionTracker,
-    detail: SessionTrackerMore,
+  notes: {
+    id: "notes",
+    title: "notes",
+    icon: StickyNote,
+    component: NotesWidget,
+    sizes: ["M", "L"],
+    orientations: ["h"],
+    defaults: { size: "M", orientation: "h" },
+    flags: { customHeader: true },
+  },
+  dictionary: {
+    id: "dictionary",
+    title: "dictionary",
+    icon: BookOpen,
+    component: DictionaryWidget,
     sizes: ["S", "M", "L"],
-    orientations: ["h", "v"],
-    defaults: { size: "S", orientation: "v" },
+    orientations: ["h"],
+    defaults: { size: "M", orientation: "h" },
+    settings: [
+      { key: "defaultWord", label: "default word", type: "text", default: "serendipity", placeholder: "serendipity" },
+      { key: "showSuggestions", label: "spelling hints", type: "toggle", default: true },
+      { key: "showSentence", label: "example sentence", type: "toggle", default: true },
+      { key: "showPronunciation", label: "pronunciation", type: "toggle", default: true },
+    ],
+  },
+  "dot-matrix": {
+    id: "dot-matrix",
+    title: "dot matrix",
+    icon: Star,
+    component: DotMatrixWidget,
+    sizes: ["S", "M", "L"],
+    orientations: ["h"],
+    defaults: { size: "M", orientation: "h" },
+    settings: [
+      {
+        key: "colorMode",
+        label: "accent color",
+        type: "select",
+        default: "orange",
+        options: [
+          { value: "orange", label: "orange" },
+          { value: "cyan", label: "cyan" },
+        ],
+      },
+      {
+        key: "interaction",
+        label: "mouse mode",
+        type: "select",
+        default: "repel",
+        options: [
+          { value: "repel", label: "repel" },
+          { value: "attract", label: "attract" },
+        ],
+      },
+    ],
   },
 } satisfies Record<string, WidgetManifest>;
 
@@ -373,17 +348,13 @@ export const DEFAULT_ORDER: string[] = [
   "clock",
   "nutbot",
   "now-playing",
-  "currently-playing",
-  "ambient-sound",
   "github",
   "homelab",
   "server-stats",
   "disk-storage",
   "network-stats",
-  "jellyfin",
-  "arr-stack",
-  "storage-apps",
-  "milestones",
-  "tracker",
+  "notes",
+  "dictionary",
+  "dot-matrix",
   ...CUSTOM_DEFAULT_ORDER,
 ];

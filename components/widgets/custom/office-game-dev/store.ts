@@ -1,7 +1,6 @@
-// External store for the office-game-dev widget's games/links data - same
-// module-level-cache + listener-Set + persist-on-mutation pattern as
-// lib/sessions.ts. Kept inside the widget's own folder since custom widgets
-// must not touch shared lib/ files; read via useSyncExternalStore.
+// External store for the office-game-dev widget's games/links data. Kept
+// inside the widget's own folder since custom widgets must not touch shared
+// lib/ files; read via useSyncExternalStore.
 
 export type GameLink = { id: string; label: string; url: string };
 export type Game = { id: string; name: string; links: GameLink[] };

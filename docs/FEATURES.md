@@ -194,8 +194,6 @@ Personalization uses three independent layers, each set per-canvas:
 
 `glass` mode gives a Liquid-Glass-style frosted read: more transparent fill, stronger blur + saturate so colors behind don't wash out, and (canvas only) an inset top-edge highlight for the glossy rim-light. Mouse parallax is optional.
 
-Ambient Sound can synthesize rain, wind, drone, and room-tone presets, or play uploaded looping clips.
-
 ![Wallpaper and backdrop settings](<screenshots/wallpaper-backdrop-settings.png>)
 
 ---
@@ -214,10 +212,9 @@ Bundled widgets make the hub useful immediately and serve as reference implement
 
 - Identity card, clock/date
 - Spotify / now playing
-- Steam / currently playing
 - Homelab status and host telemetry (CPU, disk, network)
 - GitHub activity
-- Ambient Sound
+- Notes, dictionary, and dot matrix
 - NutBot face and terminal
 
 They are examples, not the limit of the system.

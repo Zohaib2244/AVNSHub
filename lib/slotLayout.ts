@@ -109,11 +109,8 @@ function buildDefaultState(): SlotLayoutState {
         entry("weather",        "left",  1, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "width", city: "", units: "f" }),
         entry("disk-storage",   "left",  0, 3, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
         entry("server-stats",   "left",  1, 3, 1, 3, { hoverExpand: true,  hoverExpandAxis: "both" }),
-        entry("storage-apps",   "left",  0, 4, 1, 1, { hoverExpand: true,  hoverExpandAxis: "width" }),
         entry("network-stats",  "left",  0, 5, 1, 1, { hoverExpand: false, hoverExpandAxis: "both" }),
-        entry("arr-stack",      "left",  0, 6, 2, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
         // ── right column ─────────────────────────────────────────
-        entry("currently-playing", "right", 0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both" }),
         entry("homelab",        "right", 0, 2, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both", pollSeconds: "60" }),
         // ── base row ─────────────────────────────────────────────
         entry("identity",       "base",  0, 0, 3, 1, { hoverExpand: false, hoverExpandAxis: "height" }),

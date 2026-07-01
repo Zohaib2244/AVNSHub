@@ -63,7 +63,7 @@ function buildDefaultLayout(): LayoutState {
    visual column order and expand the ids of the dissolved pair wrappers */
 const V1_COLUMN_ORDER = ["left", "services", "center", "tracker"];
 const V1_PAIR_IDS: Record<string, WidgetId[]> = {
-  media: ["now-playing", "currently-playing"],
+  media: ["now-playing"],
   "disk-network": ["disk-storage", "network-stats"],
 };
 

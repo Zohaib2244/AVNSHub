@@ -10,41 +10,25 @@ import { lazy } from "react";
 import type { ComponentType } from "react";
 
 // --- custom-components start ---
-const _dictionary = lazy(() => import("@/components/widgets/custom/dictionary/DictionaryWidget").then((m) => ({ default: m.DictionaryWidget })));
 const _cube_timer = lazy(() => import("@/components/widgets/custom/cube-timer/CubeTimerWidget").then((m) => ({ default: m.CubeTimerWidget })));
-const _monkey_type = lazy(() => import("@/components/widgets/custom/monkey-type/MonkeyTypeWidget").then((m) => ({ default: m.MonkeyTypeWidget })));
 const _glyph_matrix = lazy(() => import("@/components/widgets/custom/glyph-matrix/GlyphMatrixWidget").then((m) => ({ default: m.GlyphMatrixWidget })));
-const _atom_bomb = lazy(() => import("@/components/widgets/custom/atom-bomb/AtomBombWidget").then((m) => ({ default: m.AtomBombWidget })));
-const _diss_glade = lazy(() => import("@/components/widgets/custom/diss-glade/DissGladeWidget").then((m) => ({ default: m.DissGladeWidget })));
-const _dot_matrix = lazy(() => import("@/components/widgets/custom/dot-matrix/DotMatrixWidget").then((m) => ({ default: m.DotMatrixWidget })));
-const _whatsapp = lazy(() => import("@/components/widgets/custom/whatsapp/WhatsappWidget").then((m) => ({ default: m.WhatsappWidget })));
 const _cookie_clicker = lazy(() => import("@/components/widgets/custom/cookie-clicker/CookieClickerWidget").then((m) => ({ default: m.CookieClickerWidget })));
 const _office_game_dev = lazy(() => import("@/components/widgets/custom/office-game-dev/OfficeGameDevWidget").then((m) => ({ default: m.OfficeGameDevWidget })));
-const _notes = lazy(() => import("@/components/widgets/custom/notes/NotesWidget").then((m) => ({ default: m.NotesWidget })));
 const _quick_links = lazy(() => import("@/components/widgets/custom/quick-links/QuickLinksWidget").then((m) => ({ default: m.QuickLinksWidget })));
 const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
 const _verlet_sim = lazy(() => import("@/components/widgets/custom/verlet-sim/VerletSimWidget").then((m) => ({ default: m.VerletSimWidget })));
-const _claude_usage = lazy(() => import("@/components/widgets/custom/claude-usage/ClaudeUsageWidget").then((m) => ({ default: m.ClaudeUsageWidget })));
 const _world_clock = lazy(() => import("@/components/widgets/custom/world-clock/WorldClockWidget").then((m) => ({ default: m.WorldClockWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
 // --- custom-map start ---
-  "dictionary": _dictionary,
   "cube-timer": _cube_timer,
-  "monkey-type": _monkey_type,
   "glyph-matrix": _glyph_matrix,
-  "atom-bomb": _atom_bomb,
-  "diss-glade": _diss_glade,
-  "dot-matrix": _dot_matrix,
-  "whatsapp": _whatsapp,
   "cookie-clicker": _cookie_clicker,
   "office-game-dev": _office_game_dev,
-  "notes": _notes,
   "quick-links": _quick_links,
   "ambient-data": _ambient_data,
   "verlet-sim": _verlet_sim,
-  "claude-usage": _claude_usage,
   "world-clock": _world_clock,
 // --- custom-map end ---
 };

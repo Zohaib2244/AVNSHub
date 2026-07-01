@@ -382,7 +382,7 @@ files or any file under `config/`, `lib/`, `app/`, `components/framework/`, or
 break the core hub or get overwritten by the next registration pass.
 
 Two real examples already in the repo to copy conventions from:
-[`components/widgets/custom/dictionary/`](../components/widgets/custom/dictionary/)
+[`components/widgets/custom/glyph-matrix/`](../components/widgets/custom/glyph-matrix/)
 and
 [`components/widgets/custom/cube-timer/`](../components/widgets/custom/cube-timer/).
 
@@ -509,7 +509,7 @@ That's the full pattern — component + manifest, styled with CSS variables and
 the two font tokens, settings narrowed from the untyped bag, branching on
 `size`. **You don't need to open files under other `components/widgets/custom/*`
 folders to figure out conventions — this guide is the complete spec.** (The
-dictionary and cube-timer widgets are real shipped examples if you want extra
+cube-timer and glyph-matrix widgets are real shipped examples if you want extra
 reference, not required reading.)
 
 ### Write plain ASCII — no smart punctuation

@@ -6,7 +6,7 @@ AVN Hub starts empty. There are no fixed widgets, no preset layouts, nothing tel
 
 Open NutBot's creator tab, describe what you want — a cube timer, a Wordle clone, a live price feed, a rope physics toy, a notes board, a visualizer — and it generates a real, running component. Not a template. Not a config file. An actual `.tsx` widget that drops straight into the canvas. Then arrange it, resize it, and put it in whichever named canvas makes sense: one for work, one for your homelab, one just because you like the way it looks.
 
-The bundled widgets (Spotify, Steam, homelab stats, GitHub activity, system stats) are examples of what the framework can hold — not the point of it. The point is the empty canvas, and the tool to make it yours.
+The bundled widgets (Spotify, homelab stats, GitHub activity, system stats, notes, dictionary, and dot matrix) are examples of what the framework can hold — not the point of it. The point is the empty canvas, and the tool to make it yours.
 
 ![AVN Hub dark mode canvas](<docs/screenshots/display dark mode.png>)
 
@@ -30,7 +30,6 @@ Stop helpers:
 ```bash
 npm run stop:hub         # stop AVN Hub on port 3000
 npm run stop:nutbot-llm  # stop Bonfire + llama.cpp local LLM ports
-npm run stop:whatsapp    # stop the local WhatsApp bridge
 npm run stop:all         # stop all local services
 ```
 
@@ -43,7 +42,7 @@ For Docker, Tailscale, environment variables, and the dev-server runtime explana
 - **Slot grid** — draggable, resizable widget slots. S / M / L sizes, horizontal and vertical orientations, Hover On Expand previews.
 - **Hub Core** — edit mode, appearance (theme / palette / wallpaper / backdrop), widget manager, layout import/export, canvas management.
 - **NutBot** — log ticker, conversational chat (local LLM or CLI harness), real host shell sessions, and the widget creator — all in one terminal.
-- **Bundled starters** — identity card, clock, Spotify, Steam, homelab status, system stats, GitHub activity, ambient sound, and more — as reference implementations and to make the canvas useful immediately.
+- **Bundled starters** — identity card, clock, Spotify, homelab status, system stats, GitHub activity, notes, dictionary, dot matrix, and more — as reference implementations and to make the canvas useful immediately.
 
 ## Docs
 
@@ -57,7 +56,6 @@ The README is only the doorway. The actual docs are split by job:
 | [docs/AVN_HUB.md](docs/AVN_HUB.md) | Hub Core, layout, theme, preferences, persistence |
 | [docs/CREATING_WIDGETS.md](docs/CREATING_WIDGETS.md) | Hand-writing or LLM-authoring widgets |
 | [docs/NUTBOT_CHAT_SETUP.md](docs/NUTBOT_CHAT_SETUP.md) | Local LLM via Bonfire plus CLI chat fallback |
-| [docs/WHATSAPP_BRIDGE_SETUP.md](docs/WHATSAPP_BRIDGE_SETUP.md) | Local WhatsApp bridge for group-chat widgets |
 | [wallpaper/README.md](wallpaper/README.md) | Wallpaper Engine export build |
 
 ## Custom Widgets

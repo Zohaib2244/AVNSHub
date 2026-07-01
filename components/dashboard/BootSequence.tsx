@@ -16,7 +16,6 @@ const LINES = [
   { text: "  init display drivers            OK", type: "ok" },
   { text: "  mount /dev/homelab              OK", type: "ok" },
   { text: "  spotify.auth.handshake          OK", type: "ok" },
-  { text: "  steam.api.connect               OK", type: "ok" },
   { text: "  homelab.ping                    PARTIAL", type: "warn" },
   { text: "  rendering dashboard...", type: "default" },
 ];

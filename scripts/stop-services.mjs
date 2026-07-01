@@ -7,17 +7,15 @@ const DEFAULTS = {
   hubPort: 3000,
   bonfireUrl: "http://127.0.0.1:8000",
   llamaPort: 8080,
-  whatsappBridgePort: 3333,
 };
 
-const TARGETS = new Set(["hub", "llm", "whatsapp", "all"]);
+const TARGETS = new Set(["hub", "llm", "all"]);
 const aliases = {
   avnhub: "hub",
   "avn-hub": "hub",
   bonfire: "llm",
   "nutbot-llm": "llm",
   nutbot: "llm",
-  "whatsapp-bridge": "whatsapp",
 };
 
 function readDotEnv() {
@@ -135,16 +133,13 @@ function usage() {
   console.log(`Usage:
   npm run stop:hub         stop AVN Hub dev server on AVN_HUB_PORT/PORT or 3000
   npm run stop:nutbot-llm  stop Bonfire and llama.cpp local LLM ports
-  npm run stop:whatsapp    stop the local WhatsApp bridge
-  npm run stop:all         stop AVN Hub, NutBot local LLM, and WhatsApp bridge
+  npm run stop:all         stop AVN Hub and NutBot local LLM
 
 Overrides:
   AVN_HUB_PORT=3000
   NUTBOT_CHAT_URL=http://127.0.0.1:8000
   NUTBOT_LLAMA_PORT=8080
-  LLAMA_SERVER_PORT=8080
-  WHATSAPP_BRIDGE_PORT=3333
-  WHATSAPP_BRIDGE_URL=http://127.0.0.1:3333`);
+  LLAMA_SERVER_PORT=8080`);
 }
 
 const requested = process.argv[2] ?? "all";
@@ -157,10 +152,6 @@ if (!TARGETS.has(target)) {
   const hubPort = numberSetting(["AVN_HUB_PORT", "PORT"], DEFAULTS.hubPort);
   const bonfirePort = portFromUrl(setting("NUTBOT_CHAT_URL", DEFAULTS.bonfireUrl), 8000);
   const llamaPort = numberSetting(["NUTBOT_LLAMA_PORT", "LLAMA_SERVER_PORT"], DEFAULTS.llamaPort);
-  const whatsappBridgePort = numberSetting(
-    ["WHATSAPP_BRIDGE_PORT"],
-    portFromUrl(setting("WHATSAPP_BRIDGE_URL", "http://127.0.0.1:3333"), DEFAULTS.whatsappBridgePort),
-  );
 
   if (target === "hub" || target === "all") {
     await stopPort("AVN Hub", hubPort);
@@ -168,8 +159,5 @@ if (!TARGETS.has(target)) {
   if (target === "llm" || target === "all") {
     await stopPort("Bonfire", bonfirePort);
     await stopPort("llama.cpp", llamaPort);
-  }
-  if (target === "whatsapp" || target === "all") {
-    await stopPort("WhatsApp bridge", whatsappBridgePort);
   }
 }

@@ -4,7 +4,7 @@
 // dashboard (no edit mode, no drag/resize, no Hub Core panel, no per-widget
 // gear settings). A short, fixed list of read-only cards plus exactly three
 // live controls (theme toggle — built into ClockWidget already; the canvas
-// pill row below; Ambient Sound's own play/pause), per the plan's decisions.
+// pill row below), per the plan's decisions.
 //
 // Renders widget content components directly (bypassing config/widgets.tsx's
 // registry entirely — these widgets aren't registered there since most of
@@ -14,9 +14,6 @@ import { useEffect, useSyncExternalStore } from "react";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
 import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
-import { SessionTracker } from "@/components/widgets/default/identity/SessionTracker";
-import { UptimeMilestonesStatic } from "@/components/widgets/default/identity/UptimeMilestonesStatic";
-import { AmbientSoundWidget } from "@/components/widgets/default/ambient/AmbientSoundWidget";
 import { AudioPulse } from "@/components/widgets/default/audio/AudioPulse";
 import { AudioVisualizer } from "@/components/widgets/default/audio/AudioVisualizer";
 import { MediaNowPlaying } from "@/components/widgets/default/audio/MediaNowPlaying";
@@ -137,16 +134,6 @@ export function WallpaperDashboard() {
         </Card>
         <Card id="audio-visualizer" size="M" span="span 2">
           <AudioVisualizer />
-        </Card>
-        <Card id="ambient-sound" size="M" span="span 2">
-          <AmbientSoundWidget />
-        </Card>
-
-        <Card id="milestones" size="M" span="span 3">
-          <UptimeMilestonesStatic />
-        </Card>
-        <Card id="tracker" size="M" span="span 2">
-          <SessionTracker />
         </Card>
       </div>
     </div>

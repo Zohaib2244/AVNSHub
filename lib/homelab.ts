@@ -22,39 +22,6 @@ export function averageUptime(services: ServiceStatus[]): string | null {
   return `${avg.toFixed(1)}%`;
 }
 
-// ─── v2 shape (future homelab aggregator — design-only, not yet built) ─
-// The aggregator is a separate project running ON the homelab that queries
-// all 8 services internally and returns one unified blob.
-//
-// Key properties:
-//   - `overall` rollup drives the GlyphStrip without client-side aggregation
-//   - `telemetry` is a discriminated union so lib/homelab.ts can render
-//     type-appropriate views without per-service hardcoding
-//   - v1 fields (name/status/uptime/last_checked) are UNCHANGED so the
-//     Phase 4 MVP component keeps working unmodified once v2 ships
-//
-// When the aggregator is ready, point HOMELAB_STATUS_URL at it — v2 fields
-// (overall/host/per-service id+telemetry) are parsed additively by
-// getHomelabStatusV2() alongside the v1 fields parsed by getHomelabStatus().
-
-export type TelemetryNone           = { type: "none" };
-export type TelemetryStorage        = { type: "storage"; used_bytes: number; total_bytes: number; used_pct: number };
-export type TelemetryMediaSessions  = { type: "media_sessions"; session_count: number; active_sessions: { user: string; title: string; progress_pct: number; device: string }[] };
-export type TelemetryRequestQueue   = { type: "request_queue"; pending_count: number; approved_count: number; available_count: number };
-export type TelemetryDownloadQueue  = { type: "download_queue"; queue_size: number; items: { title: string; progress_pct: number; eta_seconds: number }[] };
-
-export type Telemetry =
-  | TelemetryNone
-  | TelemetryStorage
-  | TelemetryMediaSessions
-  | TelemetryRequestQueue
-  | TelemetryDownloadQueue;
-
-export type ServiceStatusV2 = ServiceStatus & {
-  id: string;
-  telemetry: Telemetry;
-};
-
 // Host-level telemetry — not tied to any single service, describes the
 // machine the stack runs on.
 export type DriveInfo = {
@@ -78,25 +45,15 @@ export type HostTelemetry = {
   uptime_seconds: number;
 };
 
-export type HomelabStatusV2 = {
-  last_checked: string;
-  overall: "healthy" | "degraded" | "down";
-  host: HostTelemetry;
-  services: ServiceStatusV2[];
-};
-
-type RawServiceV2 = {
+type RawService = {
   name: string;
   status: string;
   uptime: string;
-  id?: string;
-  telemetry?: Telemetry;
 };
 
 type RawResponse = {
-  services?: RawServiceV2[];
+  services?: RawService[];
   last_checked?: string;
-  overall?: string;
   host?: HostTelemetry;
 };
 
@@ -104,17 +61,12 @@ function isValidStatus(s: string): s is "up" | "down" {
   return s === "up" || s === "down";
 }
 
-function isOverall(s: string): s is HomelabStatusV2["overall"] {
-  return s === "healthy" || s === "degraded" || s === "down";
-}
-
-// Realistic stand-in for the v2 aggregator response, used for local dev/
+// Realistic stand-in for the homelab response, used for local dev/
 // testing on machines that can't reach the real homelab (e.g. a Mac with
 // HOMELAB_STATUS_URL unset or unreachable). Enable with HOMELAB_MOCK_DATA=true.
 function mockRawResponse(): RawResponse {
   return {
     last_checked: new Date().toISOString(),
-    overall: "healthy",
     host: {
       cpu: { used_pct: 28, load_avg: [0.84, 0.91, 1.05] },
       memory: { used_bytes: 18_400_000_000, total_bytes: 34_359_738_368, used_pct: 53.6 },
@@ -130,83 +82,41 @@ function mockRawResponse(): RawResponse {
         name: "immich",
         status: "up",
         uptime: "99.9%",
-        id: "immich",
-        telemetry: { type: "storage", used_bytes: 612_000_000_000, total_bytes: 2_000_000_000_000, used_pct: 30.6 },
       },
       {
         name: "jellyfin",
         status: "up",
         uptime: "99.8%",
-        id: "jellyfin",
-        telemetry: {
-          type: "media_sessions",
-          session_count: 2,
-          active_sessions: [
-            { user: "nutmag", title: "The Bear S03E04", progress_pct: 42, device: "Chrome" },
-            { user: "guest", title: "Arcane S02E03", progress_pct: 78, device: "Apple TV" },
-          ],
-        },
       },
       {
         name: "jellyseerr",
         status: "up",
         uptime: "99.7%",
-        id: "jellyseerr",
-        telemetry: { type: "request_queue", pending_count: 3, approved_count: 12, available_count: 145 },
       },
       {
         name: "radarr",
         status: "up",
         uptime: "99.6%",
-        id: "radarr",
-        telemetry: {
-          type: "download_queue",
-          queue_size: 2,
-          items: [
-            { title: "Dune: Part Two (2024)", progress_pct: 64, eta_seconds: 1_800 },
-            { title: "Oppenheimer (2023)", progress_pct: 12, eta_seconds: 5_400 },
-          ],
-        },
       },
       {
         name: "sonarr",
         status: "up",
         uptime: "99.9%",
-        id: "sonarr",
-        telemetry: {
-          type: "download_queue",
-          queue_size: 1,
-          items: [{ title: "Severance S02E07", progress_pct: 88, eta_seconds: 300 }],
-        },
       },
       {
         name: "jackett",
         status: "down",
         uptime: "94.2%",
-        id: "jackett",
-        telemetry: { type: "none" },
       },
       {
         name: "qbittorrent",
         status: "up",
         uptime: "99.4%",
-        id: "qbittorrent",
-        telemetry: {
-          type: "download_queue",
-          queue_size: 3,
-          items: [
-            { title: "ubuntu-24.04-desktop-amd64.iso", progress_pct: 95, eta_seconds: 120 },
-            { title: "debian-12.6-amd64-netinst.iso", progress_pct: 41, eta_seconds: 2_700 },
-            { title: "arch-linux-x86_64.iso", progress_pct: 6, eta_seconds: 9_600 },
-          ],
-        },
       },
       {
         name: "nextcloud",
         status: "up",
         uptime: "99.9%",
-        id: "nextcloud",
-        telemetry: { type: "storage", used_bytes: 145_000_000_000, total_bytes: 1_000_000_000_000, used_pct: 14.5 },
       },
     ],
   };
@@ -276,35 +186,5 @@ export async function getHomelabStatus(): Promise<HomelabStatus> {
     services: raw.services
       .filter((s) => isValidStatus(s.status))
       .map((s) => ({ name: s.name, status: s.status as "up" | "down", uptime: s.uptime })),
-  };
-}
-
-// Returns null until the v2 aggregator ships — `overall`, `host`, and
-// per-service `id`/`telemetry` are all additive fields not present in the
-// current v1 response.
-export async function getHomelabStatusV2(): Promise<HomelabStatusV2 | null> {
-  const raw = await fetchRaw();
-  if (!raw || !raw.services || !raw.last_checked || !raw.host) return null;
-
-  const overall = raw.overall;
-  if (!overall || !isOverall(overall)) return null;
-
-  const services: ServiceStatusV2[] = raw.services
-    .filter((s): s is RawServiceV2 & { id: string; telemetry: Telemetry } =>
-      isValidStatus(s.status) && !!s.id && !!s.telemetry,
-    )
-    .map((s) => ({
-      name: s.name,
-      status: s.status as "up" | "down",
-      uptime: s.uptime,
-      id: s.id,
-      telemetry: s.telemetry,
-    }));
-
-  return {
-    last_checked: raw.last_checked,
-    overall,
-    host: raw.host,
-    services,
   };
 }

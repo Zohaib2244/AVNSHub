@@ -2,153 +2,21 @@
   "cube-timer": {
     "title": "cube timer",
     "iconName": "Box",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
-      {
-        "key": "showScramble",
-        "label": "show scramble",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showStats",
-        "label": "show stats",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "scrambleLength",
-        "label": "scramble length",
-        "type": "number",
-        "default": 20,
-        "min": 10,
-        "max": 30
-      }
-    ]
-  },
-  "dictionary": {
-    "title": "dictionary",
-    "iconName": "BookOpen",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "defaultWord",
-        "label": "default word",
-        "type": "text",
-        "default": "serendipity",
-        "placeholder": "serendipity"
-      },
-      {
-        "key": "showSuggestions",
-        "label": "spelling hints",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showSentence",
-        "label": "example sentence",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showPronunciation",
-        "label": "pronunciation",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  },
-  "monkey-type": {
-    "title": "monkey type",
-    "iconName": "Activity",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "wordCount",
-        "label": "word count",
-        "type": "select",
-        "default": "25",
-        "options": [
-          {
-            "value": "10",
-            "label": "10 words"
-          },
-          {
-            "value": "25",
-            "label": "25 words"
-          },
-          {
-            "value": "50",
-            "label": "50 words"
-          },
-          {
-            "value": "100",
-            "label": "100 words"
-          }
-        ]
-      },
-      {
-        "key": "showLiveWpm",
-        "label": "show live wpm",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showAccuracy",
-        "label": "show accuracy",
-        "type": "toggle",
-        "default": true
-      }
+      { "key": "showScramble", "label": "show scramble", "type": "toggle", "default": true },
+      { "key": "showStats", "label": "show stats", "type": "toggle", "default": true },
+      { "key": "scrambleLength", "label": "scramble length", "type": "number", "default": 20, "min": 10, "max": 30 }
     ]
   },
   "glyph-matrix": {
     "title": "glyph matrix",
     "iconName": "Box",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
       {
         "key": "animation",
@@ -156,46 +24,16 @@
         "type": "select",
         "default": "glyph",
         "options": [
-          {
-            "value": "glyph",
-            "label": "glyph idle"
-          },
-          {
-            "value": "pulse",
-            "label": "pulse"
-          },
-          {
-            "value": "wave",
-            "label": "wave"
-          },
-          {
-            "value": "ripple",
-            "label": "ripple"
-          },
-          {
-            "value": "rain",
-            "label": "rain"
-          },
-          {
-            "value": "snake",
-            "label": "snake"
-          },
-          {
-            "value": "charging",
-            "label": "charging"
-          },
-          {
-            "value": "scan",
-            "label": "scan"
-          },
-          {
-            "value": "binary",
-            "label": "binary"
-          },
-          {
-            "value": "spiral",
-            "label": "spiral"
-          }
+          { "value": "glyph", "label": "glyph idle" },
+          { "value": "pulse", "label": "pulse" },
+          { "value": "wave", "label": "wave" },
+          { "value": "ripple", "label": "ripple" },
+          { "value": "rain", "label": "rain" },
+          { "value": "snake", "label": "snake" },
+          { "value": "charging", "label": "charging" },
+          { "value": "scan", "label": "scan" },
+          { "value": "binary", "label": "binary" },
+          { "value": "spiral", "label": "spiral" }
         ]
       },
       {
@@ -204,18 +42,9 @@
         "type": "select",
         "default": "normal",
         "options": [
-          {
-            "value": "slow",
-            "label": "slow"
-          },
-          {
-            "value": "normal",
-            "label": "normal"
-          },
-          {
-            "value": "fast",
-            "label": "fast"
-          }
+          { "value": "slow", "label": "slow" },
+          { "value": "normal", "label": "normal" },
+          { "value": "fast", "label": "fast" }
         ]
       },
       {
@@ -224,22 +53,10 @@
         "type": "select",
         "default": "orange",
         "options": [
-          {
-            "value": "orange",
-            "label": "orange"
-          },
-          {
-            "value": "cyan",
-            "label": "cyan"
-          },
-          {
-            "value": "white",
-            "label": "white"
-          },
-          {
-            "value": "mixed",
-            "label": "mixed"
-          }
+          { "value": "orange", "label": "orange" },
+          { "value": "cyan", "label": "cyan" },
+          { "value": "white", "label": "white" },
+          { "value": "mixed", "label": "mixed" }
         ]
       },
       {
@@ -248,398 +65,48 @@
         "type": "select",
         "default": "medium",
         "options": [
-          {
-            "value": "small",
-            "label": "small"
-          },
-          {
-            "value": "medium",
-            "label": "medium"
-          },
-          {
-            "value": "large",
-            "label": "large"
-          }
+          { "value": "small", "label": "small" },
+          { "value": "medium", "label": "medium" },
+          { "value": "large", "label": "large" }
         ]
-      }
-    ]
-  },
-  "atom-bomb": {
-    "title": "atom bomb",
-    "iconName": "Bomb",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "cityName",
-        "label": "city name",
-        "type": "text",
-        "default": "Nova City",
-        "placeholder": "fictional city"
-      },
-      {
-        "key": "yield",
-        "label": "yield",
-        "type": "select",
-        "default": "medium",
-        "options": [
-          {
-            "value": "small",
-            "label": "small"
-          },
-          {
-            "value": "medium",
-            "label": "medium"
-          },
-          {
-            "value": "maximum",
-            "label": "maximum"
-          }
-        ]
-      },
-      {
-        "key": "showTelemetry",
-        "label": "show telemetry",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  },
-  "diss-glade": {
-    "title": "diss glade",
-    "iconName": "Flame",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "rivalName",
-        "label": "rival name",
-        "type": "text",
-        "default": "Glade",
-        "placeholder": "name to roast"
-      },
-      {
-        "key": "voicePitch",
-        "label": "voice pitch",
-        "type": "number",
-        "default": 0.82,
-        "min": 0.5,
-        "max": 2
-      },
-      {
-        "key": "voiceRate",
-        "label": "voice rate",
-        "type": "number",
-        "default": 0.9,
-        "min": 0.5,
-        "max": 2
-      },
-      {
-        "key": "beatEnabled",
-        "label": "beat loop",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  },
-  "dot-matrix": {
-    "title": "dot matrix",
-    "iconName": "Star",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "colorMode",
-        "label": "accent color",
-        "type": "select",
-        "default": "orange",
-        "options": [
-          {
-            "value": "orange",
-            "label": "orange"
-          },
-          {
-            "value": "cyan",
-            "label": "cyan"
-          }
-        ]
-      },
-      {
-        "key": "interaction",
-        "label": "mouse mode",
-        "type": "select",
-        "default": "repel",
-        "options": [
-          {
-            "value": "repel",
-            "label": "repel"
-          },
-          {
-            "value": "attract",
-            "label": "attract"
-          }
-        ]
-      }
-    ]
-  },
-  "whatsapp": {
-    "title": "whatsapp",
-    "iconName": "Wifi",
-    "sizes": [
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h",
-      "v"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "bridgeUrl",
-        "label": "bridge url",
-        "type": "text",
-        "default": "",
-        "placeholder": "http://127.0.0.1:3333"
-      },
-      {
-        "key": "groupId",
-        "label": "group id",
-        "type": "text",
-        "default": "",
-        "placeholder": "120363...@g.us"
-      },
-      {
-        "key": "displayName",
-        "label": "display name",
-        "type": "text",
-        "default": "group chat"
-      },
-      {
-        "key": "limit",
-        "label": "message limit",
-        "type": "number",
-        "default": 20,
-        "min": 5,
-        "max": 50
-      },
-      {
-        "key": "draftMode",
-        "label": "draft mode",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "nutbotReplyEnabled",
-        "label": "nutbot reads & replies",
-        "type": "toggle",
-        "default": false
-      },
-      {
-        "key": "nutbotTrigger",
-        "label": "reply trigger",
-        "type": "select",
-        "default": "mention",
-        "options": [
-          {
-            "value": "mention",
-            "label": "only when @nutbot is tagged"
-          },
-          {
-            "value": "latest",
-            "label": "every latest message"
-          }
-        ]
-      },
-      {
-        "key": "nutbotPollSeconds",
-        "label": "check interval (seconds)",
-        "type": "number",
-        "default": 30,
-        "min": 10,
-        "max": 300
-      },
-      {
-        "key": "nutbotAutoSend",
-        "label": "auto-send replies",
-        "type": "toggle",
-        "default": false
-      },
-      {
-        "key": "nutbotReplyPrefix",
-        "label": "prefix replies with \"nutbot: \"",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "nutbotBackend",
-        "label": "reply llm",
-        "type": "select",
-        "default": "bonfire",
-        "options": [
-          {
-            "value": "bonfire",
-            "label": "bonfire (local llm)"
-          },
-          {
-            "value": "claude",
-            "label": "claude"
-          },
-          {
-            "value": "codex",
-            "label": "codex"
-          },
-          {
-            "value": "opencode",
-            "label": "opencode"
-          }
-        ]
-      },
-      {
-        "key": "nutbotBonfireNsfw",
-        "label": "bonfire nsfw mode",
-        "type": "toggle",
-        "default": false
       }
     ]
   },
   "cookie-clicker": {
     "title": "cookie clicker",
     "iconName": "Globe",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
-      {
-        "key": "clickPower",
-        "label": "click power",
-        "type": "number",
-        "default": 1,
-        "min": 1,
-        "max": 1000
-      },
-      {
-        "key": "showUpgrades",
-        "label": "show upgrades",
-        "type": "toggle",
-        "default": true
-      }
+      { "key": "clickPower", "label": "click power", "type": "number", "default": 1, "min": 1, "max": 1000 },
+      { "key": "showUpgrades", "label": "show upgrades", "type": "toggle", "default": true }
     ]
   },
   "office-game-dev": {
     "title": "office game dev",
     "iconName": "Zap",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": []
-  },
-  "notes": {
-    "title": "notes",
-    "iconName": "HardDrive",
-    "sizes": [
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [],
-    "flags": {
-      "customHeader": true
-    }
   },
   "quick-links": {
     "title": "quick-links",
     "iconName": "Server",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
-      {
-        "key": "zenMode",
-        "label": "zen mode",
-        "type": "toggle",
-        "default": false
-      },
+      { "key": "zenMode", "label": "zen mode", "type": "toggle", "default": false },
       {
         "key": "density",
         "label": "density",
         "type": "select",
         "default": "compact",
         "options": [
-          {
-            "value": "compact",
-            "label": "compact"
-          },
-          {
-            "value": "comfy",
-            "label": "comfy"
-          }
+          { "value": "compact", "label": "compact" },
+          { "value": "comfy", "label": "comfy" }
         ]
       },
       {
@@ -648,279 +115,80 @@
         "type": "select",
         "default": "grouped",
         "options": [
-          {
-            "value": "grid",
-            "label": "grid"
-          },
-          {
-            "value": "list",
-            "label": "list"
-          },
-          {
-            "value": "grouped",
-            "label": "grouped"
-          }
+          { "value": "grid", "label": "grid" },
+          { "value": "list", "label": "list" },
+          { "value": "grouped", "label": "grouped" }
         ]
       },
-      {
-        "key": "showDescriptions",
-        "label": "show descriptions",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showIcons",
-        "label": "show icons",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "showSearch",
-        "label": "show search",
-        "type": "toggle",
-        "default": true
-      },
-      {
-        "key": "openNewTab",
-        "label": "open in new tab",
-        "type": "toggle",
-        "default": true
-      },
+      { "key": "showDescriptions", "label": "show descriptions", "type": "toggle", "default": true },
+      { "key": "showIcons", "label": "show icons", "type": "toggle", "default": true },
+      { "key": "showSearch", "label": "show search", "type": "toggle", "default": true },
+      { "key": "openNewTab", "label": "open in new tab", "type": "toggle", "default": true },
       {
         "key": "accentMode",
         "label": "accent mode",
         "type": "select",
         "default": "mixed",
         "options": [
-          {
-            "value": "orange",
-            "label": "orange"
-          },
-          {
-            "value": "cyan",
-            "label": "cyan"
-          },
-          {
-            "value": "mixed",
-            "label": "mixed"
-          }
+          { "value": "orange", "label": "orange" },
+          { "value": "cyan", "label": "cyan" },
+          { "value": "mixed", "label": "mixed" }
         ]
       },
-      {
-        "key": "maxVisible",
-        "label": "max visible (small sizes)",
-        "type": "number",
-        "default": 6,
-        "min": 2,
-        "max": 20
-      }
+      { "key": "maxVisible", "label": "max visible (small sizes)", "type": "number", "default": 6, "min": 2, "max": 20 }
     ]
   },
   "ambient-data": {
     "title": "ambient data",
     "iconName": "Server",
-    "sizes": [
-      "M",
-      "L",
-      "S"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["M", "L", "S"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": []
   },
   "verlet-sim": {
     "title": "verlet sim",
     "iconName": "Box",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
-      {
-        "key": "segments",
-        "label": "segments",
-        "type": "number",
-        "default": 16,
-        "min": 8,
-        "max": 32
-      },
-      {
-        "key": "gravity",
-        "label": "gravity",
-        "type": "number",
-        "default": 0.36,
-        "min": 0,
-        "max": 1.2
-      },
-      {
-        "key": "stiffness",
-        "label": "solver passes",
-        "type": "number",
-        "default": 6,
-        "min": 2,
-        "max": 10
-      },
+      { "key": "segments", "label": "segments", "type": "number", "default": 16, "min": 8, "max": 32 },
+      { "key": "gravity", "label": "gravity", "type": "number", "default": 0.36, "min": 0, "max": 1.2 },
+      { "key": "stiffness", "label": "solver passes", "type": "number", "default": 6, "min": 2, "max": 10 },
       {
         "key": "anchor",
         "label": "anchor",
         "type": "select",
         "default": "left",
         "options": [
-          {
-            "value": "left",
-            "label": "left pin"
-          },
-          {
-            "value": "suspended",
-            "label": "suspended"
-          }
+          { "value": "left", "label": "left pin" },
+          { "value": "suspended", "label": "suspended" }
         ]
       },
-      {
-        "key": "trails",
-        "label": "motion trails",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  },
-  "claude-usage": {
-    "title": "claude usage",
-    "iconName": "Gauge",
-    "sizes": [
-      "S",
-      "M"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "unitLabel",
-        "label": "unit label",
-        "type": "text",
-        "default": "msgs",
-        "placeholder": "msgs"
-      },
-      {
-        "key": "fiveHourUsed",
-        "label": "5h used",
-        "type": "number",
-        "default": 0,
-        "min": 0,
-        "max": 9999
-      },
-      {
-        "key": "fiveHourLimit",
-        "label": "5h limit",
-        "type": "number",
-        "default": 100,
-        "min": 1,
-        "max": 9999
-      },
-      {
-        "key": "fiveHourResetMins",
-        "label": "5h reset min",
-        "type": "number",
-        "default": 300,
-        "min": 0,
-        "max": 300
-      },
-      {
-        "key": "weeklyUsed",
-        "label": "week used",
-        "type": "number",
-        "default": 0,
-        "min": 0,
-        "max": 99999
-      },
-      {
-        "key": "weeklyLimit",
-        "label": "week limit",
-        "type": "number",
-        "default": 1000,
-        "min": 1,
-        "max": 99999
-      },
-      {
-        "key": "weeklyResetHours",
-        "label": "week reset hr",
-        "type": "number",
-        "default": 168,
-        "min": 0,
-        "max": 168
-      }
+      { "key": "trails", "label": "motion trails", "type": "toggle", "default": true }
     ]
   },
   "world-clock": {
     "title": "world clock",
     "iconName": "Clock",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
+    "sizes": ["S", "M", "L"],
+    "orientations": ["h"],
+    "defaults": { "size": "M", "orientation": "h" },
     "settings": [
-      {
-        "key": "clocks",
-        "label": "countries",
-        "type": "text",
-        "default": "Karachi|Asia/Karachi, London|Europe/London, New York|America/New_York, Tokyo|Asia/Tokyo",
-        "placeholder": "Tokyo|Asia/Tokyo, London|Europe/London"
-      },
-      {
-        "key": "alarms",
-        "label": "alarms",
-        "type": "text",
-        "default": "Karachi|09:00, Tokyo|21:30",
-        "placeholder": "Karachi|09:00, Tokyo|21:30"
-      },
+      { "key": "clocks", "label": "countries", "type": "text", "default": "Karachi|Asia/Karachi, London|Europe/London, New York|America/New_York, Tokyo|Asia/Tokyo", "placeholder": "Tokyo|Asia/Tokyo, London|Europe/London" },
+      { "key": "alarms", "label": "alarms", "type": "text", "default": "Karachi|09:00, Tokyo|21:30", "placeholder": "Karachi|09:00, Tokyo|21:30" },
       {
         "key": "hourMode",
         "label": "hour mode",
         "type": "select",
         "default": "24",
         "options": [
-          {
-            "value": "24",
-            "label": "24h"
-          },
-          {
-            "value": "12",
-            "label": "12h"
-          }
+          { "value": "24", "label": "24h" },
+          { "value": "12", "label": "12h" }
         ]
       },
-      {
-        "key": "showSeconds",
-        "label": "seconds",
-        "type": "toggle",
-        "default": false
-      }
+      { "key": "showSeconds", "label": "seconds", "type": "toggle", "default": false }
     ]
   }
 }

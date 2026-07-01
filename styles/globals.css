@@ -1131,7 +1131,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 /* ─── L-size detail ──────────────────────────────────────────────
    extra content rendered below the main content at L size — either the
    manifest's `detail` component (auto-rendered by WidgetShell) or a widget's
-   own size==="L" branch (now-playing, currently-playing) */
+   own size==="L" branch (now-playing) */
 .size-l-more {
   margin-top: 10px;
   padding-top: 10px;
