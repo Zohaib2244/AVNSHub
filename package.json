@@ -1,6 +1,6 @@
 {
   "name": "avn-hub",
-  "version": "2.2.0",
+  "version": "2.2.0-alpha.1",
   "private": true,
   "scripts": {
     "dev": "next dev",
