@@ -221,7 +221,13 @@ export async function POST(req: Request) {
         }
       };
 
-      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal);
+      // On a mid-run harness switch, hand the fallback whatever this widget's
+      // files currently hold on disk (empty until something is written) so it
+      // resumes from that exact state instead of re-discovering it with a burst
+      // of Read/find/grep/git calls.
+      const partialWork = targetId ? () => readExistingWidget(targetId) : undefined;
+
+      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
 
       if (outcome === "done") {
         // done cleanly — the harness wrote the component + manifest.json.

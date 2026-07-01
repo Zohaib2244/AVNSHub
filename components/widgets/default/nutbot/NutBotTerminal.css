@@ -167,3 +167,29 @@
   color: var(--text-primary);
   caret-color: var(--accent-orange);
 }
+
+/* focus mode toggle — sits between the tabs and the harness pill */
+.term-focus-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.term-focus-btn:hover,
+.term-focus-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.term-focus-btn.active {
+  background: color-mix(in srgb, var(--accent-orange) 12%, var(--bg-nested));
+}

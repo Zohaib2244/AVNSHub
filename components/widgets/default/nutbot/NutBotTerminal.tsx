@@ -15,13 +15,14 @@ import "./chat/NutBotChat.css";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, X } from "lucide-react";
+import { Maximize2, Minimize2, Plus, X } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 export const LOG_MESSAGES = [
   "[ok] homelab uplink ... stable",
@@ -48,6 +49,17 @@ const INITIAL_TABS: TerminalTab[] = [
 
 export function NutBotTerminal() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
+  const { focusWidgetId, enterFocusMode, exitFocusMode } = useLayout();
+  const isFocusMode = focusWidgetId === "nutbot";
+
+  // Escape exits focus mode so the user is never stuck
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && isFocusMode) exitFocusMode();
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isFocusMode, exitFocusMode]);
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
@@ -152,6 +164,15 @@ export function NutBotTerminal() {
           </button>
         </div>
 
+        <button
+          type="button"
+          className={`term-focus-btn${isFocusMode ? " active" : ""}`}
+          onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
+          aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
+          title={isFocusMode ? "exit focus mode (Esc)" : "focus mode"}
+        >
+          {isFocusMode ? <Minimize2 size={11} strokeWidth={2} /> : <Maximize2 size={11} strokeWidth={2} />}
+        </button>
         <HarnessPill />
         <div className="nutbot-v2-scale nutbot-v2-scale-nano">
           <NutBotFaceV2 compact />

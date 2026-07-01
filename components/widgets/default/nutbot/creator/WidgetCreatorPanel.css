@@ -571,6 +571,23 @@
   color: var(--bg-card);
 }
 
+/* "Install Widget" button — orange to signal it's the prerequisite step
+   before "Add to Layout" becomes available */
+.wc-install-btn {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+}
+
+.wc-install-btn:hover {
+  background: var(--accent-orange);
+  color: var(--bg-card);
+}
+
+.wc-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .wc-added-hint {
   flex-shrink: 0;
   font-family: var(--font-dot-gothic), monospace;

@@ -8,6 +8,8 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  Camera,
+  Check,
   ChevronDown,
   Download,
   Droplets,
@@ -143,8 +145,30 @@ export function HubCorePanel() {
   // accordion: only one settings section open at a time
   const [openSection, setOpenSection] = useState<CanvasSettingsSection | null>("appearance");
   const panelRef = useRef<HTMLDivElement>(null);
+  const [snapState, setSnapState] = useState<"idle" | "busy" | "done">("idle");
 
   const { editMode, startEdit, lockLayout } = useLayout();
+
+  async function handleSnapshot() {
+    if (snapState !== "idle") return;
+    const el = document.querySelector<HTMLElement>(".frame-inner");
+    if (!el) return;
+    setSnapState("busy");
+    try {
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(el, {
+        pixelRatio: window.devicePixelRatio ?? 1,
+        skipFonts: false,
+      });
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+      setSnapState("done");
+      window.setTimeout(() => setSnapState("idle"), 2000);
+    } catch {
+      setSnapState("idle");
+    }
+  }
 
   function toggleSettingsSection(section: CanvasSettingsSection) {
     setOpenSection((open) => (open === section ? null : section));
@@ -197,6 +221,17 @@ export function HubCorePanel() {
       >
         <LayoutGrid size={14} strokeWidth={1.75} />
         <span className="edge-btn-label">widgets</span>
+      </button>
+      <button
+        type="button"
+        className={`hub-core-btn edge-btn${snapState === "done" ? " active" : ""}`}
+        onClick={handleSnapshot}
+        disabled={snapState === "busy"}
+        aria-label="copy canvas snapshot to clipboard"
+        title="snapshot canvas"
+      >
+        {snapState === "done" ? <Check size={14} strokeWidth={1.75} /> : <Camera size={14} strokeWidth={1.75} />}
+        <span className="edge-btn-label">{snapState === "done" ? "copied" : "snap"}</span>
       </button>
 
       <div className="hub-core-divider" aria-hidden />

@@ -158,7 +158,18 @@ export async function POST(req: Request) {
         }
       };
 
-      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal);
+      // On a mid-run harness switch, hand the fallback whatever variation
+      // files already exist so it resumes from them instead of re-reading.
+      const expectedFiles = regenerateIndex
+        ? [variationFile(regenerateIndex)]
+        : Array.from({ length: count }, (_, i) => variationFile(startIndex + i));
+      const partialWork = () =>
+        expectedFiles
+          .filter((f) => existsSync(join(sessionDir, f)))
+          .map((f) => `<!-- ${f} -->\n${readFileSync(join(sessionDir, f), "utf-8")}`)
+          .join("\n\n");
+
+      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
 
       if (outcome === "done") {
         // Verify what was actually written rather than trusting the harness's

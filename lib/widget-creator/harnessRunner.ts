@@ -104,13 +104,21 @@ export function runHarness(
 
 /** Run the harness fallback chain against one prompt, calling `onDone` once a
     harness finishes cleanly (no limit/error). Shared turn-by-turn fallback
-    loop used by both the generate and ideate routes. */
+    loop used by both the generate and ideate routes.
+
+    `partialWork`, if given, is read at each switch and its return value is
+    embedded verbatim into the next harness's continuation note — so a fallback
+    picking up after a limit continues from the exact on-disk file contents
+    instead of spending a burst of Read/find/grep/git calls re-discovering what
+    the previous harness already wrote. Return "" when nothing was written yet
+    (the note then falls back to the generic "inspect the partial output" text). */
 export async function runHarnessChain(
   fullPrompt: string,
   requestedHarness: HarnessId,
   chain: HarnessId[],
   write: SSEWriter,
   signal: AbortSignal,
+  partialWork?: () => string,
 ): Promise<"done" | "failed"> {
   const startIdx = chain.indexOf(requestedHarness);
   const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
@@ -131,9 +139,18 @@ export async function runHarnessChain(
           ? (limitReason === "quota" ? "rate limit / quota reached" : limitReason === "overload" ? "upstream service overloaded (not your quota)" : "unknown")
           : "failed to start";
         sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-        continuationNote = status === "limit"
-          ? `The previous harness (${harnessId}) started but hit: ${reason}. Inspect the partial output already written to disk and CONTINUE from where it stopped.`
-          : undefined;
+        if (status === "limit") {
+          // A limit means the previous CLI actually ran and may have written
+          // partial work. Hand that work to the fallback inline so it doesn't
+          // re-read it from disk. (A "failed to start" never touched disk, so
+          // there is nothing to carry — leave the note undefined.)
+          const partial = partialWork?.().trim();
+          continuationNote = partial
+            ? `The previous harness (${harnessId}) started but hit: ${reason}. It had already written the file(s) below. CONTINUE from this exact on-disk state and finish the remaining work — do NOT re-read these from disk, do NOT restart from scratch:\n\n${partial}`
+            : `The previous harness (${harnessId}) started but hit: ${reason}. Inspect the partial output already written to disk and CONTINUE from where it stopped.`;
+        } else {
+          continuationNote = undefined;
+        }
         continue;
       }
       if (status === "limit") {

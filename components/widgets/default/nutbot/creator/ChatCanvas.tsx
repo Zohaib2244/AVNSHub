@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Square, PlusCircle } from "lucide-react";
+import { Download, PlusCircle, Send, Square } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
@@ -12,6 +12,7 @@ import {
   getPlacementSnapshot,
   type PlacementSnapshot,
 } from "@/lib/slotLayout";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { isValidSlug } from "@/lib/widget-creator/slug";
 
 type Phase =
@@ -135,6 +136,7 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
   // the user restores it manually after a failed/aborted run
   const [editHidden, setEditHidden] = useState(false);
   const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
+  const { setInstalling } = useLayout();
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -408,14 +410,10 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     return false;
   }
 
-  // Resume an "add to layout" commit that was in flight when a reload hit —
-  // registering a brand-new widget appends to customComponentMap.tsx, which
-  // Fast Refresh can't hot-swap, so the dev server typically force-reloads the
-  // page right as (or just after) the register fetch resolves. PENDING_ADD_KEY
-  // survives that reload; this picks the placement back up once the new
-  // widget's lazy entry is actually live. If no reload happened (Fast Refresh
-  // handled it gracefully), handleAddToLayout's own inline retry below already
-  // finished the job and cleared the marker before this could ever run.
+  // After "Install Widget" triggers a full reload (registering a new widget
+  // writes customComponentMap.tsx, which Fast Refresh can't hot-swap),
+  // PENDING_ADD_KEY survives in sessionStorage. On remount we show "adding..."
+  // immediately and retry placement until the new widget's lazy entry is live.
   useEffect(() => {
     let pendingSlug: string | null = null;
     try {
@@ -423,14 +421,16 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     } catch {}
     if (!pendingSlug) return;
 
+    // Show "adding..." right away so the user never sees a clickable
+    // "Add to Layout" button during the retry window.
+    setAdding(true);
+
     let cancelled = false;
     const slug = pendingSlug;
     (async () => {
       const ok = await placeWithRetry(slug, 16, 300);
       if (cancelled) return;
-      try {
-        sessionStorage.removeItem(PENDING_ADD_KEY);
-      } catch {}
+      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
       if (ok) {
         const done = readDoneRecord();
         if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
@@ -440,84 +440,88 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
           setAdding(false);
         }
       } else {
+        setAdding(false);
         setMessages((prev) => [
           ...prev,
           {
             role: "error",
-            text: `"${slug}" was registered but couldn't be auto-placed after the reload — every region may be full. Try the Widget Manager.`,
+            text: `"${slug}" was installed but couldn't be auto-placed — every region may be full. Try the Widget Manager.`,
           },
         ]);
       }
     })();
 
-    return () => {
-      cancelled = true;
-    };
-    // mount-only: this resumes whatever was pending when the component last
-    // unmounted (e.g. via reload), not something that should re-run per render
+    return () => { cancelled = true; };
+    // mount-only: resumes whatever was pending when the component last
+    // unmounted (reload), not something that should re-run per render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Step 1 — compile & register the new widget into the registry.
+  // Writes customComponentMap.tsx, which almost always triggers a full
+  // dev-server reload. PENDING_ADD_KEY marks that placement should follow
+  // on the other side of that reload (picked up by the mount-effect above).
+  async function handleInstall() {
+    if (!doneWidgetId || adding) return;
+    const slug = doneWidgetId;
+    setAdding(true);
+    setInstalling(true);
+    try { sessionStorage.setItem(PENDING_ADD_KEY, slug); } catch {}
+    setMessages((prev) => [
+      ...prev,
+      { role: "ok", text: `[info] installing "${slug}" — the page will refresh once to pick up the new widget.` },
+    ]);
+    try {
+      const res = await fetch("/api/widget-creator/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          name: settings.name,
+          icon: settings.icon,
+          sizes: settings.sizes,
+          orientations: settings.orientations,
+        }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      if (!res.ok || !body.ok) {
+        try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+        setInstalling(false);
+        setAdding(false);
+        setMessages((prev) => [
+          ...prev,
+          { role: "error", text: `couldn't install "${slug}": ${body.error ?? `server error ${res.status}`}` },
+        ]);
+        return;
+      }
+    } catch (err) {
+      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+      setInstalling(false);
+      setAdding(false);
+      setMessages((prev) => [...prev, { role: "error", text: `couldn't install "${slug}": ${(err as Error).message}` }]);
+      return;
+    }
+    setPendingRegistration(false);
+    const done = readDoneRecord();
+    if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+    // If the reload fires before we get here, the component unmounts and the
+    // mount-effect handles placement on the other side. If Fast Refresh
+    // somehow handles it without a reload, fall through to placement below.
+    const ok = await placeWithRetry(slug, 8, 250);
+    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    setInstalling(false);
+    setAdding(false);
+    if (ok) setAdded(true);
+    // if not placed: reload will have happened already (the mount-effect takes over)
+  }
+
+  // Step 2 — place the already-installed widget onto the canvas.
+  // Only shown after the widget is registered (pendingRegistration = false).
   async function handleAddToLayout() {
     if (!doneWidgetId || adding) return;
     const slug = doneWidgetId;
     setAdding(true);
-
-    if (pendingRegistration) {
-      try {
-        sessionStorage.setItem(PENDING_ADD_KEY, slug);
-      } catch {}
-      setMessages((prev) => [
-        ...prev,
-        { role: "ok", text: `[info] adding "${slug}" to the layout — the page will refresh once to pick up the new widget.` },
-      ]);
-      try {
-        const res = await fetch("/api/widget-creator/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            slug,
-            name: settings.name,
-            icon: settings.icon,
-            sizes: settings.sizes,
-            orientations: settings.orientations,
-          }),
-        });
-        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        if (!res.ok || !body.ok) {
-          try {
-            sessionStorage.removeItem(PENDING_ADD_KEY);
-          } catch {}
-          setAdding(false);
-          setMessages((prev) => [
-            ...prev,
-            { role: "error", text: `couldn't register "${slug}": ${body.error ?? `server error ${res.status}`}` },
-          ]);
-          return;
-        }
-      } catch (err) {
-        try {
-          sessionStorage.removeItem(PENDING_ADD_KEY);
-        } catch {}
-        setAdding(false);
-        setMessages((prev) => [...prev, { role: "error", text: `couldn't register "${slug}": ${(err as Error).message}` }]);
-        return;
-      }
-      setPendingRegistration(false);
-      const done = readDoneRecord();
-      if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
-      // registration write may have just triggered (or be about to trigger) a
-      // full reload — if it did, this component is about to unmount and
-      // everything below is abandoned harmlessly; the mount-effect above picks
-      // up PENDING_ADD_KEY and finishes the job on the other side. If it
-      // didn't (Fast Refresh handled it without a reload), we just fall
-      // through and finish placement ourselves right here.
-    }
-
     const ok = await placeWithRetry(slug, 12, 250);
-    try {
-      sessionStorage.removeItem(PENDING_ADD_KEY);
-    } catch {}
     setAdding(false);
     if (ok) {
       setAdded(true);
@@ -526,7 +530,7 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
         ...prev,
         {
           role: "error",
-          text: `couldn't place "${slug}" on the canvas — every region may be full, or the dashboard hasn't picked up the new widget yet. Try the Widget Manager, or reload the page.`,
+          text: `couldn't place "${slug}" on the canvas — every region may be full. Try the Widget Manager, or reload the page.`,
         },
       ]);
     }
@@ -618,13 +622,24 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
             <button type="button" className="wc-clear-btn" onClick={clearChat}>
               new
             </button>
-            {doneWidgetId && !added && (
+            {doneWidgetId && !added && pendingRegistration && (
+              <button
+                type="button"
+                className="wc-add-btn wc-install-btn"
+                onClick={handleInstall}
+                disabled={adding}
+                title="compiles the widget into the registry — the page refreshes once, then 'Add to Layout' appears"
+              >
+                <Download size={11} strokeWidth={2} />
+                {adding ? "installing..." : "install widget"}
+              </button>
+            )}
+            {doneWidgetId && !added && !pendingRegistration && (
               <button
                 type="button"
                 className="wc-add-btn"
                 onClick={handleAddToLayout}
                 disabled={adding}
-                title={pendingRegistration ? "commits the widget and refreshes the page once" : undefined}
               >
                 <PlusCircle size={11} strokeWidth={2} />
                 {adding ? "adding..." : "add to layout"}

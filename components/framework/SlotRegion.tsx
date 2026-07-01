@@ -42,6 +42,7 @@ export function SlotRegion({
   instances,
   dims,
   entranceDelays,
+  inFocusMode,
 }: {
   region: SlotRegionId;
   instances: SlotWidgetInstance[];
@@ -49,6 +50,8 @@ export function SlotRegion({
   /** widget id -> seconds before its mount fade+scale-in plays, forwarded to
       each SlotWidgetCell — see WidgetShell's entranceDelay prop comment */
   entranceDelays?: Record<string, number>;
+  /** when true this region is dimmed and fully non-interactive (focus mode) */
+  inFocusMode?: boolean;
 }) {
   const { editMode } = useLayout();
   const regionRef = useRef<HTMLDivElement>(null);
@@ -73,6 +76,18 @@ export function SlotRegion({
     };
   }, []);
 
+  // inert blocks all pointer, keyboard, and AT interaction on non-focused
+  // regions; removed immediately on exit so other widgets respond right away
+  useEffect(() => {
+    const el = regionRef.current;
+    if (!el) return;
+    if (inFocusMode) {
+      el.setAttribute("inert", "");
+    } else {
+      el.removeAttribute("inert");
+    }
+  }, [inFocusMode]);
+
   function clearHoverIntent() {
     if (hoverIntentRef.current === null) return;
     window.clearTimeout(hoverIntentRef.current);
@@ -86,6 +101,7 @@ export function SlotRegion({
   }
 
   function supportsHoverExpand() {
+    if (inFocusMode) return false;
     if (editMode) return false;
     if (typeof window === "undefined") return false;
     if (!window.matchMedia("(hover: hover) and (pointer: fine)").matches) return false;

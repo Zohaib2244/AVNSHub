@@ -478,6 +478,22 @@ html[data-backdrop="glass"] .frame {
   display: grid;
   gap: 12px;
   min-height: 0;
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Focus mode ──────────────────────────────────────────────────────────────
+   Non-center regions fade out and become completely non-interactive (the
+   `inert` attribute is applied by SlotRegion.tsx; the opacity change gives
+   visual feedback that matches the interaction state). The center region gets
+   an orange accent border to signal it owns the frame. */
+.slot-frame[data-focus-mode="true"] .slot-region:not(.slot-region-center) {
+  opacity: 0.08;
+}
+
+.slot-frame[data-focus-mode="true"] .slot-region-center .block,
+.slot-frame[data-focus-mode="true"] .slot-region-center .namecard {
+  border-color: var(--accent-orange);
+  box-shadow: 5px 5px 0 var(--shadow);
 }
 
 @media (min-width: 1024px) {
@@ -2364,4 +2380,81 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-region-btn:hover {
   color: var(--accent-cyan);
   border-color: var(--accent-cyan);
+}
+
+/* ── Widget-install lock overlay ─────────────────────────────────────────────
+   Covers the entire .slot-page (including the HubCore edge panel) while a new
+   widget is being compiled and registered. Blocks all pointer + keyboard
+   interaction via pointer-events:all on the overlay (top z-index) and
+   pointer-events:none on the canvas content via the data-installing selector.
+   The page reloads once registration completes, so this state is always
+   transient. */
+
+.slot-frame[data-installing="true"] .slot-region {
+  opacity: 0.2;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.installing-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 600;
+  background: color-mix(in srgb, var(--bg-page) 72%, transparent);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  border-radius: inherit;
+}
+
+.installing-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 20px;
+  background: var(--bg-card);
+  border: 1.5px solid var(--accent-orange);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  color: var(--text-primary);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.installing-badge-label {
+  color: var(--text-primary);
+}
+
+.installing-badge-sub {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+}
+
+.installing-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.installing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-orange);
+  animation: installing-pulse 1.1s ease-in-out infinite;
+}
+
+.installing-dot:nth-child(2) { animation-delay: 0.18s; }
+.installing-dot:nth-child(3) { animation-delay: 0.36s; }
+
+@keyframes installing-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(0.75); }
+  50%       { opacity: 1;    transform: scale(1.15); }
 }

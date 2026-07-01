@@ -1,0 +1,17 @@
+{
+  "title": "verlet sim",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "segments", "label": "segments", "type": "number", "default": 16, "min": 8, "max": 32 },
+    { "key": "gravity", "label": "gravity", "type": "number", "default": 0.36, "min": 0, "max": 1.2 },
+    { "key": "stiffness", "label": "solver passes", "type": "number", "default": 6, "min": 2, "max": 10 },
+    { "key": "anchor", "label": "anchor", "type": "select", "default": "left", "options": [
+      { "value": "left", "label": "left pin" },
+      { "value": "suspended", "label": "suspended" }
+    ] },
+    { "key": "trails", "label": "motion trails", "type": "toggle", "default": true }
+  ]
+}
