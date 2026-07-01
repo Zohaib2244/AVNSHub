@@ -8,7 +8,7 @@ import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator
 import { isValidIdeateSessionId, sessionDirFor, variationFile } from "@/lib/widget-creator/ideateStore";
 
 // Few-shot structural/style reference trimmed from the user's own hand-built
-// widget-ideas-proto.html — same dark "ember" palette tokens and chunky
+// Ideate mockups use the same dark "ember" palette tokens and chunky
 // sticker-card chrome the real widget framework uses, kept here as raw text
 // rather than read from disk so the prompt doesn't depend on that file
 // staying on disk or unedited.

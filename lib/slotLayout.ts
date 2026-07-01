@@ -99,23 +99,23 @@ function buildDefaultState(): SlotLayoutState {
       },
       frameRatios: {
         columns:    [2, 3, 2] as FrameRatios["columns"],
-        centerRows: [5, 5]    as FrameRatios["centerRows"],
+        centerRows: [6, 4]    as FrameRatios["centerRows"],
       },
       widgets: [
-        // ── center (Central Base) ────────────────────────────────
-        entry("nutbot",         "center", 0, 0, 1, 1, {}),
-        // ── left column ──────────────────────────────────────────
-        entry("clock",          "left",  0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "height", showCalendar: true, showLofi: true }),
-        entry("now-playing",    "left",  0, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "both" }),
-        entry("weather",        "left",  1, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "width", city: "", units: "f" }),
-        entry("disk-storage",   "left",  0, 3, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
-        entry("server-stats",   "left",  1, 3, 1, 3, { hoverExpand: true,  hoverExpandAxis: "both" }),
-        entry("network-stats",  "left",  0, 5, 1, 1, { hoverExpand: false, hoverExpandAxis: "both" }),
-        // ── right column ─────────────────────────────────────────
-        entry("homelab",        "right", 0, 2, 2, 2, { hoverExpand: true,  hoverExpandAxis: "both", pollSeconds: "60" }),
-        // ── base row ─────────────────────────────────────────────
-        entry("identity",       "base",  0, 0, 3, 1, { hoverExpand: false, hoverExpandAxis: "height" }),
-        entry("github",         "base",  0, 1, 3, 1, { hoverExpand: true,  hoverExpandAxis: "height", flyoutCommits: 5 }),
+        entry("clock",          "left",   0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "height", showCalendar: true, showLofi: true }),
+        entry("now-playing",    "left",   1, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
+        entry("nutbot",         "center", 0, 0, 1, 1, { hoverExpand: false, hoverExpandAxis: "both" }),
+        entry("github",         "base",   0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "width", flyoutCommits: 5 }),
+        entry("dot-matrix",     "base",   2, 0, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, colorMode: "orange", interaction: "repel" }),
+        entry("network-stats",  "left",   1, 3, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
+        entry("disk-storage",   "left",   1, 4, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
+        entry("identity",       "left",   0, 2, 1, 3, { hoverExpand: true,  hoverExpandAxis: "width", displayName: "AVN Hub", tagline: "front page to your life", initials: "AVN" }),
+        entry("glyph-matrix",   "right",  0, 2, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, animation: "pulse", speed: "normal", color: "orange", dotSize: "medium" }),
+        entry("notes",          "right",  0, 4, 2, 2, { hoverExpand: false, hoverExpandAxis: "both" }),
+        entry("dictionary",     "right",  0, 0, 1, 2, { hoverExpand: true,  hoverExpandAxis: "both", defaultWord: "serendipity", showSuggestions: true, showSentence: true, showPronunciation: true }),
+        entry("server-stats",   "left",   0, 5, 2, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
+        entry("verlet-sim",     "left",   1, 6, 1, 1, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, segments: 16, gravity: 0.36, stiffness: 6, anchor: "suspended", trails: true }),
+        entry("ambient-data",   "right",  1, 0, 1, 4, { hoverExpand: true,  hoverExpandAxis: "width", showHeader: false }),
       ].filter((w): w is SlotWidgetInstance => w !== null),
     };
   }

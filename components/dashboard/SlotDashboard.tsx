@@ -79,14 +79,6 @@ export function SlotDashboard() {
   const dragRef = useRef<RatioDragState | null>(null);
   const [previewRatios, setPreviewRatios] = useState<FrameRatios | null>(null);
 
-  // Track whether focus mode changed THIS render so we apply the animated
-  // transition (0.4s) only on the toggle itself, not on every drag/ratio update.
-  // Updating a ref during render is intentional here — it's safe (no setState
-  // during render) and gives us a reliable "just changed" flag per render.
-  const prevIsFocusModeRef = useRef(isFocusMode);
-  const focusChanged = prevIsFocusModeRef.current !== isFocusMode;
-  prevIsFocusModeRef.current = isFocusMode;
-
   const left = slotLayout.widgets.filter((w) => w.region === "left");
   const right = slotLayout.widgets.filter((w) => w.region === "right");
   const base = slotLayout.widgets.filter((w) => w.region === "base");
@@ -108,10 +100,9 @@ export function SlotDashboard() {
   const activeRatios = isFocusMode ? FOCUS_RATIOS : ratios;
 
   // Framer-motion animates the grid template values by interpolating the
-  // numbers inside the string (its "complex" type). Duration is 0.4s only on
-  // the render where focus mode actually toggles; every other update (drag
-  // preview, canvas switch) is instant so drag handles stay snappy.
-  const layoutTransition = focusChanged
+  // numbers inside the string (its "complex" type). Drag previews stay instant
+  // so ratio handles remain snappy.
+  const layoutTransition = previewRatios === null
     ? ({ duration: 0.4, ease: [0.4, 0, 0.2, 1] } as const)
     : ({ duration: 0 } as const);
 
@@ -220,7 +211,7 @@ export function SlotDashboard() {
               widget tree (fade out) and mounts the new one (cascade in) —
               even when a widget id happens to exist in both canvases. Only
               opacity is tweened here (no `layout` prop, no measuring), so
-              this can't trip the dense-grid reflow loop CLAUDE.md warns
+              this can't trip the dense-grid reflow loop the layout notes warn
               about; the per-widget scale+stagger lives in WidgetShell. */}
           <AnimatePresence mode="wait" initial={false}>
           <motion.div
