@@ -7,23 +7,40 @@ import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harn
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
 import { isValidIdeateSessionId, sessionDirFor, variationFile } from "@/lib/widget-creator/ideateStore";
 
+const REPO_ROOT = process.cwd();
+
+// Pull the default (dark "ember") token values straight out of the real
+// stylesheet instead of hand-copying hex values here — this used to be a
+// separate hardcoded :root block that could silently drift from
+// styles/globals.css whenever the palette was retuned. Falls back to the
+// last-known-good block only if globals.css can't be read at all.
+const FALLBACK_ROOT_TOKENS = `--bg-page: #13100c;
+  --bg-card: #1e1a14;
+  --bg-nested: #1a1610;
+  --border: #3d3220;
+  --shadow: #070604;
+  --text-primary: #e8dfc8;
+  --text-muted: #9f9887;
+  --text-muted-dim: #8b8475;
+  --accent-orange: #ff6b2b;
+  --accent-cyan: #00b4c8;`;
+
+function readDefaultRootTokens(): string {
+  try {
+    const css = readFileSync(join(REPO_ROOT, "styles/globals.css"), "utf-8");
+    const match = css.match(/:root\s*\{([^}]*)\}/);
+    return match ? match[1].trim() : FALLBACK_ROOT_TOKENS;
+  } catch {
+    return FALLBACK_ROOT_TOKENS;
+  }
+}
+
 // Few-shot structural/style reference trimmed from the user's own hand-built
 // Ideate mockups use the same dark "ember" palette tokens and chunky
-// sticker-card chrome the real widget framework uses, kept here as raw text
-// rather than read from disk so the prompt doesn't depend on that file
-// staying on disk or unedited.
+// sticker-card chrome the real widget framework uses.
 const STYLE_REFERENCE = `<style>
   :root {
-    --bg-page: #13100c;
-    --bg-card: #1e1a14;
-    --bg-nested: #1a1610;
-    --border: #3d3220;
-    --shadow: #070604;
-    --text-primary: #e8dfc8;
-    --text-muted: #9f9887;
-    --text-muted-dim: #8b8475;
-    --accent-orange: #ff6b2b;
-    --accent-cyan: #00b4c8;
+    ${readDefaultRootTokens()}
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg-page); color: var(--text-primary); font-family: 'JetBrains Mono', monospace; padding: 32px; }

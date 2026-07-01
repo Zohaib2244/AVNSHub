@@ -10,16 +10,9 @@ import {
   sanitizeComponentMap,
   registerCustomWidget,
 } from "@/lib/widget-creator/customRegistry";
+import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
 
 const REPO_ROOT = process.cwd();
-
-function readDoc(relPath: string): string {
-  try {
-    return readFileSync(join(REPO_ROOT, relPath), "utf-8");
-  } catch {
-    return "";
-  }
-}
 
 function readExistingWidget(slug: string): string {
   try {
@@ -75,17 +68,14 @@ function deleteWidgetBackups(slug: string): void {
   } catch {}
 }
 
-// The authoring guide — stable 24KB doc. Returned separately so callers can
-// send it via --append-system-prompt (cacheable system prefix on claude) rather
-// than embedding it in the user turn on every request.
-function buildSystemPrompt(): string {
-  return readDoc("docs/CREATING_WIDGETS.md");
-}
-
-// Core user-facing prompt. `includeDoc` controls whether the authoring guide
-// is embedded (needed for codex/opencode which have no system-prompt flag) or
-// omitted (when it's already in claude's --append-system-prompt).
-function buildCorePrompt(settings: GenerateSettings, userPrompt: string, includeDoc: boolean): string {
+// Core user-facing prompt. The authoring guide itself lives in the
+// "avn-widget-build" harness skill (.claude/skills/, .agents/skills/ — see
+// scripts/sync-widget-skill.mjs, which regenerates it from
+// docs/CREATING_WIDGETS.md) rather than being embedded here: claude, codex,
+// and opencode all discover and load project-local skills in their headless
+// invocation modes (verified directly against each CLI), so there's no need
+// to pass ~6K tokens of guide text on every single turn.
+function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string {
   const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
@@ -132,22 +122,22 @@ ${existingCode || "(could not read existing file - write a corrected version)"}
 \`\`\``
     : `## Your task - creating a new widget
 
-Write a new widget following the rules in the authoring guide. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
+Write a new widget following the rules in the \`avn-widget-build\` skill. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
 - \`${comp}.tsx\` - the component, with a named export \`export function ${comp}() { ... }\`
 - \`manifest.json\` - the widget's manifest data (see "Required output" below)
 
 Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file - the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.
 
-The authoring guide (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - write directly from the guide and the spec in this prompt.`;
+The \`avn-widget-build\` skill (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - load the skill and write directly from it plus the spec in this prompt.`;
 
-  const docSection = includeDoc
-    ? `\n## Authoring guide (follow exactly)\n\n${buildSystemPrompt()}\n`
-    : "";
+  const skillSection = `\n## Authoring rules
+
+Load the \`avn-widget-build\` skill now and follow it exactly - it covers the config/widgets.tsx manifest pattern, the custom-widget split-registry pattern, per-size layout, the settings schema, design tokens, and a minimal complete example.\n`;
 
   return `You are generating a widget for the AVN Hub project - a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
 
 ${taskSection}
-${docSection}
+${skillSection}
 ## Widget spec from the user
 
 ${settingsSummary || "(No structured settings provided - infer from the prompt below.)"}
@@ -258,16 +248,24 @@ export async function POST(req: Request) {
     );
   }
 
-  // Full prompt (doc included) — used for codex/opencode and fallbacks.
-  // Lean prompt (doc excluded) — used for claude's user turn when the doc goes
-  // via --append-system-prompt into the cacheable system-prefix instead.
-  const fullPrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ true);
-  const claudePrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ false);
+  const corePrompt = buildCorePrompt(settings, userPrompt);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
   const requestedHarness: HarnessId = bodyHarness ?? settings.harness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? settings.harnessChain ?? HARNESS_CHAIN_DEFAULT;
+
+  // The prompt only ever tells the harness to "load the avn-widget-build
+  // skill" — it doesn't carry the authoring rules itself (see
+  // docs/CREATING_WIDGETS.md's skill section). If the skill file isn't
+  // actually there, generation must not silently proceed with a harness that
+  // has no idea what the framework rules are.
+  const skillError = checkSkillOrError("avn-widget-build", requestedHarness);
+  if (skillError) {
+    return new Response(`event: error\ndata: ${JSON.stringify({ message: skillError })}\n\n`, {
+      headers: { "Content-Type": "text/event-stream" },
+    });
+  }
 
   const encoder = new TextEncoder();
   const abortController = new AbortController();
@@ -302,8 +300,8 @@ export async function POST(req: Request) {
         : undefined;
 
       const { outcome, sessionId: outSessionId } = await runHarnessChain(
-        fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { systemPrompt: buildSystemPrompt(), claudePrompt, sessionId: incomingSessionId, resumePrompt },
+        corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
+        { sessionId: incomingSessionId, resumePrompt },
       );
 
       if (outcome !== "done") {

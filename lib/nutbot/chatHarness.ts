@@ -57,12 +57,18 @@ function buildInvocation(
       "--tools",
       "",
       "--bare",
-      "--system-prompt",
-      persona,
     ];
 
-    if (sessionId) args.push("--resume", sessionId);
-    else args.push("--session-id", conversationId);
+    // --system-prompt only on the first turn — a --resume turn already has it
+    // as part of the session's own history, so resending it here would just
+    // repeat the (now catalog-carrying, ~1K token) persona every single turn
+    // for no benefit. Mirrors the same pattern in
+    // lib/widget-creator/harnessRunner.ts's claude invocation.
+    if (sessionId) {
+      args.push("--resume", sessionId);
+    } else {
+      args.push("--system-prompt", persona, "--session-id", conversationId);
+    }
 
     return {
       args,

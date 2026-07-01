@@ -53,18 +53,12 @@ function extractSessionIdFromLine(line: string): string | null {
 
 // --- Per-run options (only meaningful for the claude adapter) ---
 export type HarnessOpts = {
-  /** Move the stable authoring-guide doc into claude's --append-system-prompt
-      so it's in the cacheable system-prefix rather than the user turn.
-      Non-Windows only (cmd.exe ARG_MAX would truncate it). */
-  systemPrompt?: string;
-  /** Lean user prompt that omits the doc (used when systemPrompt is set, so
-      the doc isn't sent twice). Falls back to the main prompt if absent. */
-  claudePrompt?: string;
   /** Existing session ID — causes claude to use --resume instead of -p so
       the model continues from its prior context. */
   sessionId?: string;
-  /** Short user instruction for resume turns. Replaces claudePrompt/prompt
-      when sessionId is set and this is provided. */
+  /** Short user instruction for resume turns. Replaces `prompt` when
+      sessionId is set and this is provided — the model already has full
+      context (including the avn-widget-build skill, loaded on turn 1). */
   resumePrompt?: string;
 };
 
@@ -79,14 +73,10 @@ export function runHarness(
   return new Promise((resolve) => {
     const isResume = adapter.id === "claude" && Boolean(opts?.sessionId);
 
-    // Pick the most specific prompt available:
-    //   resume turn → short instruction only (model already has full context)
-    //   claude first turn with system prompt → lean prompt (doc is in sys prompt)
-    //   everything else → full prompt
-    const activePrompt =
-      isResume && opts?.resumePrompt != null ? opts.resumePrompt :
-      adapter.id === "claude" && !isResume && opts?.claudePrompt != null ? opts.claudePrompt :
-      prompt;
+    // Resume turn → short instruction only (model already has full context
+    // from turn 1, including the avn-widget-build skill it loaded then).
+    // Everything else → full prompt.
+    const activePrompt = isResume && opts?.resumePrompt != null ? opts.resumePrompt : prompt;
 
     const sendablePrompt = continuationNote
       ? `${continuationNote}\n\n${activePrompt}`
@@ -118,12 +108,6 @@ export function runHarness(
           "--verbose",
           "--permission-mode", "bypassPermissions",
         ];
-        // Move the stable authoring guide into the system-prompt block on
-        // non-Windows. On Windows (shell: true → cmd.exe 8191-char ARG_MAX)
-        // keep it in the user prompt via stdin to avoid truncation.
-        if (opts?.systemPrompt && process.platform !== "win32") {
-          args = args.concat(["--append-system-prompt", opts.systemPrompt]);
-        }
       }
     } else if (adapter.promptViaArg) {
       args = [...adapter.args, sendablePrompt];
@@ -216,9 +200,9 @@ export function runHarness(
 
 /** Run the harness fallback chain.
  *
- *  `opts` (system prompt + session resume) applies ONLY to the first harness.
- *  Fallback harnesses always receive the full prompt with no session context —
- *  they don't share session state with the harness that hit the limit.
+ *  `opts` (session resume) applies ONLY to the first harness. Fallback
+ *  harnesses always receive the full prompt with no session context — they
+ *  don't share session state with the harness that hit the limit.
  *
  *  `partialWork`, if given, is read at each switch and embedded into the
  *  continuation note so a fallback continues from the exact on-disk file state
@@ -246,8 +230,8 @@ export async function runHarnessChain(
     const adapter = HARNESS_ADAPTERS[harnessId];
     if (!adapter) continue;
 
-    // opts (system prompt + session resume) only apply to the first harness.
-    // Fallback harnesses always start fresh with the full prompt.
+    // opts (session resume) only apply to the first harness. Fallback
+    // harnesses always start fresh with the full prompt.
     const harnessOpts = i === 0 ? opts : undefined;
 
     const { status, limitReason, newSessionId } = await runHarness(

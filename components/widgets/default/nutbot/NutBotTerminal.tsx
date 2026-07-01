@@ -25,7 +25,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.2 ready",
+  "[info] nutbot v2.3 ready",
 ];
 
 type MainTab = "log" | "chat" | "shells" | "creator";
@@ -105,7 +105,7 @@ export function NutBotTerminal() {
     <div className="nutbot-terminal">
       {/* ── single combined row: title + tabs + controls ── */}
       <div className="term-row">
-        <span className="term-title">NUTBOT V2.2</span>
+        <span className="term-title">NUTBOT V2.3</span>
 
         <div className="term-tabs">
           {(["log", "chat", "shells", "creator"] as MainTab[]).map((tab) => (

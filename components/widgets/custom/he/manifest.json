@@ -1,0 +1,10 @@
+{
+  "title": "he",
+  "iconName": "Box",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "example", "label": "example", "type": "text", "default": "" }
+  ]
+}
