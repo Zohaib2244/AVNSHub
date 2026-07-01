@@ -25,6 +25,7 @@ const _quick_links = lazy(() => import("@/components/widgets/custom/quick-links/
 const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
 const _verlet_sim = lazy(() => import("@/components/widgets/custom/verlet-sim/VerletSimWidget").then((m) => ({ default: m.VerletSimWidget })));
 const _claude_usage = lazy(() => import("@/components/widgets/custom/claude-usage/ClaudeUsageWidget").then((m) => ({ default: m.ClaudeUsageWidget })));
+const _world_clock = lazy(() => import("@/components/widgets/custom/world-clock/WorldClockWidget").then((m) => ({ default: m.WorldClockWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -44,5 +45,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "ambient-data": _ambient_data,
   "verlet-sim": _verlet_sim,
   "claude-usage": _claude_usage,
+  "world-clock": _world_clock,
 // --- custom-map end ---
 };

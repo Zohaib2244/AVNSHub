@@ -987,3 +987,109 @@
   font-size: 0.65rem;
   color: var(--text-primary);
 }
+
+/* ── plan mode ──────────────────────────────────────────────── */
+
+.wc-plan-body {
+  gap: 8px;
+}
+
+.wc-brief-card {
+  border: 1.5px solid var(--accent-orange);
+  box-shadow: 3px 3px 0 var(--shadow, #070604);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--bg-nested);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.wc-brief-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.wc-brief-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--accent-orange);
+}
+
+.wc-brief-meta {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.wc-brief-tag {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.5rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  color: var(--text-muted);
+}
+
+.wc-brief-concept {
+  margin: 0;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.wc-brief-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wc-brief-action-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.wc-brief-build-btn {
+  border-color: var(--accent-orange);
+  color: var(--accent-orange);
+}
+
+.wc-brief-build-btn:hover {
+  background: var(--accent-orange);
+  color: var(--bg-card);
+}
+
+.wc-brief-viz-btn {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.wc-brief-viz-btn:hover {
+  background: var(--accent-cyan);
+  color: var(--bg-card);
+}

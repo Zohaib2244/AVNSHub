@@ -1,0 +1,39 @@
+{
+  "title": "world clock",
+  "iconName": "Clock",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    {
+      "key": "clocks",
+      "label": "countries",
+      "type": "text",
+      "default": "Karachi|Asia/Karachi, London|Europe/London, New York|America/New_York, Tokyo|Asia/Tokyo",
+      "placeholder": "Tokyo|Asia/Tokyo, London|Europe/London"
+    },
+    {
+      "key": "alarms",
+      "label": "alarms",
+      "type": "text",
+      "default": "Karachi|09:00, Tokyo|21:30",
+      "placeholder": "Karachi|09:00, Tokyo|21:30"
+    },
+    {
+      "key": "hourMode",
+      "label": "hour mode",
+      "type": "select",
+      "default": "24",
+      "options": [
+        { "value": "24", "label": "24h" },
+        { "value": "12", "label": "12h" }
+      ]
+    },
+    {
+      "key": "showSeconds",
+      "label": "seconds",
+      "type": "toggle",
+      "default": false
+    }
+  ]
+}

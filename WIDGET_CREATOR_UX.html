@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Widget Creator UX — Reference Mockup</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-page:    #13100c;
+      --bg-card:    #1e1a14;
+      --bg-nested:  #1a1610;
+      --border:     #3d3220;
+      --shadow:     #070604;
+      --text:       #e8dfc8;
+      --muted:      #9f9887;
+      --muted-dim:  #8b8475;
+      --orange:     #ff6b2b;
+      --cyan:       #00b4c8;
+      --dot:  'DotGothic16', monospace;
+      --mono: 'JetBrains Mono', monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text);
+      font-family: var(--mono);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 40px 40px 60px;
+      gap: 24px;
+    }
+
+    /* ── creator panel shell ─────────────────────────────────── */
+    .creator-panel {
+      width: 960px;
+      height: 580px;
+      background: var(--bg-card);
+      border-radius: 16px;
+      border: 1.5px solid var(--border);
+      box-shadow: 5px 5px 0 var(--shadow);
+      overflow: hidden;
+      position: relative;
+      flex-shrink: 0;
+    }
+
+    /* ── screen switching ────────────────────────────────────── */
+    .screen { display: none; height: 100%; flex-direction: column; }
+    .screen.active { display: flex; }
+
+    /* ════════════════════════════════════════════════════════════
+       SCREEN 1 — PROJECT LIST
+    ════════════════════════════════════════════════════════════ */
+    .pl-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .pl-title {
+      font-family: var(--dot);
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text);
+    }
+    .pl-actions { display: flex; align-items: center; gap: 8px; }
+
+    .sort-group { display: flex; gap: 3px; }
+    .sort-btn {
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 3px 9px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sort-btn.active { border-color: var(--orange); color: var(--orange); }
+
+    .new-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 6px;
+      border: 1.5px solid var(--orange);
+      background: transparent;
+      color: var(--orange);
+      font-family: var(--dot);
+      font-size: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .new-btn:hover { background: var(--orange); color: var(--bg-card); }
+
+    .pl-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .section-label {
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted-dim);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 7px;
+    }
+    .section-label::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .proj-list { display: flex; flex-direction: column; gap: 5px; }
+
+    .proj-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 13px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-nested);
+      box-shadow: 2px 2px 0 var(--shadow);
+      cursor: pointer;
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+    .proj-row.in-progress:hover  { border-color: var(--orange); }
+    .proj-row.created:hover { border-color: var(--cyan); }
+
+    .proj-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .proj-dot.in-progress { background: var(--orange); }
+    .proj-dot.created     { background: var(--cyan); }
+
+    .proj-name {
+      flex: 1;
+      font-size: 0.73rem;
+      font-weight: 500;
+      color: var(--text);
+    }
+
+    .proj-pipeline {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .pp-stage {
+      font-family: var(--dot);
+      font-size: 0.46rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 6px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      color: var(--muted-dim);
+      white-space: nowrap;
+    }
+    .pp-stage.done    { border-color: var(--cyan);   color: var(--cyan);   }
+    .pp-stage.working { border-color: var(--orange);  color: var(--orange);
+                        animation: pp-pulse 1.5s ease-in-out infinite; }
+    @keyframes pp-pulse {
+      0%,100% { opacity: 1; } 50% { opacity: 0.5; }
+    }
+
+    .proj-time {
+      font-size: 0.58rem;
+      color: var(--muted-dim);
+      flex-shrink: 0;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* delete button — visible on hover for In Progress rows only */
+    .proj-delete {
+      width: 20px; height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 4px;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--muted-dim);
+      font-size: 0.75rem;
+      line-height: 1;
+      cursor: pointer;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .proj-row.in-progress:hover .proj-delete {
+      opacity: 1;
+    }
+    .proj-delete:hover {
+      color: #c0392b;
+      border-color: #c0392b;
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       SCREEN 2 — ENTRY POINT PICKER
+    ════════════════════════════════════════════════════════════ */
+    .ep-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .back-btn {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 3px 7px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .back-btn:hover { border-color: var(--border); color: var(--text); }
+
+    .ep-heading {
+      font-family: var(--dot);
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--text);
+    }
+
+    .ep-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 24px;
+    }
+
+    .ep-prompt {
+      font-family: var(--dot);
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+    }
+
+    .ep-cards {
+      display: flex;
+      gap: 14px;
+    }
+
+    .ep-card {
+      width: 240px;
+      padding: 22px 20px;
+      border-radius: 14px;
+      border: 1.5px solid var(--border);
+      background: var(--bg-nested);
+      box-shadow: 4px 4px 0 var(--shadow);
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 11px;
+      transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+    }
+    .ep-card:hover { transform: translateY(-1px); box-shadow: 5px 6px 0 var(--shadow); }
+    .ep-card.plan:hover    { border-color: var(--orange); }
+    .ep-card.ideate:hover  { border-color: var(--cyan); }
+    .ep-card.build:hover   { border-color: var(--muted); }
+
+    .ep-card-icon {
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .ep-card-label {
+      font-family: var(--dot);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+    .ep-card.plan .ep-card-label   { color: var(--orange); }
+    .ep-card.ideate .ep-card-label { color: var(--cyan); }
+    .ep-card.build .ep-card-label  { color: var(--text); }
+
+    .ep-card-desc {
+      font-size: 0.61rem;
+      line-height: 1.6;
+      color: var(--muted);
+    }
+    .ep-card-hint {
+      font-family: var(--dot);
+      font-size: 0.47rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted-dim);
+    }
+
+    /* ════════════════════════════════════════════════════════════
+       SCREENS 3-5 — WORKSPACE (shared shell)
+    ════════════════════════════════════════════════════════════ */
+    .ws-topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .ws-name-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text);
+      border-bottom: 1px solid transparent;
+      padding: 0 2px;
+      transition: border-color 0.15s;
+      min-width: 0;
+      max-width: 220px;
+    }
+    .ws-name-input:focus { border-bottom-color: var(--orange); }
+
+    /* pipeline bar */
+    .pipeline {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      flex-shrink: 0;
+    }
+    .pip-btn {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 10px;
+      font-family: var(--dot);
+      font-size: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      color: var(--muted-dim);
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .pip-btn:hover:not(.current) { color: var(--muted); border-color: var(--border); }
+    .pip-btn.has-data { color: var(--muted); }
+    .pip-btn.current  { color: var(--orange); border-color: var(--orange); background: color-mix(in srgb, var(--orange) 8%, transparent); }
+
+    .pip-dot {
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .pip-btn.current .pip-dot  { background: var(--orange); }
+    .pip-btn.has-data .pip-dot { background: var(--cyan); }
+    .pip-btn:not(.current):not(.has-data) .pip-dot {
+      background: transparent;
+      border: 1px solid var(--muted-dim);
+    }
+    .pip-arrow {
+      font-size: 0.55rem;
+      color: var(--muted-dim);
+      padding: 0 1px;
+    }
+
+    /* workspace body */
+    .ws-body {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .ws-left {
+      width: 30%;
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+    .ws-right {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+
+    /* settings sidebar */
+    .ws-section { border-bottom: 1px solid var(--border); }
+    .ws-sec-head {
+      padding: 6px 10px;
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .ws-sec-body {
+      padding: 5px 10px 11px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .ws-field-label {
+      font-family: var(--dot);
+      font-size: 0.47rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted-dim);
+    }
+    .ws-input {
+      width: 100%;
+      background: var(--bg-nested);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 4px 7px;
+      font-family: var(--mono);
+      font-size: 0.61rem;
+      color: var(--text);
+      outline: none;
+    }
+    .ws-input:focus { border-color: var(--orange); }
+    .ws-row { display: flex; gap: 6px; }
+    .ws-row .ws-input { flex: 1; }
+    .ws-toggles { display: flex; gap: 3px; }
+    .ws-tog {
+      font-family: var(--dot);
+      font-size: 0.48rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .ws-tog.on          { border-color: var(--orange); color: var(--orange); }
+    .ws-tog.on.cyan     { border-color: var(--cyan);   color: var(--cyan);   }
+    .ws-help {
+      font-size: 0.6rem;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+    .ws-ref-badge {
+      font-family: var(--dot);
+      font-size: 0.48rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--cyan);
+    }
+
+    /* chat canvas */
+    .ws-chat {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding: 8px;
+      gap: 6px;
+    }
+    .ws-status {
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding-bottom: 5px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ws-msgs {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-right: 2px;
+    }
+    .ws-msg {
+      font-size: 0.63rem;
+      line-height: 1.5;
+      border-radius: 5px;
+      padding: 5px 7px;
+    }
+    .ws-msg-user {
+      background: var(--bg-nested);
+      border: 1px solid var(--border);
+      color: var(--text);
+      align-self: flex-end;
+      max-width: 85%;
+    }
+    .ws-msg-ai { color: var(--text); max-width: 95%; }
+    .ws-msg-ok { color: var(--cyan); font-style: italic; }
+
+    /* brief card */
+    .brief-card {
+      border: 1.5px solid var(--orange);
+      box-shadow: 3px 3px 0 var(--shadow);
+      border-radius: 10px;
+      padding: 11px 13px;
+      background: var(--bg-nested);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .brief-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .brief-title {
+      font-family: var(--dot);
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--orange);
+    }
+    .brief-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+    .brief-tag {
+      font-family: var(--dot);
+      font-size: 0.46rem;
+      text-transform: uppercase;
+      padding: 1px 5px;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--muted);
+    }
+    .brief-concept {
+      font-size: 0.6rem;
+      line-height: 1.5;
+      color: var(--muted);
+    }
+    .brief-actions { display: flex; gap: 6px; }
+    .brief-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      height: 25px;
+      border-radius: 6px;
+      border: 1.5px solid;
+      background: transparent;
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .brief-btn.build { border-color: var(--orange); color: var(--orange); }
+    .brief-btn.build:hover { background: var(--orange); color: var(--bg-card); }
+    .brief-btn.viz   { border-color: var(--cyan);   color: var(--cyan); }
+    .brief-btn.viz:hover   { background: var(--cyan);   color: var(--bg-card); }
+
+    /* footer */
+    .ws-footer {
+      display: flex;
+      gap: 5px;
+      align-items: flex-end;
+      padding-top: 5px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ws-textarea {
+      flex: 1;
+      background: var(--bg-nested);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 8px;
+      font-family: var(--mono);
+      font-size: 0.62rem;
+      color: var(--text);
+      resize: none;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .ws-textarea:focus { border-color: var(--orange); }
+    .ws-send {
+      width: 28px; height: 28px;
+      border-radius: 5px;
+      border: 1px solid var(--orange);
+      background: transparent;
+      color: var(--orange);
+      font-size: 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.15s;
+    }
+    .ws-send:hover { background: var(--orange); color: var(--bg-card); }
+
+    /* ideate canvas */
+    .ideate-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .ideate-statusbar {
+      font-family: var(--dot);
+      font-size: 0.49rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 5px 9px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .ideate-gallery {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-content: flex-start;
+    }
+    .var-card {
+      width: 192px;
+      border-radius: 10px;
+      border: 1.5px solid var(--border);
+      box-shadow: 2px 2px 0 var(--shadow);
+      background: var(--bg-nested);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .var-head {
+      font-family: var(--dot);
+      font-size: 0.47rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .var-frame {
+      height: 120px;
+      background: var(--bg-page);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--muted-dim);
+      font-size: 0.55rem;
+      font-style: italic;
+    }
+    .var-actions {
+      display: flex;
+      gap: 4px;
+      padding: 5px;
+      border-top: 1px solid var(--border);
+    }
+    .var-btn {
+      flex: 1;
+      height: 20px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--dot);
+      font-size: 0.44rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .var-btn:hover { color: var(--text); border-color: var(--text); }
+    .var-btn.finalize { border-color: var(--cyan); color: var(--cyan); }
+    .var-btn.finalize:hover { background: var(--cyan); color: var(--bg-card); }
+    .ideate-footer {
+      display: flex;
+      gap: 5px;
+      align-items: flex-end;
+      padding: 7px 9px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    /* note callout */
+    .note {
+      width: 960px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      box-shadow: 3px 3px 0 var(--shadow);
+    }
+    .note-head {
+      font-family: var(--dot);
+      font-size: 0.52rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--orange);
+      margin-bottom: 8px;
+    }
+    .note-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .note-item {
+      font-size: 0.61rem;
+      line-height: 1.55;
+      color: var(--muted);
+      display: flex;
+      gap: 8px;
+    }
+    .note-item::before {
+      content: '·';
+      color: var(--orange);
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div class="creator-panel">
+
+  <!-- ══════════════════════════════════════════════════════════
+       ① PROJECT LIST
+  ══════════════════════════════════════════════════════════ -->
+  <div id="screen-list" class="screen active">
+    <div class="pl-header">
+      <span class="pl-title">Widget Creator</span>
+      <div class="pl-actions">
+        <div class="sort-group">
+          <button class="sort-btn active">Recent</button>
+          <button class="sort-btn">A – Z</button>
+        </div>
+        <button class="new-btn" onclick="show('pick')">+ New Widget</button>
+      </div>
+    </div>
+
+    <div class="pl-body">
+
+      <!-- in progress -->
+      <div>
+        <div class="section-label">In Progress</div>
+        <div class="proj-list">
+          <div class="proj-row in-progress" onclick="show('plan')">
+            <div class="proj-dot in-progress"></div>
+            <div class="proj-name">Weather Dashboard</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage done">Plan</span>
+              <span class="pp-stage working">Ideate</span>
+              <span class="pp-stage">Build</span>
+            </div>
+            <div class="proj-time">2 hours ago</div>
+            <button class="proj-delete" onclick="deleteRow(event, this)" title="delete project">×</button>
+          </div>
+          <div class="proj-row in-progress">
+            <div class="proj-dot in-progress"></div>
+            <div class="proj-name">Pomodoro Timer</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage working">Plan</span>
+              <span class="pp-stage">Ideate</span>
+              <span class="pp-stage">Build</span>
+            </div>
+            <div class="proj-time">34 min ago</div>
+            <button class="proj-delete" onclick="deleteRow(event, this)" title="delete project">×</button>
+          </div>
+          <div class="proj-row in-progress">
+            <div class="proj-dot in-progress"></div>
+            <div class="proj-name">Untitled</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage working">Build</span>
+            </div>
+            <div class="proj-time">just now</div>
+            <button class="proj-delete" onclick="deleteRow(event, this)" title="delete project">×</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- created -->
+      <div>
+        <div class="section-label">Created</div>
+        <div class="proj-list">
+          <div class="proj-row created" onclick="show('build')">
+            <div class="proj-dot created"></div>
+            <div class="proj-name">Cube Timer</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage done">Plan</span>
+              <span class="pp-stage done">Ideate</span>
+              <span class="pp-stage done">Build</span>
+            </div>
+            <div class="proj-time">2 weeks ago</div>
+          </div>
+          <div class="proj-row created">
+            <div class="proj-dot created"></div>
+            <div class="proj-name">Dictionary</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage">Plan</span>
+              <span class="pp-stage">Ideate</span>
+              <span class="pp-stage done">Build</span>
+            </div>
+            <div class="proj-time">1 month ago</div>
+          </div>
+          <div class="proj-row created">
+            <div class="proj-dot created"></div>
+            <div class="proj-name">Glyph Matrix</div>
+            <div class="proj-pipeline">
+              <span class="pp-stage">Plan</span>
+              <span class="pp-stage done">Ideate</span>
+              <span class="pp-stage done">Build</span>
+            </div>
+            <div class="proj-time">1 month ago</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ② NEW WIDGET — ENTRY PICKER
+  ══════════════════════════════════════════════════════════ -->
+  <div id="screen-pick" class="screen">
+    <div class="ep-header">
+      <button class="back-btn" onclick="show('list')">← Projects</button>
+      <span class="ep-heading">New Widget</span>
+    </div>
+    <div class="ep-body">
+      <div class="ep-prompt">Where do you want to start?</div>
+      <div class="ep-cards">
+        <div class="ep-card plan" onclick="show('plan')">
+          <div class="ep-card-icon">◎</div>
+          <div class="ep-card-label">Plan</div>
+          <div class="ep-card-desc">Chat with AI to figure out what to build — use cases, data sources, size layouts, behaviour.</div>
+          <div class="ep-card-hint">Plan → Ideate → Build</div>
+        </div>
+        <div class="ep-card ideate" onclick="show('ideate')">
+          <div class="ep-card-icon">◈</div>
+          <div class="ep-card-label">Ideate</div>
+          <div class="ep-card-desc">Generate HTML/CSS mockups to visualise the look and feel before writing real component code.</div>
+          <div class="ep-card-hint">Ideate → Build</div>
+        </div>
+        <div class="ep-card build" onclick="show('build')">
+          <div class="ep-card-icon">⚒</div>
+          <div class="ep-card-label">Build</div>
+          <div class="ep-card-desc">Know exactly what you want? Describe it and let the AI generate the widget directly.</div>
+          <div class="ep-card-hint">Build only</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ③ WORKSPACE — PLAN MODE
+  ══════════════════════════════════════════════════════════ -->
+  <div id="screen-plan" class="screen">
+    <div class="ws-topbar">
+      <button class="back-btn" onclick="show('list')">← Projects</button>
+      <input class="ws-name-input" value="Weather Dashboard" />
+      <div class="pipeline">
+        <button class="pip-btn current">
+          <span class="pip-dot"></span> Plan
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn" onclick="show('ideate')">
+          <span class="pip-dot"></span> Ideate
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn" onclick="show('build')">
+          <span class="pip-dot"></span> Build
+        </button>
+      </div>
+    </div>
+
+    <div class="ws-body">
+      <div class="ws-left">
+        <div class="ws-section">
+          <div class="ws-sec-head">Plan Mode</div>
+          <div class="ws-sec-body">
+            <div class="ws-help">
+              Chat to figure out what to build. When the concept is clear, AI outputs a brief — click
+              <strong style="color:var(--orange)">Build this</strong> to jump to Build with all settings pre-filled,
+              or <strong style="color:var(--cyan)">Visualize first</strong> to mockup in Ideate.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ws-right">
+        <div class="ws-chat">
+          <div class="ws-status">plan · claude · ready</div>
+          <div class="ws-msgs">
+            <div class="ws-msg ws-msg-user">
+              I want a widget that shows the current weather and a 3-day forecast for my city
+            </div>
+            <div class="ws-msg ws-msg-ai">
+              Good start. A couple of quick questions:<br><br>
+              1. Data source — do you have an OpenWeatherMap key, or want Open-Meteo (free, no key)?<br>
+              2. How much per size — just temp + condition at S, fuller card at M, forecast grid at L?
+            </div>
+            <div class="ws-msg ws-msg-user">
+              Open-Meteo. S = temp + icon only. M = temp + feels-like + wind + humidity. L = everything + 3-day grid.
+            </div>
+            <div class="ws-msg ws-msg-ai">Perfect — here's the brief:</div>
+            <div class="brief-card">
+              <div class="brief-top">
+                <div class="brief-title">Weather Dashboard</div>
+                <div class="brief-tags">
+                  <span class="brief-tag">S</span>
+                  <span class="brief-tag">M</span>
+                  <span class="brief-tag">L</span>
+                  <span class="brief-tag">#weather-dashboard</span>
+                </div>
+              </div>
+              <div class="brief-concept">
+                Shows current temperature + weather condition (S), feels-like, wind, and humidity (M), plus a 3-day forecast grid (L) using the Open-Meteo API — no key required.
+              </div>
+              <div class="brief-actions">
+                <button class="brief-btn build" onclick="show('build')">⚒ Build this</button>
+                <button class="brief-btn viz"   onclick="show('ideate')">◈ Visualize first</button>
+              </div>
+            </div>
+          </div>
+          <div class="ws-footer">
+            <textarea class="ws-textarea" rows="2" placeholder="refine the brief or ask for alternatives..."></textarea>
+            <button class="ws-send">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ④ WORKSPACE — IDEATE MODE
+  ══════════════════════════════════════════════════════════ -->
+  <div id="screen-ideate" class="screen">
+    <div class="ws-topbar">
+      <button class="back-btn" onclick="show('list')">← Projects</button>
+      <input class="ws-name-input" value="Weather Dashboard" />
+      <div class="pipeline">
+        <button class="pip-btn has-data" onclick="show('plan')">
+          <span class="pip-dot"></span> Plan
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn current">
+          <span class="pip-dot"></span> Ideate
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn" onclick="show('build')">
+          <span class="pip-dot"></span> Build
+        </button>
+      </div>
+    </div>
+
+    <div class="ws-body">
+      <div class="ws-left">
+        <div class="ws-section">
+          <div class="ws-sec-head">Variations</div>
+          <div class="ws-sec-body">
+            <div class="ws-field-label">Count per prompt</div>
+            <div class="ws-toggles">
+              <button class="ws-tog">1</button>
+              <button class="ws-tog">2</button>
+              <button class="ws-tog on cyan">3</button>
+              <button class="ws-tog">4</button>
+            </div>
+          </div>
+        </div>
+        <div class="ws-section">
+          <div class="ws-sec-head">Concept (from brief)</div>
+          <div class="ws-sec-body">
+            <div class="ws-help">
+              Current temp + condition, feels-like, wind, humidity, and 3-day forecast grid via Open-Meteo.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ws-right">
+        <div class="ideate-body">
+          <div class="ideate-statusbar">3 variations · done · session-abc123</div>
+          <div class="ideate-gallery">
+            <div class="var-card">
+              <div class="var-head">variation 1</div>
+              <div class="var-frame">[ renders in iframe ]</div>
+              <div class="var-actions">
+                <button class="var-btn">regen</button>
+                <button class="var-btn finalize" onclick="show('build')">finalize → build</button>
+              </div>
+            </div>
+            <div class="var-card">
+              <div class="var-head">variation 2</div>
+              <div class="var-frame">[ renders in iframe ]</div>
+              <div class="var-actions">
+                <button class="var-btn">regen</button>
+                <button class="var-btn finalize" onclick="show('build')">finalize → build</button>
+              </div>
+            </div>
+            <div class="var-card">
+              <div class="var-head">variation 3</div>
+              <div class="var-frame">[ renders in iframe ]</div>
+              <div class="var-actions">
+                <button class="var-btn">regen</button>
+                <button class="var-btn finalize" onclick="show('build')">finalize → build</button>
+              </div>
+            </div>
+          </div>
+          <div class="ideate-footer">
+            <textarea class="ws-textarea" rows="2" placeholder="describe a new concept or tweak..."></textarea>
+            <button class="ws-send">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════
+       ⑤ WORKSPACE — BUILD MODE
+  ══════════════════════════════════════════════════════════ -->
+  <div id="screen-build" class="screen">
+    <div class="ws-topbar">
+      <button class="back-btn" onclick="show('list')">← Projects</button>
+      <input class="ws-name-input" value="Weather Dashboard" />
+      <div class="pipeline">
+        <button class="pip-btn has-data" onclick="show('plan')">
+          <span class="pip-dot"></span> Plan
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn has-data" onclick="show('ideate')">
+          <span class="pip-dot"></span> Ideate
+        </button>
+        <span class="pip-arrow">›</span>
+        <button class="pip-btn current">
+          <span class="pip-dot"></span> Build
+        </button>
+      </div>
+    </div>
+
+    <div class="ws-body">
+      <div class="ws-left">
+        <div class="ws-section">
+          <div class="ws-sec-head">Identity</div>
+          <div class="ws-sec-body">
+            <div class="ws-field-label">Title</div>
+            <input class="ws-input" value="Weather Dashboard" />
+            <div class="ws-row">
+              <div>
+                <div class="ws-field-label">Slug</div>
+                <input class="ws-input" value="weather-dashboard" style="width:120px" />
+              </div>
+              <div>
+                <div class="ws-field-label">Icon</div>
+                <input class="ws-input" value="Cloud" style="width:80px" />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ws-section">
+          <div class="ws-sec-head">Sizes</div>
+          <div class="ws-sec-body">
+            <div class="ws-toggles">
+              <button class="ws-tog on">S</button>
+              <button class="ws-tog on">M</button>
+              <button class="ws-tog on">L</button>
+            </div>
+          </div>
+        </div>
+        <div class="ws-section">
+          <div class="ws-sec-head">Data Source</div>
+          <div class="ws-sec-body">
+            <div class="ws-field-label">URL</div>
+            <input class="ws-input" value="https://api.open-meteo.com/…" />
+          </div>
+        </div>
+        <div class="ws-section">
+          <div class="ws-sec-head">Design Reference</div>
+          <div class="ws-sec-body">
+            <div class="ws-ref-badge">● Mockup attached from Ideate</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="ws-right">
+        <div class="ws-chat">
+          <div class="ws-status">build · claude · ready</div>
+          <div class="ws-msgs">
+            <div class="ws-msg ws-msg-ok">
+              Settings pre-filled from brief · design reference attached from Ideate. Describe the widget or ask for changes.
+            </div>
+          </div>
+          <div class="ws-footer">
+            <textarea class="ws-textarea" rows="2" placeholder="describe the widget or ask for changes..."></textarea>
+            <button class="ws-send">›</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.creator-panel -->
+
+<!-- design notes -->
+<div class="note">
+  <div class="note-head">Design Notes</div>
+  <div class="note-items">
+    <div class="note-item">Project List — orange dot + pulsing stage label = AI currently active on that project. Cyan dot = widget exists in the codebase (Created).</div>
+    <div class="note-item">Pipeline bar — orange highlight = stage you're viewing, cyan dot = stage has data, hollow dot = untouched. Every stage is always clickable.</div>
+    <div class="note-item">Project name is editable inline in the workspace top bar. New projects default to "Untitled" until a brief title is generated or the user types one.</div>
+    <div class="note-item">Deletion — only In Progress projects can be deleted from the creator (× button appears on hover). Created projects cannot be deleted here; deleting a widget from Hub Core Widget Manager automatically removes its project entry.</div>
+    <div class="note-item">Back navigation (← Projects) is blocked while AI is generating — the button is greyed out/inert until the run completes or is stopped.</div>
+    <div class="note-item">Pre-existing widgets (built before this system) appear in Created with empty Plan/Ideate stages — they can be opened and worked on like any other project.</div>
+  </div>
+</div>
+
+<script>
+  function show(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + id).classList.add('active');
+  }
+
+  // Delete an In Progress row (stops propagation so the row click doesn't fire)
+  function deleteRow(e, btn) {
+    e.stopPropagation();
+    const row = btn.closest('.proj-row');
+    row.style.transition = 'opacity 0.2s, transform 0.2s';
+    row.style.opacity = '0';
+    row.style.transform = 'translateX(8px)';
+    setTimeout(() => row.remove(), 200);
+  }
+</script>
+</body>
+</html>

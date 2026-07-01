@@ -237,6 +237,7 @@ export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) 
   const isCreateMode = mode === "create";
   const isEditMode = mode === "edit";
   const isIdeateMode = mode === "ideate";
+  const isPlanMode = mode === "plan";
   const customIds = Object.keys(CUSTOM_WIDGETS);
 
   function toggleSize(s: string) {
@@ -286,6 +287,12 @@ export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) 
               onClick={() => onModeChange("ideate")}
               title="brainstorm HTML/CSS mockups before building"
             >ideate</button>
+            <button
+              type="button"
+              className={`wc-toggle-btn${isPlanMode ? " active" : ""}`}
+              onClick={() => onModeChange("plan")}
+              title="chat with AI to figure out what to build"
+            >plan</button>
           </div>
         </div>
       </Section>
@@ -297,6 +304,18 @@ export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) 
             variation renders live as an HTML/CSS mockup (animations included) —
             no real component yet. Regenerate one in place, or finalize a design
             to switch into create mode with it as the build reference.
+          </p>
+        </Section>
+      )}
+
+      {isPlanMode && (
+        <Section title="about plan mode">
+          <p className="wc-ideate-help">
+            Chat with AI to figure out what to build. Describe a use case or vague
+            idea — get concept suggestions, then a structured brief. Click
+            &ldquo;Build this&rdquo; to jump into create mode with the settings
+            pre-filled, or &ldquo;Visualize first&rdquo; to generate mockups in
+            ideate mode before committing to a build.
           </p>
         </Section>
       )}

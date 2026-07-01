@@ -77,6 +77,7 @@ function validateSettings(settings: GenerateSettings): string | null {
 }
 
 const MESSAGES_KEY = "nutmag-creator-messages";
+const SESSION_ID_KEY = "nutmag-creator-session-id";
 // `registered` distinguishes "already wired into customComponentMap.tsx /
 // customRegistry.json" (an edit to a pre-existing widget — the generate route
 // applies that immediately) from "still needs the explicit add-to-layout
@@ -118,6 +119,19 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     }
     return [];
   });
+  // Claude session ID returned by the generate route on the first successful
+  // turn. Sent back on every subsequent request so the route can use --resume
+  // (the model already has the full authoring guide + widget spec in context,
+  // so only the bare user instruction needs to be re-sent).
+  const [creatorSessionId, setCreatorSessionId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      try { return sessionStorage.getItem(SESSION_ID_KEY); } catch {}
+    }
+    return null;
+  });
+  // Track which widget slug the current session was established for so we can
+  // invalidate it if the user switches to a different widget target.
+  const sessionForSlugRef = useRef<string | null>(null);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
   // restore done state from sessionStorage so HMR/reload doesn't lose it
   const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => readDoneRecord()?.slug ?? null);
@@ -186,6 +200,14 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     setPendingRegistration(false);
     writeDoneRecord(null);
 
+    // Invalidate the claude session if we're now targeting a different widget —
+    // a stale session would resume a conversation about the wrong component.
+    const currentTarget = (settings.editSlug || settings.slug || "").trim() || null;
+    if (creatorSessionId && sessionForSlugRef.current !== currentTarget) {
+      setCreatorSessionId(null);
+      try { sessionStorage.removeItem(SESSION_ID_KEY); } catch {}
+    }
+
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setPhase({ id: "connecting", harness: activeHarness });
@@ -218,6 +240,10 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
           prompt: userText,
           harness: activeHarness,
           harnessChain,
+          // If we have a session ID from a prior turn, pass it so the route
+          // uses --resume and only sends the bare instruction (~50 tokens)
+          // instead of re-sending the full authoring guide + widget spec (~6K).
+          sessionId: creatorSessionId ?? undefined,
         }),
         signal: abort.signal,
       });
@@ -260,6 +286,15 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
               // registerCustomWidget()'s doc comment). false means a brand-new
               // widget that still needs the explicit "add to layout" commit.
               const registered = Boolean(payload.registered);
+              // Store the claude session ID so the next refinement turn can use
+              // --resume instead of re-sending the full prompt (~6K tokens saved
+              // per turn). Only present when claude ran (not codex/opencode).
+              const newSessionId = (payload.sessionId as string | null) ?? null;
+              if (newSessionId) {
+                setCreatorSessionId(newSessionId);
+                sessionForSlugRef.current = slug;
+                try { sessionStorage.setItem(SESSION_ID_KEY, newSessionId); } catch {}
+              }
               setPhase({ id: "done" });
               setMessages((prev) => {
                 const updated = [...prev];
@@ -392,8 +427,11 @@ export function ChatCanvas({ settings, onSettingsChange, activeHarness, harnessC
     // exact desync that let an edit-mode run delete a working widget)
     onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
     writeDoneRecord(null);
+    setCreatorSessionId(null);
+    sessionForSlugRef.current = null;
     try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
     try { sessionStorage.removeItem(MESSAGES_KEY); } catch {}
+    try { sessionStorage.removeItem(SESSION_ID_KEY); } catch {}
   }
 
   // placeWidgetAuto can fail right after registration because the dashboard's

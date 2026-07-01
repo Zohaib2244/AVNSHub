@@ -169,7 +169,7 @@ export async function POST(req: Request) {
           .map((f) => `<!-- ${f} -->\n${readFileSync(join(sessionDir, f), "utf-8")}`)
           .join("\n\n");
 
-      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
+      const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
 
       if (outcome === "done") {
         // Verify what was actually written rather than trusting the harness's

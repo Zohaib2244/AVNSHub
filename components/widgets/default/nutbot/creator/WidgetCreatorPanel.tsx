@@ -4,10 +4,11 @@ import { useState, useSyncExternalStore } from "react";
 import { SettingsPane } from "./SettingsPane";
 import { ChatCanvas } from "./ChatCanvas";
 import { IdeateCanvas } from "./IdeateCanvas";
+import { PlanCanvas, type WidgetBrief } from "./PlanCanvas";
 import { getPrefs, getServerPrefs, subscribePrefs } from "@/lib/prefs";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 
-export type PanelMode = "create" | "edit" | "ideate";
+export type PanelMode = "create" | "edit" | "ideate" | "plan";
 
 const EMPTY_SETTINGS: GenerateSettings = {
   sizes: ["S", "M", "L"],
@@ -48,6 +49,9 @@ export function WidgetCreatorPanel() {
   // prompt initializer) even if FINALIZE_PROMPT's text is identical to the
   // previous finalize — a plain string key would collide and silently no-op
   const [finalizeNonce, setFinalizeNonce] = useState(0);
+  // plan → ideate bridge: concept string pre-fills IdeateCanvas's prompt textarea
+  const [planIdeatePrompt, setPlanIdeatePrompt] = useState<string | undefined>(undefined);
+  const [planIdeateNonce, setPlanIdeateNonce] = useState(0);
 
   function patchSettings(patch: Partial<GenerateSettings>) {
     setSettings((prev) => {
@@ -75,6 +79,29 @@ export function WidgetCreatorPanel() {
     setPanelMode("create");
   }
 
+  function handlePlanBuild(brief: WidgetBrief) {
+    patchSettings({
+      name: brief.title,
+      slug: brief.slug,
+      icon: brief.icon,
+      sizes: brief.sizes ?? ["S", "M"],
+      orientations: ["h"],
+      sDescription: brief.sContent,
+      mDescription: brief.mContent,
+      lDescription: brief.lContent,
+      dataShape: brief.dataShape || undefined,
+      editSlug: undefined,
+      designReferenceHtml: undefined,
+    });
+    setPanelMode("create");
+  }
+
+  function handlePlanVisualize(brief: WidgetBrief) {
+    setPlanIdeatePrompt(brief.concept || brief.title);
+    setPlanIdeateNonce((n) => n + 1);
+    setPanelMode("ideate");
+  }
+
   return (
     <div className="wc-panel">
       <div className="wc-left">
@@ -82,11 +109,19 @@ export function WidgetCreatorPanel() {
       </div>
       <div className="wc-divider" />
       <div className="wc-right">
-        {panelMode === "ideate" ? (
+        {panelMode === "plan" ? (
+          <PlanCanvas
+            activeHarness={prefs.activeHarness}
+            onBuild={handlePlanBuild}
+            onVisualize={handlePlanVisualize}
+          />
+        ) : panelMode === "ideate" ? (
           <IdeateCanvas
+            key={`ideate-${planIdeateNonce}`}
             activeHarness={prefs.activeHarness}
             harnessChain={prefs.harnessChain}
             onFinalize={handleFinalize}
+            initialPrompt={planIdeatePrompt}
           />
         ) : (
           <ChatCanvas

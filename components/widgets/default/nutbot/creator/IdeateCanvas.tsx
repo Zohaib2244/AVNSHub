@@ -21,6 +21,8 @@ type Props = {
   /** hands a finalized variation's raw HTML up to the panel, which switches
       into create mode and pre-fills the build prompt */
   onFinalize: (html: string) => void;
+  /** pre-fills the prompt textarea — used when "Visualize" is clicked from Plan mode */
+  initialPrompt?: string;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -134,10 +136,10 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ activeHarness, harnessChain, onFinalize }: Props) {
+export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialPrompt }: Props) {
   const [sessionId, setSessionId] = useState(loadSessionId);
   const [rounds, setRounds] = useState<Round[]>(loadRounds);
-  const [prompt, setPrompt] = useState("");
+  const [prompt, setPrompt] = useState(initialPrompt ?? "");
   const [count, setCount] = useState(3);
   const [phase, setPhase] = useState<Phase>({ id: "idle" });
   const [regeneratingFile, setRegeneratingFile] = useState<string | null>(null);

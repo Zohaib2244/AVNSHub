@@ -1,5 +1,5 @@
 ﻿import { spawn } from "child_process";
-import { readFileSync, readdirSync } from "fs";
+import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
@@ -31,8 +31,61 @@ function readExistingWidget(slug: string): string {
   }
 }
 
-function buildPrompt(settings: GenerateSettings, userPrompt: string): string {
-  const creatingWidgetsDoc = readDoc("docs/CREATING_WIDGETS.md");
+// --- Edit-mode file safety: backup before run, restore if .tsx goes missing --
+// The harness may delete a .tsx to "rewrite from scratch" and then get cut off
+// before writing the replacement (rate limit, error). The backup lets us put
+// the working file back so the site never reaches a "module not found" state.
+
+function backupWidgetFiles(slug: string): void {
+  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+  try {
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx"))) {
+      copyFileSync(join(dir, f), join(dir, f + ".bak"));
+    }
+  } catch {}
+}
+
+// Restores a .tsx.bak → .tsx only when the .tsx is missing (file was deleted
+// by the harness but never replaced). If the .tsx still exists — even broken —
+// it's left alone so the next "fix" turn can repair it. Returns true if any
+// file was restored.
+function restoreMissingWidgetFiles(slug: string): boolean {
+  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+  let restored = false;
+  try {
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
+      const tsx = join(dir, f.slice(0, -4)); // strip ".bak"
+      const bak = join(dir, f);
+      if (!existsSync(tsx)) {
+        copyFileSync(bak, tsx);
+        restored = true;
+      }
+      unlinkSync(bak);
+    }
+  } catch {}
+  return restored;
+}
+
+function deleteWidgetBackups(slug: string): void {
+  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+  try {
+    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
+      unlinkSync(join(dir, f));
+    }
+  } catch {}
+}
+
+// The authoring guide — stable 24KB doc. Returned separately so callers can
+// send it via --append-system-prompt (cacheable system prefix on claude) rather
+// than embedding it in the user turn on every request.
+function buildSystemPrompt(): string {
+  return readDoc("docs/CREATING_WIDGETS.md");
+}
+
+// Core user-facing prompt. `includeDoc` controls whether the authoring guide
+// is embedded (needed for codex/opencode which have no system-prompt flag) or
+// omitted (when it's already in claude's --append-system-prompt).
+function buildCorePrompt(settings: GenerateSettings, userPrompt: string, includeDoc: boolean): string {
   const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
@@ -79,22 +132,22 @@ ${existingCode || "(could not read existing file - write a corrected version)"}
 \`\`\``
     : `## Your task - creating a new widget
 
-Write a new widget following the rules in the authoring guide below. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
+Write a new widget following the rules in the authoring guide. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
 - \`${comp}.tsx\` - the component, with a named export \`export function ${comp}() { ... }\`
 - \`manifest.json\` - the widget's manifest data (see "Required output" below)
 
 Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file - the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.
 
-The authoring guide below (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - write directly from the guide and the spec in this prompt.`;
+The authoring guide (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - write directly from the guide and the spec in this prompt.`;
+
+  const docSection = includeDoc
+    ? `\n## Authoring guide (follow exactly)\n\n${buildSystemPrompt()}\n`
+    : "";
 
   return `You are generating a widget for the AVN Hub project - a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
 
 ${taskSection}
-
-## Authoring guide (follow exactly)
-
-${creatingWidgetsDoc}
-
+${docSection}
 ## Widget spec from the user
 
 ${settingsSummary || "(No structured settings provided - infer from the prompt below.)"}
@@ -182,8 +235,12 @@ export async function POST(req: Request) {
     prompt: string;
     harness?: HarnessId;
     harnessChain?: HarnessId[];
+    /** claude session ID from a prior turn — when present, uses --resume so
+        the model continues from its existing context instead of re-reading the
+        full authoring guide + widget spec. Absent on the first turn. */
+    sessionId?: string;
   };
-  const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain } = body;
+  const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain, sessionId: incomingSessionId } = body;
 
   // Guard against a desynced client sending a "create" (no editSlug) for a
   // slug that already exists — without this, a stale `settings.slug` left
@@ -201,7 +258,11 @@ export async function POST(req: Request) {
     );
   }
 
-  const fullPrompt = buildPrompt(settings, userPrompt);
+  // Full prompt (doc included) — used for codex/opencode and fallbacks.
+  // Lean prompt (doc excluded) — used for claude's user turn when the doc goes
+  // via --append-system-prompt into the cacheable system-prefix instead.
+  const fullPrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ true);
+  const claudePrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ false);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
@@ -221,13 +282,35 @@ export async function POST(req: Request) {
         }
       };
 
+      // For edits: snapshot the existing .tsx files before spawning the harness.
+      // If the harness deletes the file to "rewrite from scratch" and then gets
+      // cut off (rate limit, error), restoreMissingWidgetFiles() puts the last
+      // working version back so the site never reaches "module not found".
+      if (existedBeforeThisRun && targetId) backupWidgetFiles(targetId);
+
       // On a mid-run harness switch, hand the fallback whatever this widget's
       // files currently hold on disk (empty until something is written) so it
       // resumes from that exact state instead of re-discovering it with a burst
       // of Read/find/grep/git calls.
       const partialWork = targetId ? () => readExistingWidget(targetId) : undefined;
 
-      const outcome = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
+      // resumePrompt: for claude --resume turns the model already has full
+      // context, so just send the bare user instruction. Full prompt is still
+      // used for fallback harnesses that don't share the claude session.
+      const resumePrompt = incomingSessionId
+        ? userPrompt
+        : undefined;
+
+      const { outcome, sessionId: outSessionId } = await runHarnessChain(
+        fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork,
+        { systemPrompt: buildSystemPrompt(), claudePrompt, sessionId: incomingSessionId, resumePrompt },
+      );
+
+      if (outcome !== "done") {
+        // Harness chain failed entirely — restore the backup so a previously
+        // working edit stays working rather than disappearing from the site.
+        if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
+      }
 
       if (outcome === "done") {
         // done cleanly — the harness wrote the component + manifest.json.
@@ -266,22 +349,38 @@ export async function POST(req: Request) {
           ok = false;
         }
 
+        if (!ok && existedBeforeThisRun && targetId) {
+          // Registration failed or component file missing after a claimed-done run.
+          // Restore the backup so the site stays in a working state.
+          restoreMissingWidgetFiles(targetId);
+        }
+
         if (ok) {
           sendEvent(write, "status", { type: "tsc_check" });
           const tscResult = await runTscCheck();
           if (tscResult.errors.length > 0) {
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
-            // Nothing to roll back either way: an edit's registration predates
-            // this run (left intact), and a new widget was never registered
-            // here in the first place — the files just stay on disk to fix.
+            // Restore the backup if the harness left the .tsx missing (deleted
+            // to rewrite but never finished). If the .tsx exists but is broken
+            // TypeScript, leave it on disk so the next "fix" turn can repair it.
+            if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
             sendEvent(write, "error", {
               message: existedBeforeThisRun
                 ? "TypeScript errors in edited code — check the errors above and re-submit to fix."
                 : "TypeScript errors in generated code — fix the errors above, then re-submit to try again.",
             });
           } else {
+            // tsc clean — safe to drop the safety backup
+            if (existedBeforeThisRun && targetId) deleteWidgetBackups(targetId);
             const doneSlug = settings.editSlug ?? settings.slug ?? null;
-            sendEvent(write, "status", { type: "done", slug: doneSlug, registered: existedBeforeThisRun });
+            // Include sessionId so ChatCanvas can --resume on the next
+            // refinement turn instead of re-sending the full ~6K-token prompt.
+            sendEvent(write, "status", {
+              type: "done",
+              slug: doneSlug,
+              registered: existedBeforeThisRun,
+              sessionId: outSessionId,
+            });
           }
         }
       }
