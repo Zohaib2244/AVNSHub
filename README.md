@@ -17,8 +17,8 @@ The bundled widgets (Spotify, homelab stats, GitHub activity, system stats, note
 AVN Hub intentionally runs the Next.js dev server as its runtime. NutBot can generate real `.tsx` widgets into the source tree, so the running app needs HMR, TypeScript, the source tree, and at least one authenticated CLI harness if you want AI widget creation.
 
 ```bash
-git clone https://github.com/Zohaib2244/AVN-Hub.git
-cd AVN-Hub
+git clone https://github.com/Zohaib2244/AVNSHub.git
+cd AVNSHub
 npm install
 npm run dev
 ```

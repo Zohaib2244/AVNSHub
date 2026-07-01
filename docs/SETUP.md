@@ -35,8 +35,8 @@ A slim `next build` / `next start` production image does not have those properti
 ## Install
 
 ```bash
-git clone https://github.com/Zohaib2244/AVN-Hub.git
-cd AVN-Hub
+git clone https://github.com/Zohaib2244/AVNSHub.git
+cd AVNSHub
 npm install
 cp .env.example .env.local
 ```

@@ -16,8 +16,6 @@ This folder is the long-form documentation for AVN Hub. The root README stays sh
 
 | Doc | Purpose |
 | --- | --- |
-| [BUG_REPORT.md](BUG_REPORT.md) | Bug report notes |
-| [HTML_WIDGET_IMPORT_PLAN.md](HTML_WIDGET_IMPORT_PLAN.md) | HTML widget import planning |
 | [../wallpaper/README.md](../wallpaper/README.md) | Wallpaper Engine build |
 
 ## Source Of Truth
