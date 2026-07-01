@@ -25,4 +25,3 @@ This folder is the long-form documentation for AVN Hub. The root README stays sh
 - Use [CREATING_WIDGETS.md](CREATING_WIDGETS.md) for widget authoring behavior.
 - Use [AVN_HUB.md](AVN_HUB.md) for layout, Hub Core, localStorage keys, and persistence behavior.
 - Use [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md) for chat backend setup.
-- Use `CLAUDE.md` for broad architecture notes and historical context for coding agents.

@@ -150,7 +150,7 @@ export function WidgetShell({
   );
 
   return (
-    // no `layout` prop — see CLAUDE.md's grid reflow-loop warning. This only
+    // no `layout` prop — grid layout animation can trigger reflow loops. This only
     // tweens opacity/scale on mount, never measures position.
     <motion.div
       id={manifest.id}
