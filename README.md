@@ -1,12 +1,16 @@
 # AVN Hub
 
-> A self-hosted widget playground for building, placing, and remixing AI-generated dashboard cards.
+> A blank canvas. Fill it with whatever you want.
 
-AVN Hub is a living personal dashboard canvas. Start with bundled widgets, ask NutBot to generate new ones, write your own when you want finer control, and arrange everything in a resizable slot grid. It is not a fixed portfolio page. It is an environment you keep shaping into the interface you want.
+AVN Hub starts empty. There are no fixed widgets, no preset layouts, nothing telling you what your dashboard should be. You fill it — and the AI widget creator is how you do it.
 
-![AVN Hub dark mode canvas with the slot grid, NutBot terminal, live widgets, and side control tabs](<docs/screenshots/display dark mode.png>)
+Open NutBot's creator tab, describe what you want — a cube timer, a Wordle clone, a live price feed, a rope physics toy, a notes board, a visualizer — and it generates a real, running component. Not a template. Not a config file. An actual `.tsx` widget that drops straight into the canvas. Then arrange it, resize it, and put it in whichever named canvas makes sense: one for work, one for your homelab, one just because you like the way it looks.
 
-![AVN Hub light mode canvas showing the same widget layout with a different palette](<docs/screenshots/display light mode.png>)
+The bundled widgets (Spotify, Steam, homelab stats, GitHub activity, system stats) are examples of what the framework can hold — not the point of it. The point is the empty canvas, and the tool to make it yours.
+
+![AVN Hub dark mode canvas](<docs/screenshots/display dark mode.png>)
+
+![AVN Hub light mode canvas](<docs/screenshots/display light mode.png>)
 
 ## Quick Start
 
@@ -34,13 +38,12 @@ For Docker, Tailscale, environment variables, and the dev-server runtime explana
 
 ## What You Get
 
-- A Slot Layout canvas with draggable, resizable widgets.
-- Hub Core controls for edit mode, appearance, layout, import/export, and widget management.
-- Multiple named AVN Hub Canvases, each with its own layout, theme, palette, and wallpaper.
-- Built-in widgets for identity, music, games, homelab status, system stats, GitHub activity, clock/date, quicklinks, ambient sound, and NutBot.
-- NutBot terminal tabs for logs, chat, real host shells, and AI widget creation.
-- Custom widgets generated from prompts or written by hand.
-- Optional NutBot chat backed by either a local Bonfire/llama.cpp LLM or the shared `claude` / `codex` / `opencode` CLI harness chain.
+- **Widget creator** — describe a widget in plain language; NutBot generates the component, type-checks it, and registers it. Anything: games, tools, visualizations, live data, timers, toys.
+- **Named canvases** — multiple layouts each with their own theme, palette, wallpaper, and widget arrangement. Switch contexts, switch vibes.
+- **Slot grid** — draggable, resizable widget slots. S / M / L sizes, horizontal and vertical orientations, Hover On Expand previews.
+- **Hub Core** — edit mode, appearance (theme / palette / wallpaper / backdrop), widget manager, layout import/export, canvas management.
+- **NutBot** — log ticker, conversational chat (local LLM or CLI harness), real host shell sessions, and the widget creator — all in one terminal.
+- **Bundled starters** — identity card, clock, Spotify, Steam, homelab status, system stats, GitHub activity, ambient sound, and more — as reference implementations and to make the canvas useful immediately.
 
 ## Docs
 
@@ -59,9 +62,9 @@ The README is only the doorway. The actual docs are split by job:
 
 ## Custom Widgets
 
-NutBot's `CREATOR` tab is the fastest path: describe the widget, choose its size/orientation options, and let the CLI harness generate the component and manifest. Generated widgets are type-checked before registration and then appear in the Widget Manager like any bundled widget.
+Open the `✦ creator` tab in NutBot and describe what you want. The creator walks you through three stages — plan (figure out the concept), ideate (see HTML mockups of variations), build (generate the real component). Once built, the widget is type-checked, registered, and immediately available in the Widget Manager alongside every bundled widget.
 
-You can also write one manually:
+To write one manually instead:
 
 ```text
 components/widgets/custom/<slug>/
@@ -69,7 +72,7 @@ components/widgets/custom/<slug>/
   manifest.json
 ```
 
-Follow [docs/CREATING_WIDGETS.md](docs/CREATING_WIDGETS.md) for the exact contract.
+See [docs/CREATING_WIDGETS.md](docs/CREATING_WIDGETS.md) for the full authoring contract.
 
 ## NutBot Chat
 
