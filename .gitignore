@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/lib/generated/prisma
+
+# local SQLite database (shared hub data — lives on the host, not in git)
+/prisma/*.db
+/prisma/*.db-journal
+
+# uploaded wallpaper/media blobs (shared hub data — lives on the host, not in git)
+/data/uploads/

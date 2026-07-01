@@ -15,6 +15,7 @@
 
 import { DEFAULT_PALETTE, isPaletteId, type PaletteId } from "@/config/themes";
 import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
+import { pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
 export type ThemeMode = "light" | "dark" | "auto";
 
@@ -74,6 +75,7 @@ export function applyThemeSettings() {
 
 export function setThemeMode(mode: ThemeMode) {
   localStorage.setItem(themeKey(), mode);
+  pushToServer(themeKey(), mode);
   applyTheme();
   listeners.forEach((listener) => listener());
 }
@@ -89,6 +91,7 @@ export function getServerPalette(): PaletteId {
 
 export function setPalette(id: PaletteId) {
   localStorage.setItem(paletteKey(), id);
+  pushToServer(paletteKey(), id);
   applyPalette();
   listeners.forEach((listener) => listener());
 }
@@ -112,4 +115,40 @@ subscribeCanvases(() => {
   lastCanvasId = id;
   applyThemeSettings();
   listeners.forEach((listener) => listener());
+  syncWithServer();
 });
+
+// Reconcile the active canvas's theme mode + palette with the server: on
+// load, on canvas switch (above), and every 15s thereafter (skipped while
+// the tab is hidden). A fresh install has nothing on the server yet, in
+// which case we seed it with whatever's local.
+async function syncWithServer() {
+  const [remoteMode, remotePalette] = await Promise.all([
+    pullFromServer<ThemeMode>(themeKey()),
+    pullFromServer<PaletteId>(paletteKey()),
+  ]);
+
+  let changed = false;
+  if (remoteMode === undefined) {
+    pushToServer(themeKey(), getThemeMode());
+  } else if ((remoteMode === "light" || remoteMode === "dark" || remoteMode === "auto") && remoteMode !== getThemeMode()) {
+    localStorage.setItem(themeKey(), remoteMode);
+    changed = true;
+  }
+
+  if (remotePalette === undefined) {
+    pushToServer(paletteKey(), getPalette());
+  } else if (isPaletteId(remotePalette) && remotePalette !== getPalette()) {
+    localStorage.setItem(paletteKey(), remotePalette);
+    changed = true;
+  }
+
+  if (!changed) return;
+  applyThemeSettings();
+  listeners.forEach((listener) => listener());
+}
+
+if (typeof window !== "undefined") {
+  syncWithServer();
+  pollWhileVisible(syncWithServer);
+}

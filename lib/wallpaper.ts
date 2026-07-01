@@ -1,8 +1,13 @@
 // Wallpaper image + backdrop mode store. Mirrors lib/theme.ts's external-store
 // pattern (module cache, listener set, subscribeCanvases() re-sync on canvas
-// switch) — split into its own module because the image half is backed by
-// IndexedDB (lib/idb.ts), which is async-only, unlike theme's synchronous
-// localStorage reads.
+// switch).
+//
+// The wallpaper image/video itself is stored server-side (app/api/hub-files,
+// bytes on disk + a FileBlob row for its mimeType) — the server is the source
+// of truth, not a local cache; getWallpaperUrl() just returns an API URL, and
+// <img>/<video> load it directly. The only thing kept client-side is small
+// metadata (kind + a version stamp used to cache-bust the URL after a
+// replace), synced through the same KV store as everything else in lib/.
 //
 // Three independent stacked layers, each per-canvas:
 //   BG (the wallpaper image itself — no mode of its own)
@@ -14,15 +19,12 @@
 // cascading from the other — small strings, so both stay in localStorage like
 // theme mode/palette, namespaced the same way.
 //
-// The wallpaper itself can be an image or a short looping video (same Blob
-// storage either way — IndexedDB preserves Blob.type through the structured
-// clone, so kindOf() below is all that's needed to tell them apart at read
-// time). Parallax is a separate opt-in toggle that nudges the wallpaper layer
-// with the mouse — purely cosmetic, lives next to the wallpaper picker in
-// Hub Core's Appearance settings.
+// Parallax is a separate opt-in toggle that nudges the wallpaper layer with
+// the mouse — purely cosmetic, lives next to the wallpaper picker in Hub
+// Core's Appearance settings.
 
 import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
-import { idbDelete, idbGet, idbSet } from "@/lib/idb";
+import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
 export type BackdropMode = "solid" | "blur" | "transparent" | "glass";
 export type WallpaperKind = "image" | "video";
@@ -30,15 +32,23 @@ export type WallpaperKind = "image" | "video";
 const CANVAS_MODE_KEY = "nutmag-backdrop";
 const WIDGET_MODE_KEY = "nutmag-widget-backdrop";
 const PARALLAX_KEY = "nutmag-parallax";
+const WALLPAPER_META_KEY = "nutmag-wallpaper-meta";
 const listeners = new Set<() => void>();
 
-/** canvasId -> resolved object URL + blob kind, or null once confirmed empty */
-const urlCache = new Map<string, { url: string; kind: WallpaperKind } | null>();
-/** canvasId -> in-flight load, so concurrent getters don't double-fetch */
-const loading = new Map<string, Promise<void>>();
+type WallpaperMeta = { kind: WallpaperKind; version: number };
 
-function wallpaperKey(canvasId: string): string {
+/** canvasId -> cached metadata, or null once confirmed empty; unset = not read from localStorage yet */
+const metaCache = new Map<string, WallpaperMeta | null>();
+/** canvasIds whose metadata has been reconciled with the server at least once
+    this session — see syncWallpaperMeta() for why this matters */
+const metaEverSynced = new Set<string>();
+
+function wallpaperFileKey(canvasId: string): string {
   return `wallpaper:${canvasId}`;
+}
+
+function wallpaperMetaKey(canvasId: string): string {
+  return canvasScopedKey(WALLPAPER_META_KEY, canvasId);
 }
 
 function canvasModeKey(canvasId: string): string {
@@ -57,35 +67,57 @@ function kindOf(blob: Blob): WallpaperKind {
   return blob.type.startsWith("video/") ? "video" : "image";
 }
 
-async function load(canvasId: string): Promise<void> {
-  if (loading.has(canvasId)) return loading.get(canvasId);
-  const promise = (async () => {
-    const blob = await idbGet(wallpaperKey(canvasId));
-    urlCache.set(canvasId, blob ? { url: URL.createObjectURL(blob), kind: kindOf(blob) } : null);
-    loading.delete(canvasId);
-    listeners.forEach((listener) => listener());
-  })();
-  loading.set(canvasId, promise);
-  return promise;
+function isWallpaperMeta(v: unknown): v is WallpaperMeta {
+  if (!v || typeof v !== "object") return false;
+  const { kind, version } = v as Record<string, unknown>;
+  return (kind === "image" || kind === "video") && typeof version === "number";
 }
 
-/** synchronous for useSyncExternalStore — returns the cached object URL (or
-    null), kicking off a background IndexedDB read on first call for a canvas
-    that hasn't been loaded yet */
+function readMeta(canvasId: string): WallpaperMeta | null {
+  if (!metaCache.has(canvasId)) {
+    let meta: WallpaperMeta | null = null;
+    try {
+      const raw = localStorage.getItem(wallpaperMetaKey(canvasId));
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (isWallpaperMeta(parsed)) meta = parsed;
+      }
+    } catch {
+      // corrupt saved metadata — treat as no wallpaper
+    }
+    metaCache.set(canvasId, meta);
+  }
+  return metaCache.get(canvasId) ?? null;
+}
+
+function writeMeta(canvasId: string, meta: WallpaperMeta | null) {
+  metaCache.set(canvasId, meta);
+  try {
+    if (meta) localStorage.setItem(wallpaperMetaKey(canvasId), JSON.stringify(meta));
+    else localStorage.removeItem(wallpaperMetaKey(canvasId));
+  } catch {
+    // storage full/blocked — metadata still applies for this session
+  }
+}
+
+/** synchronous for useSyncExternalStore — an API URL pointing straight at the
+    server-stored file (the server is the source of truth, no local blob
+    cache), or null if this canvas has no wallpaper. `v` cache-busts the URL
+    after a replace so the browser doesn't serve the old file from cache. */
 export function getWallpaperUrl(canvasId: string = getActiveCanvasId()): string | null {
-  if (!urlCache.has(canvasId) && !loading.has(canvasId)) void load(canvasId);
-  return urlCache.get(canvasId)?.url ?? null;
+  const meta = readMeta(canvasId);
+  if (!meta) return null;
+  return `/api/hub-files?key=${encodeURIComponent(wallpaperFileKey(canvasId))}&v=${meta.version}`;
 }
 
 export function getServerWallpaperUrl(): null {
   return null;
 }
 
-/** "image" | "video" | null (no wallpaper set, or not loaded yet) — drives
-    whether WallpaperLayer renders a <video> or a background-image div */
+/** "image" | "video" | null (no wallpaper set) — drives whether
+    WallpaperLayer renders a <video> or a background-image div */
 export function getWallpaperKind(canvasId: string = getActiveCanvasId()): WallpaperKind | null {
-  if (!urlCache.has(canvasId) && !loading.has(canvasId)) void load(canvasId);
-  return urlCache.get(canvasId)?.kind ?? null;
+  return readMeta(canvasId)?.kind ?? null;
 }
 
 export function getServerWallpaperKind(): null {
@@ -93,18 +125,23 @@ export function getServerWallpaperKind(): null {
 }
 
 export async function setWallpaper(canvasId: string, file: File): Promise<void> {
-  await idbSet(wallpaperKey(canvasId), file);
-  const previous = urlCache.get(canvasId);
-  if (previous) URL.revokeObjectURL(previous.url);
-  urlCache.set(canvasId, { url: URL.createObjectURL(file), kind: kindOf(file) });
+  await fetch(`/api/hub-files?key=${encodeURIComponent(wallpaperFileKey(canvasId))}`, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+  const meta: WallpaperMeta = { kind: kindOf(file), version: Date.now() };
+  writeMeta(canvasId, meta);
+  pushToServer(wallpaperMetaKey(canvasId), meta);
+  metaEverSynced.add(canvasId);
   listeners.forEach((listener) => listener());
 }
 
 export async function clearWallpaper(canvasId: string): Promise<void> {
-  await idbDelete(wallpaperKey(canvasId));
-  const previous = urlCache.get(canvasId);
-  if (previous) URL.revokeObjectURL(previous.url);
-  urlCache.set(canvasId, null);
+  await fetch(`/api/hub-files?key=${encodeURIComponent(wallpaperFileKey(canvasId))}`, { method: "DELETE" });
+  writeMeta(canvasId, null);
+  deleteFromServer(wallpaperMetaKey(canvasId));
+  metaEverSynced.add(canvasId);
   listeners.forEach((listener) => listener());
 }
 
@@ -119,6 +156,7 @@ export function getServerParallax(): boolean {
 
 export function setParallax(canvasId: string, enabled: boolean) {
   localStorage.setItem(parallaxKey(canvasId), enabled ? "1" : "0");
+  pushToServer(parallaxKey(canvasId), enabled);
   listeners.forEach((listener) => listener());
 }
 
@@ -146,6 +184,7 @@ export function getServerBackdropMode(): BackdropMode {
 
 export function setBackdropMode(canvasId: string, mode: BackdropMode) {
   localStorage.setItem(canvasModeKey(canvasId), mode);
+  pushToServer(canvasModeKey(canvasId), mode);
   applyBackdropModes();
   listeners.forEach((listener) => listener());
 }
@@ -160,6 +199,7 @@ export function getServerWidgetBackdropMode(): BackdropMode {
 
 export function setWidgetBackdropMode(canvasId: string, mode: BackdropMode) {
   localStorage.setItem(widgetModeKey(canvasId), mode);
+  pushToServer(widgetModeKey(canvasId), mode);
   applyBackdropModes();
   listeners.forEach((listener) => listener());
 }
@@ -189,4 +229,86 @@ subscribeCanvases(() => {
   lastCanvasId = id;
   applyBackdropModes();
   listeners.forEach((listener) => listener());
+  syncModesWithServer();
+  syncWallpaperMeta();
 });
+
+// Reconcile the active canvas's backdrop modes + parallax flag with the
+// server: on load, on canvas switch (above), and every 15s thereafter
+// (skipped while the tab is hidden).
+async function syncModesWithServer() {
+  const canvasId = getActiveCanvasId();
+  const [remoteMode, remoteWidgetMode, remoteParallax] = await Promise.all([
+    pullFromServer<BackdropMode>(canvasModeKey(canvasId)),
+    pullFromServer<BackdropMode>(widgetModeKey(canvasId)),
+    pullFromServer<boolean>(parallaxKey(canvasId)),
+  ]);
+
+  const isMode = (v: unknown): v is BackdropMode => v === "solid" || v === "blur" || v === "transparent" || v === "glass";
+  let changed = false;
+
+  if (remoteMode === undefined) {
+    pushToServer(canvasModeKey(canvasId), getBackdropMode(canvasId));
+  } else if (isMode(remoteMode) && remoteMode !== getBackdropMode(canvasId)) {
+    localStorage.setItem(canvasModeKey(canvasId), remoteMode);
+    changed = true;
+  }
+
+  if (remoteWidgetMode === undefined) {
+    pushToServer(widgetModeKey(canvasId), getWidgetBackdropMode(canvasId));
+  } else if (isMode(remoteWidgetMode) && remoteWidgetMode !== getWidgetBackdropMode(canvasId)) {
+    localStorage.setItem(widgetModeKey(canvasId), remoteWidgetMode);
+    changed = true;
+  }
+
+  if (remoteParallax === undefined) {
+    pushToServer(parallaxKey(canvasId), getParallax(canvasId));
+  } else if (typeof remoteParallax === "boolean" && remoteParallax !== getParallax(canvasId)) {
+    localStorage.setItem(parallaxKey(canvasId), remoteParallax ? "1" : "0");
+    changed = true;
+  }
+
+  if (!changed) return;
+  applyBackdropModes();
+  listeners.forEach((listener) => listener());
+}
+
+/** Reconcile the active canvas's wallpaper metadata with the server: on
+    load, on canvas switch (above), and every 15s thereafter. Unlike the
+    other stores, "no wallpaper" is a real, common, intentional state (the
+    user cleared it) rather than "never set" — so a missing server value only
+    gets treated as "seed the server" on this canvas's *first* sync this
+    session (covers a metadata push that failed right after a successful
+    file upload); every sync after that treats a missing server value as an
+    intentional deletion made from another device and adopts it locally. */
+async function syncWallpaperMeta() {
+  const canvasId = getActiveCanvasId();
+  const key = wallpaperMetaKey(canvasId);
+  const remote = await pullFromServer<WallpaperMeta>(key);
+  const local = readMeta(canvasId);
+
+  if (remote === undefined) {
+    if (!metaEverSynced.has(canvasId) && local) {
+      pushToServer(key, local);
+    } else if (local) {
+      writeMeta(canvasId, null);
+      listeners.forEach((listener) => listener());
+    }
+    metaEverSynced.add(canvasId);
+    return;
+  }
+
+  metaEverSynced.add(canvasId);
+  if (local && local.version === remote.version) return;
+  writeMeta(canvasId, remote);
+  listeners.forEach((listener) => listener());
+}
+
+if (typeof window !== "undefined") {
+  syncModesWithServer();
+  syncWallpaperMeta();
+  pollWhileVisible(() => {
+    syncModesWithServer();
+    syncWallpaperMeta();
+  });
+}

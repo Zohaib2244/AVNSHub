@@ -7,6 +7,7 @@
 // canvases exist beyond reacting to subscribeCanvases().
 
 import { isCanvasIconName } from "@/config/canvasIcons";
+import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
 export type Canvas = { id: string; name: string; icon?: string };
 
@@ -99,6 +100,7 @@ function persist() {
   } catch {
     // storage full/blocked — state still applies for this session
   }
+  pushToServer(STORAGE_KEY, state);
 }
 
 function commit(next: CanvasesState) {
@@ -112,6 +114,32 @@ export function subscribeCanvases(listener: () => void) {
   return () => {
     listeners.delete(listener);
   };
+}
+
+// Reconcile with the server: on load, and every 15s thereafter (skipped
+// while the tab is hidden) — lets a canvas created/renamed/deleted on one
+// browser/device show up on another. A fresh install has nothing on the
+// server yet, in which case we seed it with whatever's local.
+async function syncWithServer() {
+  const remote = await pullFromServer<CanvasesState>(STORAGE_KEY);
+  if (remote === undefined) {
+    pushToServer(STORAGE_KEY, getCanvases());
+    return;
+  }
+  const clean = sanitize(remote);
+  if (!clean || JSON.stringify(clean) === JSON.stringify(getCanvases())) return;
+  state = clean;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // storage full/blocked — the reconciled value still applies for this session
+  }
+  listeners.forEach((listener) => listener());
+}
+
+if (typeof window !== "undefined") {
+  syncWithServer();
+  pollWhileVisible(syncWithServer);
 }
 
 function generateId(): string {
@@ -178,6 +206,9 @@ export function deleteCanvas(id: string) {
   } catch {
     // ignore
   }
+  deleteFromServer(slotLayoutKey(id));
+  deleteFromServer(canvasScopedKey("nutmag-theme", id));
+  deleteFromServer(canvasScopedKey("nutmag-palette", id));
 }
 
 /** swap a canvas with its immediate left/right neighbor in the tab order */
