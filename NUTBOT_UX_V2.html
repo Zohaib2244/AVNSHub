@@ -1,0 +1,1420 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NutBot UX v2 — Mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
+<style>
+/* ── tokens ──────────────────────────────────────────────── */
+:root {
+  --bg:          #13100c;
+  --bg-card:     #1e1a14;
+  --bg-nested:   #1a1610;
+  --border:      #3d3220;
+  --shadow:      #070604;
+  --text-p:      #e8dfc8;
+  --text-m:      #9f9887;
+  --text-mm:     #6b6457;
+  --orange:      #ff6b2b;
+  --cyan:        #00b4c8;
+  --font-dot:    'DotGothic16', monospace;
+  --font-mono:   'JetBrains Mono', monospace;
+  --green:       #4caf74;
+  --red:         #c0392b;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text-p);
+  font-family: var(--font-mono);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 32px 24px 60px;
+  gap: 48px;
+}
+
+/* ── nav ────────────────────────────────────────────────── */
+.page-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  background: var(--bg-nested);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  z-index: 100;
+}
+.page-nav-label {
+  font-family: var(--font-dot);
+  font-size: 0.5rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mm);
+  margin-right: 8px;
+}
+.nav-btn {
+  padding: 4px 12px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-m);
+  font-family: var(--font-dot);
+  font-size: 0.5rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.nav-btn:hover { color: var(--text-p); border-color: var(--text-m); }
+.nav-btn.active { color: var(--orange); border-color: var(--orange); background: color-mix(in srgb, var(--orange) 8%, transparent); }
+
+/* ── section label ──────────────────────────────────────── */
+.section-title {
+  font-family: var(--font-dot);
+  font-size: 0.55rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mm);
+  text-align: center;
+}
+
+/* ── screen wrapper ─────────────────────────────────────── */
+.screen {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 760px;
+}
+.screen.visible { display: flex; }
+
+/* ── nutbot frame ───────────────────────────────────────── */
+.nb-frame {
+  width: 100%;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+
+/* ── header row ─────────────────────────────────────────── */
+.nb-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.nb-title {
+  font-family: var(--font-dot);
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  color: var(--text-p);
+  flex-shrink: 0;
+}
+.nb-spacer { flex: 1; }
+
+/* model selector */
+.nb-model-sel {
+  position: relative;
+  flex-shrink: 0;
+}
+.nb-model-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.15s;
+}
+.nb-model-pill:hover { border-color: var(--text-m); }
+.nb-model-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--cyan);
+  flex-shrink: 0;
+}
+.nb-model-dot.bonfire { background: var(--orange); }
+.nb-model-dot.claude  { background: var(--cyan); }
+.nb-model-dot.codex   { background: #8b5cf6; }
+.nb-model-dot.opencode { background: var(--green); }
+.nb-model-name {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-p);
+}
+.nb-model-caret {
+  font-size: 0.55rem;
+  color: var(--text-m);
+}
+.nb-model-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  padding: 4px;
+  z-index: 50;
+  min-width: 150px;
+  display: none;
+}
+.nb-model-dropdown.open { display: block; }
+.nb-model-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.nb-model-opt:hover { background: var(--bg-nested); }
+.nb-model-opt.selected { background: color-mix(in srgb, var(--orange) 10%, transparent); }
+.nb-model-opt-name {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-p);
+}
+.nb-model-opt-desc {
+  font-size: 0.52rem;
+  color: var(--text-m);
+  font-family: var(--font-mono);
+  margin-top: 1px;
+}
+.nb-model-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 6px;
+}
+
+/* expand btn */
+.nb-expand-btn {
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-m);
+  cursor: pointer;
+  font-size: 0.65rem;
+  transition: color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.nb-expand-btn:hover { color: var(--text-p); border-color: var(--text-m); }
+
+/* face */
+.nb-face {
+  width: 30px; height: 22px;
+  background: var(--bg-nested);
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.nb-face-eye {
+  width: 6px; height: 8px;
+  background: var(--text-p);
+  border-radius: 1px;
+}
+
+/* ── tab bar ─────────────────────────────────────────────── */
+.nb-tabs {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 0 2px;
+  gap: 1px;
+}
+.nb-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 16px;
+  height: 38px;
+  border: none;
+  background: transparent;
+  color: var(--text-m);
+  font-family: var(--font-dot);
+  font-size: 0.55rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  position: relative;
+  white-space: nowrap;
+}
+.nb-tab:hover { color: var(--text-p); }
+.nb-tab.active {
+  color: var(--text-p);
+  border-bottom-color: var(--orange);
+}
+.nb-tab-icon {
+  opacity: 0.7;
+}
+.nb-tab.active .nb-tab-icon { opacity: 1; }
+.nb-tab-badge {
+  min-width: 16px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  font-size: 0.48rem;
+  color: var(--text-m);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+}
+.nb-tab.active .nb-tab-badge {
+  background: color-mix(in srgb, var(--orange) 15%, transparent);
+  border-color: var(--orange);
+  color: var(--orange);
+}
+
+/* ── body ───────────────────────────────────────────────── */
+.nb-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── log tab ─────────────────────────────────────────────── */
+.nb-log {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  height: 100%;
+  overflow-y: auto;
+}
+.log-line {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-m);
+  line-height: 1.6;
+}
+.log-line .ok    { color: var(--green); }
+.log-line .info  { color: var(--cyan); }
+.log-line .warn  { color: var(--orange); }
+.log-line .err   { color: var(--red); }
+
+/* ── chat tab ────────────────────────────────────────────── */
+.nb-chat {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.chat-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chat-msg {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  line-height: 1.6;
+  max-width: 85%;
+  padding: 6px 10px;
+  border-radius: 7px;
+}
+.chat-msg.user {
+  align-self: flex-end;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  color: var(--text-p);
+}
+.chat-msg.bot {
+  align-self: flex-start;
+  color: var(--text-p);
+}
+.chat-msg.bot .bot-name {
+  font-family: var(--font-dot);
+  font-size: 0.48rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 3px;
+}
+.chat-footer {
+  display: flex;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.chat-input {
+  flex: 1;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-p);
+  outline: none;
+  resize: none;
+}
+.chat-send {
+  width: 30px; height: 30px;
+  border-radius: 6px;
+  border: 1px solid var(--orange);
+  background: transparent;
+  color: var(--orange);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem;
+}
+
+/* ── shells screen ───────────────────────────────────────── */
+.shells-screen {
+  display: flex;
+  height: 100%;
+}
+.shells-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.shells-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shells-sidebar-label {
+  font-family: var(--font-dot);
+  font-size: 0.52rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-m);
+}
+.shells-new-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-m);
+  font-family: var(--font-dot);
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.shells-new-btn:hover { color: var(--orange); border-color: var(--orange); }
+.shells-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+.shell-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.12s;
+  border-left: 2px solid transparent;
+}
+.shell-row:hover { background: var(--bg-nested); }
+.shell-row.active {
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  border-left-color: var(--orange);
+}
+.shell-row-info { flex: 1; min-width: 0; }
+.shell-row-name {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-p);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.shell-row-meta {
+  font-size: 0.52rem;
+  color: var(--text-mm);
+  margin-top: 1px;
+}
+.shell-row-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
+}
+.shell-close {
+  width: 16px; height: 16px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-mm);
+  cursor: pointer;
+  font-size: 0.6rem;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.shell-row:hover .shell-close { opacity: 1; }
+.shell-close:hover { color: var(--red); }
+
+.shells-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-nested);
+}
+.shells-main-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shells-main-title {
+  font-family: var(--font-dot);
+  font-size: 0.52rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-m);
+}
+.shells-main-body {
+  flex: 1;
+  padding: 12px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-m);
+  overflow-y: auto;
+  line-height: 1.7;
+}
+.shell-line-prompt { color: var(--green); }
+.shell-line-out    { color: var(--text-m); }
+.shell-line-cmd    { color: var(--text-p); }
+.shell-cursor {
+  display: inline-block;
+  width: 7px; height: 13px;
+  background: var(--orange);
+  vertical-align: middle;
+  animation: blink 0.8s step-end infinite;
+  border-radius: 1px;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+.shells-main-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.shells-main-prompt { color: var(--green); font-size: 0.62rem; flex-shrink: 0; }
+.shells-main-inp {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-p);
+}
+
+/* ── creator front page (IMPROVED) ──────────────────────── */
+.creator-home {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* hero new widget banner */
+.cr-hero {
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.cr-hero-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-nested);
+  box-shadow: 3px 3px 0 var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  text-align: left;
+}
+.cr-hero-btn:hover {
+  border-color: var(--orange);
+  box-shadow: 4px 4px 0 var(--shadow);
+  transform: translate(-1px, -1px);
+}
+.cr-hero-left { display: flex; align-items: center; gap: 12px; }
+.cr-hero-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1rem;
+  color: var(--orange);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+  transition: border-color 0.15s;
+  flex-shrink: 0;
+}
+.cr-hero-btn:hover .cr-hero-icon { border-color: var(--orange); }
+.cr-hero-text {}
+.cr-hero-label {
+  font-family: var(--font-dot);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-p);
+}
+.cr-hero-sub {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  color: var(--text-m);
+  margin-top: 2px;
+}
+.cr-hero-arrow {
+  color: var(--text-mm);
+  font-size: 1.1rem;
+  transition: color 0.15s, transform 0.15s;
+}
+.cr-hero-btn:hover .cr-hero-arrow { color: var(--orange); transform: translateX(2px); }
+
+/* projects list */
+.cr-projects {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+}
+.cr-proj-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px 4px;
+}
+.cr-proj-hdr-label {
+  font-family: var(--font-dot);
+  font-size: 0.48rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-mm);
+}
+.cr-proj-hdr-count {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--text-mm);
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 6px;
+}
+
+/* project row */
+.cr-proj-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+  position: relative;
+}
+.cr-proj-item:hover {
+  background: var(--bg-nested);
+  border-bottom-color: var(--border);
+}
+.cr-proj-item:hover .cr-proj-del { opacity: 1; }
+
+/* status stripe on left */
+.cr-proj-stripe {
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--border);
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.cr-proj-item:hover .cr-proj-stripe { background: var(--text-mm); }
+.cr-proj-stripe.created { background: var(--cyan); }
+
+.cr-proj-main { flex: 1; min-width: 0; }
+.cr-proj-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 3px;
+}
+.cr-proj-name {
+  font-family: var(--font-mono);
+  font-size: 0.67rem;
+  font-weight: 500;
+  color: var(--text-p);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.cr-proj-slug {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--text-mm);
+  white-space: nowrap;
+}
+
+/* pipeline row */
+.cr-proj-pipe {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cr-pipe-stage {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-dot);
+  font-size: 0.44rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mm);
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid transparent;
+}
+.cr-pipe-stage.done {
+  color: var(--cyan);
+  border-color: color-mix(in srgb, var(--cyan) 30%, transparent);
+  background: color-mix(in srgb, var(--cyan) 6%, transparent);
+}
+.cr-pipe-stage.active {
+  color: var(--orange);
+  border-color: color-mix(in srgb, var(--orange) 40%, transparent);
+  background: color-mix(in srgb, var(--orange) 8%, transparent);
+}
+.cr-pipe-sep { color: var(--text-mm); font-size: 0.6rem; opacity: 0.4; }
+.cr-pipe-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+.cr-proj-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.cr-proj-time {
+  font-family: var(--font-mono);
+  font-size: 0.52rem;
+  color: var(--text-mm);
+}
+.cr-proj-del {
+  width: 18px; height: 18px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-mm);
+  cursor: pointer;
+  font-size: 0.6rem;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, border-color 0.15s;
+}
+.cr-proj-del:hover { color: var(--red); border-color: var(--red); }
+
+/* empty state */
+.cr-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 32px;
+  color: var(--text-mm);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  text-align: center;
+}
+
+/* ── entry picker ────────────────────────────────────────── */
+.cr-picker {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 14px;
+  gap: 12px;
+}
+.cr-picker-hdr {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cr-back {
+  display: flex; align-items: center; gap: 4px;
+  padding: 3px 9px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-m);
+  font-family: var(--font-dot);
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.cr-back:hover { color: var(--text-p); border-color: var(--text-m); }
+.cr-picker-title {
+  font-family: var(--font-dot);
+  font-size: 0.65rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-p);
+}
+.cr-picker-sub {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-m);
+  padding-left: 2px;
+}
+.cr-cards {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+.cr-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-nested);
+  box-shadow: 3px 3px 0 var(--shadow);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+}
+.cr-card:hover {
+  transform: translate(-1px,-1px);
+  box-shadow: 4px 4px 0 var(--shadow);
+}
+.cr-card.plan:hover  { border-color: var(--cyan); }
+.cr-card.ideate:hover { border-color: var(--orange); }
+.cr-card.build:hover { border-color: var(--orange); }
+.cr-card-icon { font-size: 1.2rem; }
+.cr-card.plan .cr-card-icon  { color: var(--cyan); }
+.cr-card.ideate .cr-card-icon { color: var(--orange); }
+.cr-card.build .cr-card-icon  { color: var(--orange); }
+.cr-card-label {
+  font-family: var(--font-dot);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-p);
+}
+.cr-card-desc {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  color: var(--text-m);
+  line-height: 1.6;
+}
+
+/* ── design notes ────────────────────────────────────────── */
+.notes-block {
+  width: 100%;
+  max-width: 760px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.notes-title {
+  font-family: var(--font-dot);
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-m);
+  margin-bottom: 4px;
+}
+.notes-item {
+  display: flex;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-m);
+  line-height: 1.6;
+}
+.notes-num {
+  color: var(--orange);
+  flex-shrink: 0;
+  font-weight: 500;
+}
+
+</style>
+</head>
+<body>
+
+<!-- nav -->
+<div class="page-nav">
+  <span class="page-nav-label">screen →</span>
+  <button class="nav-btn active" onclick="show(0)">1 · Log tab</button>
+  <button class="nav-btn" onclick="show(1)">2 · Chat tab</button>
+  <button class="nav-btn" onclick="show(2)">3 · Shells</button>
+  <button class="nav-btn" onclick="show(3)">4 · Creator home</button>
+  <button class="nav-btn" onclick="show(4)">5 · New widget picker</button>
+</div>
+
+<!-- SCREEN 1: Log tab (shows new tab bar + model selector) -->
+<div class="screen visible" style="margin-top:52px;">
+  <div class="section-title">screen 1 — new header + tab bar (Log tab)</div>
+  <div class="nb-frame" style="min-height:460px;">
+    <div class="nb-header">
+      <span class="nb-title">NUTBOT V2.2</span>
+      <div class="nb-spacer"></div>
+      <!-- unified model selector -->
+      <div class="nb-model-sel" id="modelSel1">
+        <div class="nb-model-pill" onclick="toggleModel('modelSel1')">
+          <span class="nb-model-dot codex"></span>
+          <span class="nb-model-name">codex</span>
+          <span class="nb-model-caret">▾</span>
+        </div>
+        <div class="nb-model-dropdown" id="modelDrop1">
+          <div class="nb-model-sep"></div>
+          <div style="padding:4px 10px 3px; font-family:var(--font-dot); font-size:0.45rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-mm);">local llm</div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel1','bonfire','bonfire')">
+            <span class="nb-model-dot bonfire"></span>
+            <div>
+              <div class="nb-model-opt-name">bonfire</div>
+              <div class="nb-model-opt-desc">local llm · chat + plan</div>
+            </div>
+          </div>
+          <div class="nb-model-sep"></div>
+          <div style="padding:4px 10px 3px; font-family:var(--font-dot); font-size:0.45rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-mm);">cloud harness</div>
+          <div class="nb-model-opt selected" onclick="selectModel('modelSel1','codex','codex')">
+            <span class="nb-model-dot codex"></span>
+            <div>
+              <div class="nb-model-opt-name">codex</div>
+              <div class="nb-model-opt-desc">openai codex cli · creator</div>
+            </div>
+          </div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel1','claude','claude')">
+            <span class="nb-model-dot claude"></span>
+            <div>
+              <div class="nb-model-opt-name">claude</div>
+              <div class="nb-model-opt-desc">anthropic claude · chat + creator</div>
+            </div>
+          </div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel1','opencode','opencode')">
+            <span class="nb-model-dot opencode"></span>
+            <div>
+              <div class="nb-model-opt-name">opencode</div>
+              <div class="nb-model-opt-desc">opencode cli · creator</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="nb-expand-btn" title="focus mode">⤢</button>
+      <div class="nb-face"><div class="nb-face-eye"></div><div class="nb-face-eye"></div></div>
+    </div>
+
+    <!-- NEW TAB BAR -->
+    <div class="nb-tabs">
+      <button class="nb-tab active">
+        <span class="nb-tab-icon">◈</span> log
+      </button>
+      <button class="nb-tab" onclick="show(1)">
+        <span class="nb-tab-icon">◎</span> chat
+      </button>
+      <button class="nb-tab" onclick="show(2)">
+        <span class="nb-tab-icon">⌨</span> shells
+        <span class="nb-tab-badge">2</span>
+      </button>
+      <button class="nb-tab" onclick="show(3)">
+        <span class="nb-tab-icon">✦</span> creator
+      </button>
+    </div>
+
+    <div class="nb-body">
+      <div class="nb-log">
+        <div class="log-line"><span class="ok">[ok]</span> homelab uplink ... stable</div>
+        <div class="log-line"><span class="ok">[ok]</span> spotify.auth ... connected</div>
+        <div class="log-line"><span class="ok">[ok]</span> github.sync ... up to date</div>
+        <div class="log-line"><span class="info">[info]</span> checking jellyfin sessions...</div>
+        <div class="log-line"><span class="ok">[ok]</span> jellyfin ... 2 active sessions</div>
+        <div class="log-line"><span class="warn">[info]</span> arr stack queue ... items pending</div>
+        <div class="log-line"><span class="ok">[ok]</span> storage apps ... nominal</div>
+        <div class="log-line"><span class="info">[info]</span> nutbot v2.2 ready · model: codex</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN 2: Chat tab -->
+<div class="screen">
+  <div class="section-title">screen 2 — chat tab (model applies here too)</div>
+  <div class="nb-frame" style="min-height:460px;">
+    <div class="nb-header">
+      <span class="nb-title">NUTBOT V2.2</span>
+      <div class="nb-spacer"></div>
+      <div class="nb-model-sel" id="modelSel2">
+        <div class="nb-model-pill" onclick="toggleModel('modelSel2')">
+          <span class="nb-model-dot bonfire"></span>
+          <span class="nb-model-name">bonfire</span>
+          <span class="nb-model-caret">▾</span>
+        </div>
+        <div class="nb-model-dropdown" id="modelDrop2">
+          <div class="nb-model-sep"></div>
+          <div style="padding:4px 10px 3px; font-family:var(--font-dot); font-size:0.45rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-mm);">local llm</div>
+          <div class="nb-model-opt selected" onclick="selectModel('modelSel2','bonfire','bonfire')">
+            <span class="nb-model-dot bonfire"></span>
+            <div>
+              <div class="nb-model-opt-name">bonfire</div>
+              <div class="nb-model-opt-desc">local llm · chat + plan</div>
+            </div>
+          </div>
+          <div class="nb-model-sep"></div>
+          <div style="padding:4px 10px 3px; font-family:var(--font-dot); font-size:0.45rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--text-mm);">cloud harness</div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel2','codex','codex')">
+            <span class="nb-model-dot codex"></span>
+            <div><div class="nb-model-opt-name">codex</div><div class="nb-model-opt-desc">openai codex cli · creator</div></div>
+          </div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel2','claude','claude')">
+            <span class="nb-model-dot claude"></span>
+            <div><div class="nb-model-opt-name">claude</div><div class="nb-model-opt-desc">anthropic claude · chat + creator</div></div>
+          </div>
+          <div class="nb-model-opt" onclick="selectModel('modelSel2','opencode','opencode')">
+            <span class="nb-model-dot opencode"></span>
+            <div><div class="nb-model-opt-name">opencode</div><div class="nb-model-opt-desc">opencode cli · creator</div></div>
+          </div>
+        </div>
+      </div>
+      <button class="nb-expand-btn">⤢</button>
+      <div class="nb-face"><div class="nb-face-eye"></div><div class="nb-face-eye"></div></div>
+    </div>
+    <div class="nb-tabs">
+      <button class="nb-tab" onclick="show(0)"><span class="nb-tab-icon">◈</span> log</button>
+      <button class="nb-tab active"><span class="nb-tab-icon">◎</span> chat</button>
+      <button class="nb-tab" onclick="show(2)"><span class="nb-tab-icon">⌨</span> shells <span class="nb-tab-badge">2</span></button>
+      <button class="nb-tab" onclick="show(3)"><span class="nb-tab-icon">✦</span> creator</button>
+    </div>
+    <div class="nb-body">
+      <div class="nb-chat">
+        <div class="chat-msgs">
+          <div class="chat-msg bot">
+            <div class="bot-name">nutbot · bonfire</div>
+            hey, what do you want to build today?
+          </div>
+          <div class="chat-msg user">show me my homelab storage breakdown</div>
+          <div class="chat-msg bot">
+            <div class="bot-name">nutbot · bonfire</div>
+            your immich instance is using 1.4TB — mostly photos from 2022-2023. nextcloud has 340GB. qbit has 80GB of queued downloads. overall you're at 74% of your NAS capacity.
+          </div>
+        </div>
+        <div class="chat-footer">
+          <textarea class="chat-input" rows="2" placeholder="chat with nutbot..."></textarea>
+          <button class="chat-send">→</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-block">
+    <div class="notes-title">chat + model</div>
+    <div class="notes-item"><span class="notes-num">→</span> the selected model in the header applies to chat. bonfire uses local llm; claude/codex/opencode use the harness chain — same backend the creator uses.</div>
+    <div class="notes-item"><span class="notes-num">→</span> the nsfw / web-search toggles that were previously bonfire-only can move inside the chat body as small icon buttons, removing the need for separate logic by model.</div>
+  </div>
+</div>
+
+<!-- SCREEN 3: Shells -->
+<div class="screen">
+  <div class="section-title">screen 3 — shells tab (own screen, sidebar + terminal)</div>
+  <div class="nb-frame" style="min-height:480px;">
+    <div class="nb-header">
+      <span class="nb-title">NUTBOT V2.2</span>
+      <div class="nb-spacer"></div>
+      <div class="nb-model-sel">
+        <div class="nb-model-pill">
+          <span class="nb-model-dot codex"></span>
+          <span class="nb-model-name">codex</span>
+          <span class="nb-model-caret">▾</span>
+        </div>
+      </div>
+      <button class="nb-expand-btn">⤢</button>
+      <div class="nb-face"><div class="nb-face-eye"></div><div class="nb-face-eye"></div></div>
+    </div>
+    <div class="nb-tabs">
+      <button class="nb-tab" onclick="show(0)"><span class="nb-tab-icon">◈</span> log</button>
+      <button class="nb-tab" onclick="show(1)"><span class="nb-tab-icon">◎</span> chat</button>
+      <button class="nb-tab active"><span class="nb-tab-icon">⌨</span> shells <span class="nb-tab-badge">2</span></button>
+      <button class="nb-tab" onclick="show(3)"><span class="nb-tab-icon">✦</span> creator</button>
+    </div>
+    <div class="nb-body">
+      <div class="shells-screen">
+        <!-- sidebar -->
+        <div class="shells-sidebar">
+          <div class="shells-sidebar-head">
+            <span class="shells-sidebar-label">shells</span>
+            <button class="shells-new-btn">+ new</button>
+          </div>
+          <div class="shells-list">
+            <div class="shell-row active">
+              <div class="shell-row-dot"></div>
+              <div class="shell-row-info">
+                <div class="shell-row-name">shell 1</div>
+                <div class="shell-row-meta">bash · 12m</div>
+              </div>
+              <button class="shell-close">✕</button>
+            </div>
+            <div class="shell-row">
+              <div class="shell-row-dot"></div>
+              <div class="shell-row-info">
+                <div class="shell-row-name">shell 2</div>
+                <div class="shell-row-meta">bash · 3m</div>
+              </div>
+              <button class="shell-close">✕</button>
+            </div>
+          </div>
+        </div>
+        <!-- terminal -->
+        <div class="shells-main">
+          <div class="shells-main-header">
+            <span class="shells-main-title">shell 1 — bash</span>
+          </div>
+          <div class="shells-main-body">
+            <div><span class="shell-line-prompt">zohaib@avn-hub</span><span class="shell-line-out"> ~/projects </span><span class="shell-line-cmd">$ ls widgets/custom/</span></div>
+            <div class="shell-line-out">cube-timer/   dictionary/   monkey-type/   glyph-matrix/</div>
+            <div class="shell-line-out">atom-bomb/    diss-glade/   dot-matrix/</div>
+            <div><span class="shell-line-prompt">zohaib@avn-hub</span><span class="shell-line-out"> ~/projects </span><span class="shell-line-cmd">$ npm run dev</span></div>
+            <div class="shell-line-out"> ▲ Next.js 15 (Turbopack)</div>
+            <div class="shell-line-out">   ✓ Starting...</div>
+            <div class="shell-line-out">   ✓ Ready in 1823ms</div>
+            <div><span class="shell-line-prompt">zohaib@avn-hub</span><span class="shell-line-out"> ~/projects </span><span class="shell-cursor"></span></div>
+          </div>
+          <div class="shells-main-input">
+            <span class="shells-main-prompt">$</span>
+            <input class="shells-main-inp" placeholder="type a command..." />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes-block">
+    <div class="notes-title">shells redesign</div>
+    <div class="notes-item"><span class="notes-num">→</span> shells tab shows a dedicated screen: sidebar with sessions list + main terminal pane. no more shell 1 / shell 2 tabs on the main tab row.</div>
+    <div class="notes-item"><span class="notes-num">→</span> "new" button in the sidebar adds a shell. close button on each row removes it. last shell can't be closed (same rule as before).</div>
+    <div class="notes-item"><span class="notes-num">→</span> xterm instances stay mounted the same way — just hidden behind the sidebar selection instead of tab selection. no behaviour change under the hood.</div>
+  </div>
+</div>
+
+<!-- SCREEN 4: Creator home (improved) -->
+<div class="screen">
+  <div class="section-title">screen 4 — creator home (improved UX)</div>
+  <div class="nb-frame" style="min-height:500px;">
+    <div class="nb-header">
+      <span class="nb-title">NUTBOT V2.2</span>
+      <div class="nb-spacer"></div>
+      <div class="nb-model-sel">
+        <div class="nb-model-pill">
+          <span class="nb-model-dot codex"></span>
+          <span class="nb-model-name">codex</span>
+          <span class="nb-model-caret">▾</span>
+        </div>
+      </div>
+      <button class="nb-expand-btn">⤢</button>
+      <div class="nb-face"><div class="nb-face-eye"></div><div class="nb-face-eye"></div></div>
+    </div>
+    <div class="nb-tabs">
+      <button class="nb-tab" onclick="show(0)"><span class="nb-tab-icon">◈</span> log</button>
+      <button class="nb-tab" onclick="show(1)"><span class="nb-tab-icon">◎</span> chat</button>
+      <button class="nb-tab" onclick="show(2)"><span class="nb-tab-icon">⌨</span> shells <span class="nb-tab-badge">2</span></button>
+      <button class="nb-tab active"><span class="nb-tab-icon">✦</span> creator</button>
+    </div>
+    <div class="nb-body">
+      <div class="creator-home">
+
+        <!-- HERO: new widget as a prominent full-width banner -->
+        <div class="cr-hero">
+          <button class="cr-hero-btn" onclick="show(4)">
+            <div class="cr-hero-left">
+              <div class="cr-hero-icon">✦</div>
+              <div class="cr-hero-text">
+                <div class="cr-hero-label">new widget</div>
+                <div class="cr-hero-sub">plan · ideate · build — pick where to start</div>
+              </div>
+            </div>
+            <span class="cr-hero-arrow">→</span>
+          </button>
+        </div>
+
+        <!-- PROJECTS LIST -->
+        <div class="cr-projects">
+          <!-- In Progress section -->
+          <div class="cr-proj-header">
+            <span class="cr-proj-hdr-label">in progress</span>
+            <span class="cr-proj-hdr-count">3</span>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Untitled</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage active"><div class="cr-pipe-dot"></div> plan</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage">ideate</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage">build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">2m ago</span>
+              <button class="cr-proj-del">✕</button>
+            </div>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Untitled</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage done"><div class="cr-pipe-dot"></div> plan</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage active"><div class="cr-pipe-dot"></div> ideate</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage">build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">2m ago</span>
+              <button class="cr-proj-del">✕</button>
+            </div>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Untitled</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage">ideate</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage active"><div class="cr-pipe-dot"></div> build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">2m ago</span>
+              <button class="cr-proj-del">✕</button>
+            </div>
+          </div>
+
+          <!-- Created section -->
+          <div class="cr-proj-header" style="margin-top:8px;">
+            <span class="cr-proj-hdr-label">created</span>
+            <span class="cr-proj-hdr-count">7</span>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe created"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Cube Timer</span>
+                <span class="cr-proj-slug">#cube-timer</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage done"><div class="cr-pipe-dot"></div> build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">pre-existing</span>
+            </div>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe created"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Dictionary</span>
+                <span class="cr-proj-slug">#dictionary</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage done"><div class="cr-pipe-dot"></div> plan</div>
+                <span class="cr-pipe-sep">›</span>
+                <div class="cr-pipe-stage done"><div class="cr-pipe-dot"></div> build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">pre-existing</span>
+            </div>
+          </div>
+
+          <div class="cr-proj-item">
+            <div class="cr-proj-stripe created"></div>
+            <div class="cr-proj-main">
+              <div class="cr-proj-title-row">
+                <span class="cr-proj-name">Monkey Type</span>
+                <span class="cr-proj-slug">#monkey-type</span>
+              </div>
+              <div class="cr-proj-pipe">
+                <div class="cr-pipe-stage done"><div class="cr-pipe-dot"></div> build</div>
+              </div>
+            </div>
+            <div class="cr-proj-right">
+              <span class="cr-proj-time">pre-existing</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="notes-block">
+    <div class="notes-title">creator home changes</div>
+    <div class="notes-item"><span class="notes-num">1</span> <b>new widget</b> is now a full-width hero card — always visible, can't miss it. entry picker loads on click.</div>
+    <div class="notes-item"><span class="notes-num">2</span> <b>pipeline stages</b> shown inline per row as small chips: orange = where you are, cyan-filled = done, hollow = not started. makes it immediately obvious where each project is.</div>
+    <div class="notes-item"><span class="notes-num">3</span> <b>section counts</b> (3 / 7) in the header give a quick overview without scrolling.</div>
+    <div class="notes-item"><span class="notes-num">4</span> <b>left stripe</b> on each row: grey for in-progress, cyan for created — instant visual category signal.</div>
+    <div class="notes-item"><span class="notes-num">5</span> <b>delete ✕</b> appears on hover for in-progress rows. created rows have no delete option (read-only from creator).</div>
+    <div class="notes-item"><span class="notes-num">6</span> <b>slug shown</b> for created widgets so you can identify them without opening.</div>
+  </div>
+</div>
+
+<!-- SCREEN 5: Entry picker (new widget flow) -->
+<div class="screen">
+  <div class="section-title">screen 5 — new widget entry picker</div>
+  <div class="nb-frame" style="min-height:380px;">
+    <div class="nb-header">
+      <span class="nb-title">NUTBOT V2.2</span>
+      <div class="nb-spacer"></div>
+      <div class="nb-model-sel">
+        <div class="nb-model-pill">
+          <span class="nb-model-dot codex"></span>
+          <span class="nb-model-name">codex</span>
+          <span class="nb-model-caret">▾</span>
+        </div>
+      </div>
+      <button class="nb-expand-btn">⤢</button>
+      <div class="nb-face"><div class="nb-face-eye"></div><div class="nb-face-eye"></div></div>
+    </div>
+    <div class="nb-tabs">
+      <button class="nb-tab" onclick="show(0)"><span class="nb-tab-icon">◈</span> log</button>
+      <button class="nb-tab" onclick="show(1)"><span class="nb-tab-icon">◎</span> chat</button>
+      <button class="nb-tab" onclick="show(2)"><span class="nb-tab-icon">⌨</span> shells <span class="nb-tab-badge">2</span></button>
+      <button class="nb-tab active"><span class="nb-tab-icon">✦</span> creator</button>
+    </div>
+    <div class="nb-body">
+      <div class="cr-picker">
+        <div class="cr-picker-hdr">
+          <button class="cr-back" onclick="show(3)">← projects</button>
+          <span class="cr-picker-title">new widget</span>
+        </div>
+        <p class="cr-picker-sub">where do you want to start?</p>
+        <div class="cr-cards">
+          <div class="cr-card plan">
+            <div class="cr-card-icon">🗺</div>
+            <div class="cr-card-label">Plan</div>
+            <p class="cr-card-desc">Chat with AI to figure out what to build. Get a concept brief, then jump to ideate or build.</p>
+          </div>
+          <div class="cr-card ideate">
+            <div class="cr-card-icon">💡</div>
+            <div class="cr-card-label">Ideate</div>
+            <p class="cr-card-desc">Brainstorm HTML/CSS mockups before writing code. Visualize directions, then finalize one.</p>
+          </div>
+          <div class="cr-card build">
+            <div class="cr-card-icon">🔨</div>
+            <div class="cr-card-label">Build</div>
+            <p class="cr-card-desc">Jump straight into generation. Describe your widget and let the AI write the component.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- global notes -->
+<div class="notes-block" style="max-width:760px; margin-top:8px;">
+  <div class="notes-title">summary of all changes</div>
+  <div class="notes-item"><span class="notes-num">1</span> <b>NutBot v2.2</b> — version bump in terminal header and boot log.</div>
+  <div class="notes-item"><span class="notes-num">2</span> <b>unified model selector</b> in the header. one pill controls everything: bonfire (local llm, chat + plan), claude/codex/opencode (harness, all tabs). replaces the separate HarnessPill and chatBackend pref — both collapse into a single "activeModel" setting.</div>
+  <div class="notes-item"><span class="notes-num">3</span> <b>bonfire in model selector</b> — shown first under "local llm" group, cloud harnesses below the separator.</div>
+  <div class="notes-item"><span class="notes-num">4</span> <b>tab bar</b> — 4 fixed tabs (log / chat / shells / creator) with icons, underline active indicator, larger hit area. shell count badge on shells tab. no more shell-1 / shell-2 / + cluttering the row.</div>
+  <div class="notes-item"><span class="notes-num">5</span> <b>shells screen</b> — sidebar (session list + new button) + active terminal pane. switching shells = clicking the sidebar, not adding tabs to the main bar.</div>
+  <div class="notes-item"><span class="notes-num">6</span> <b>creator home</b> — new widget as full-width hero at top. pipeline stages as inline chips per row. section counts. left stripe for visual category. slug shown for created widgets.</div>
+</div>
+
+<script>
+const screens = document.querySelectorAll('.screen');
+const navBtns = document.querySelectorAll('.nav-btn');
+
+function show(i) {
+  screens.forEach((s, j) => s.classList.toggle('visible', j === i));
+  navBtns.forEach((b, j) => b.classList.toggle('active', j === i));
+  // close any open dropdowns
+  document.querySelectorAll('.nb-model-dropdown').forEach(d => d.classList.remove('open'));
+}
+
+function toggleModel(selId) {
+  const sel = document.getElementById(selId);
+  const drop = sel.querySelector('.nb-model-dropdown');
+  const isOpen = drop.classList.contains('open');
+  document.querySelectorAll('.nb-model-dropdown').forEach(d => d.classList.remove('open'));
+  if (!isOpen) drop.classList.add('open');
+}
+
+function selectModel(selId, model, dotClass) {
+  const sel = document.getElementById(selId);
+  const pill = sel.querySelector('.nb-model-pill');
+  pill.querySelector('.nb-model-dot').className = `nb-model-dot ${dotClass}`;
+  pill.querySelector('.nb-model-name').textContent = model;
+  sel.querySelectorAll('.nb-model-opt').forEach(o => o.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+  sel.querySelector('.nb-model-dropdown').classList.remove('open');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.nb-model-sel')) {
+    document.querySelectorAll('.nb-model-dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+</script>
+</body>
+</html>

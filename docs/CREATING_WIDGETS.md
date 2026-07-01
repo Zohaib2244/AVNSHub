@@ -114,7 +114,7 @@ weather: {
 ### Manifest fields
 
 | Field | Required | Meaning |
-|---|---|---|
+| --- | --- | --- |
 | `id` | ✅ | **Unique** stable identifier. Equals the object key. Becomes the persistence key and the card's DOM id (`#weather`). Pick a short kebab-case slug. |
 | `title` | ✅ | Display name shown as the card label and in Hub widget controls. |
 | `icon` | ✅ | A `lucide-react` icon component. |
@@ -131,7 +131,7 @@ weather: {
 `SPAN_MAP` fixes how each size/shape occupies the 6-column grid:
 
 | | horizontal | vertical |
-|---|---|---|
+| --- | --- | --- |
 | **S** | 1×1 | 1×2 |
 | **M** | 2×1 | 2×2 |
 | **L** | 3×2 | 2×3 |
@@ -269,6 +269,50 @@ back to the field default automatically.
 
 ---
 
+## 6. Keyboard input (optional)
+
+If your widget captures keyboard events (space, arrow keys, letter keys, etc.),
+gate every listener on `isFocused` from `useWidget()`. This prevents your widget
+from stealing keystrokes when the user is typing in NutBot chat, the Hub Core
+search field, or any other widget.
+
+```tsx
+const { size, isFocused } = useWidget();
+
+useEffect(() => {
+  if (!isFocused) return; // only capture keys when the user has clicked this widget
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.code === "Space") {
+      e.preventDefault();
+      // start/stop timer, submit guess, etc.
+    }
+  };
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+}, [isFocused]);
+```
+
+**How it works:**
+
+- `isFocused` is `true` when the user has clicked this widget's card; `false`
+  otherwise.
+- The user **clicks the widget** to give it keyboard focus — a subtle orange
+  border appears on the card to confirm.
+- **Clicking outside any widget** (on the canvas background) or pressing
+  `Escape` clears keyboard focus.
+- Entering edit mode also clears keyboard focus.
+
+Add `isFocused` to the `useEffect` dependency array so the listener
+registers/unregisters cleanly when focus changes.
+
+**Checklist addition for keyboard widgets:**
+
+- [ ] All `window.addEventListener("keydown"/"keyup"/"keypress")` calls are
+  gated with `if (!isFocused) return;` at the top of the handler.
+- [ ] `isFocused` is in the `useEffect` dependency array.
+
+---
+
 ## Identity & persistence (how the backend tracks a widget)
 
 - **`id` is the identity.** It's the `WIDGETS` key, the layout/persistence key in
@@ -385,7 +429,7 @@ they work the same as in any other widget.
 
 ### `useWidget()` in a custom widget
 
-Same hook, same shape as elsewhere: `{ id, size, orientation, settings }`.
+Same hook, same shape as elsewhere: `{ id, size, orientation, settings, isFocused }`.
 `settings` is an untyped bag — `Record<string, string | number | boolean>` —
 resolved from your manifest's `settings` schema. Narrow before use:
 
