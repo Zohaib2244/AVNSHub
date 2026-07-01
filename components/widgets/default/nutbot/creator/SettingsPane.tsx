@@ -5,17 +5,26 @@ import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
 import { WidgetPicker } from "./WidgetPicker";
-import type { PanelMode } from "./WidgetCreatorPanel";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
 import { renameWidgetPlacement } from "@/lib/slotLayout";
 
+// kept in sync with PanelMode in WidgetCreatorPanel but defined locally to
+// avoid a circular import when SettingsPane is used from CreatorWorkspace
+type SettingsPaneMode = "create" | "edit" | "ideate" | "plan";
+
 type Props = {
   settings: GenerateSettings;
   onChange: (patch: Partial<GenerateSettings>) => void;
-  mode: PanelMode;
-  onModeChange: (mode: PanelMode) => void;
+  mode: SettingsPaneMode;
+  onModeChange: (mode: SettingsPaneMode) => void;
+  /** When false the mode-toggle Section is hidden (used by CreatorWorkspace,
+      where mode is controlled by the pipeline bar instead). */
+  showModeToggle?: boolean;
+  /** When true the entire settings form is locked — used during AI generation
+      to prevent settings from changing mid-build. */
+  disabled?: boolean;
 };
 
 function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
@@ -232,7 +241,7 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
   );
 }
 
-export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) {
+export function SettingsPane({ settings, onChange, mode, onModeChange, showModeToggle = true, disabled = false }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
   const isCreateMode = mode === "create";
   const isEditMode = mode === "edit";
@@ -258,8 +267,12 @@ export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) 
   const imageValue = (settings[imageKey as keyof GenerateSettings] as string | null) ?? null;
 
   return (
-    <div className="wc-settings">
-      <Section title="mode">
+    <div
+      className="wc-settings"
+      style={disabled ? { opacity: 0.45, pointerEvents: "none", userSelect: "none" } : undefined}
+      aria-disabled={disabled || undefined}
+    >
+      {showModeToggle && <Section title="mode">
         <div className="wc-row">
           <div className="wc-toggle-group">
             <button
@@ -295,7 +308,7 @@ export function SettingsPane({ settings, onChange, mode, onModeChange }: Props) 
             >plan</button>
           </div>
         </div>
-      </Section>
+      </Section>}
 
       {isIdeateMode && (
         <Section title="about ideate mode">

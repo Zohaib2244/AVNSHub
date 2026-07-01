@@ -26,6 +26,8 @@ import {
 import { CANVAS_ICONS } from "@/config/canvasIcons";
 import { CanvasIconPicker } from "@/components/dashboard/CanvasIconPicker";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { showHubDialog } from "@/lib/hubDialog";
+import { getWorkingProjectId } from "@/lib/widget-creator/projectStore";
 
 function abbreviate(name: string): string {
   const trimmed = name.trim();
@@ -93,7 +95,18 @@ export function CanvasSwitcher() {
                 active={canvas.id === activeId}
                 deletable={canvases.length > 1}
                 managing={activePopover === manageKeyFor(canvas.id)}
-                onSwitch={() => switchCanvas(canvas.id)}
+                onSwitch={() => {
+                  if (getWorkingProjectId() !== null) {
+                    showHubDialog({
+                      title: "switch canvas?",
+                      body: "Switching canvas will stop the current widget generation. The active build will be cancelled.",
+                      confirmLabel: "switch canvas",
+                      onConfirm: () => switchCanvas(canvas.id),
+                    });
+                  } else {
+                    switchCanvas(canvas.id);
+                  }
+                }}
                 onOpenManage={() => setActivePopover(manageKeyFor(canvas.id))}
                 onCloseManage={() => setActivePopover(null)}
               />

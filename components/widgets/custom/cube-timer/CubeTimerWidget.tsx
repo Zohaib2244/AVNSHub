@@ -134,7 +134,7 @@ function ScrambleBar({ scramble }: { scramble: string }) {
 }
 
 export function CubeTimerWidget() {
-  const { size, settings } = useWidget();
+  const { size, settings, isFocused } = useWidget();
   const showScramble = settings.showScramble !== false;
   const showStats = settings.showStats !== false;
   const configuredLength =
@@ -182,6 +182,7 @@ export function CubeTimerWidget() {
 
   useEffect(() => {
     const onDown = (event: KeyboardEvent) => {
+      if (!isFocused) return;
       if (event.code !== "Space" || event.repeat) return;
       event.preventDefault();
 
@@ -196,6 +197,7 @@ export function CubeTimerWidget() {
     };
 
     const onUp = (event: KeyboardEvent) => {
+      if (!isFocused) return;
       if (event.code !== "Space") return;
       event.preventDefault();
 
@@ -211,7 +213,7 @@ export function CubeTimerWidget() {
       window.removeEventListener("keydown", onDown);
       window.removeEventListener("keyup", onUp);
     };
-  }, [startTimer, stopTimer]);
+  }, [startTimer, stopTimer, isFocused]);
 
   useEffect(() => () => clearTimer(), [clearTimer]);
 

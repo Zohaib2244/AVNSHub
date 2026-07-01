@@ -1,6 +1,5 @@
-/* ── fill-height layout (nutbot-block flag turns .block into flex col) ─── */
+/* ── fill-height layout ───────────────────────────────────────── */
 
-/* terminal header uses the nano zoom for the v2 robot decoration */
 .nutbot-v2-scale-nano { zoom: 0.28; }
 
 .nutbot-block {
@@ -15,72 +14,119 @@
   flex-direction: column;
 }
 
-.nutbot-terminal > .term-row {
-  flex-shrink: 0;
-}
-
 .nutbot-terminal > .term-body {
   flex: 1;
   height: auto;
   min-height: 60px;
 }
 
-/* ──────────────────────────────────────────────────────────────── */
+/* ── single combined row: title + tabs + controls ────────────── */
 
 .term-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  border-bottom: 1px solid var(--border);
   margin-bottom: 6px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.term-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 10px 0 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  opacity: 0.65;
+  border-right: 1px solid var(--border);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
 }
 
 .term-tabs {
   display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+  align-items: stretch;
+  flex: 1;
   min-width: 0;
 }
 
+.term-row-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 4px 8px;
+  border-left: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* ── tab button (pill indicator style) ───────────────────────── */
+
 .term-tab {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.58rem;
-  letter-spacing: 0.06em;
+  justify-content: center;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.55rem;
+  letter-spacing: 0.11em;
   text-transform: uppercase;
-  padding: 3px 6px;
-  border-radius: 5px;
-  border: 1px solid var(--border);
-  background: var(--bg-nested);
+  padding: 0 11px;
+  height: 34px;
+  border: none;
+  background: transparent;
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.2s ease, border-color 0.2s ease;
+  transition: color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.term-tab:hover {
+  color: var(--text-primary);
 }
 
 .term-tab.active {
   color: var(--accent-orange);
-  border-color: var(--accent-orange);
 }
 
-.term-tab-add {
-  padding: 3px 5px;
+/* animated background pill (motion.div with layoutId="term-tab-bg") */
+.term-tab-bg {
+  position: absolute;
+  inset: 5px 3px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent-orange) 11%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-orange) 22%, transparent);
+  pointer-events: none;
 }
 
-.term-tab-close {
-  opacity: 0.6;
-  transition: opacity 0.2s ease;
+/* tab label + icon sit above the bg */
+.term-tab-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
 }
 
-.term-tab-close:hover {
+.term-tab-icon {
+  opacity: 0.65;
+  font-size: 0.62rem;
+}
+
+.term-tab.active .term-tab-icon {
   opacity: 1;
 }
+
+/* ── body ────────────────────────────────────────────────────── */
 
 .term-body {
   height: 112px;
   overflow-y: auto;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   line-height: 1.55;
   color: var(--text-primary);
   background: var(--bg-nested);
@@ -89,17 +135,16 @@
   padding: 7px 9px;
 }
 
+.term-body.term-body-shells {
+  height: 260px;
+  overflow: hidden;
+  padding: 0;
+}
+
 .term-body.term-body-real {
   height: 260px;
   overflow: hidden;
   padding: 4px;
-}
-
-/* a mounted shell tab; inactive ones are display:none (set inline) but stay
-   mounted so their pty session + scrollback survive a tab switch */
-.term-shell-pane {
-  width: 100%;
-  height: 100%;
 }
 
 .term-xterm {
@@ -141,9 +186,7 @@
   color: var(--bg-card);
 }
 
-.term-output {
-  color: var(--text-muted);
-}
+.term-output { color: var(--text-muted); }
 
 .term-prompt {
   display: flex;
@@ -168,7 +211,7 @@
   caret-color: var(--accent-orange);
 }
 
-/* focus mode toggle — sits between the tabs and the harness pill */
+/* focus mode toggle */
 .term-focus-btn {
   display: inline-flex;
   align-items: center;
@@ -192,4 +235,285 @@
 
 .term-focus-btn.active {
   background: color-mix(in srgb, var(--accent-orange) 12%, var(--bg-nested));
+}
+
+/* ── shells screen ───────────────────────────────────────────── */
+
+.shells-screen {
+  display: flex;
+  height: 100%;
+  overflow: hidden;
+}
+
+.shells-sidebar {
+  width: 140px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.shells-sidebar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.shells-sidebar-label {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.shells-new-btn {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.48rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.shells-new-btn:hover {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.shells-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.shells-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  cursor: pointer;
+  border-left: 2px solid transparent;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.shells-row:hover {
+  background: var(--bg-card);
+}
+
+.shells-row.active {
+  border-left-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 8%, transparent);
+}
+
+.shells-row-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #4caf74;
+  flex-shrink: 0;
+}
+
+.shells-row-name {
+  flex: 1;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.6rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.shells-row-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s, color 0.12s;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.shells-row:hover .shells-row-close {
+  opacity: 1;
+}
+
+.shells-row-close:hover {
+  color: #c0392b;
+}
+
+.shells-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.shells-terminal-pane {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── unified model picker ────────────────────────────────────── */
+
+.nm-root {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.nm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.nm-pill:hover,
+.nm-pill.open {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.nm-chevron {
+  transition: transform 0.2s;
+}
+
+.nm-chevron.open {
+  transform: rotate(180deg);
+}
+
+.nm-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--text-muted);
+}
+
+.nm-dot-orange  { background: var(--accent-orange); }
+.nm-dot-cyan    { background: var(--accent-cyan); }
+.nm-dot-purple  { background: #8b5cf6; }
+.nm-dot-green   { background: #4caf74; }
+.nm-dot-muted   { background: var(--text-muted); }
+
+.nm-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 186px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  z-index: 100;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.nm-group-label {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.46rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 5px 10px 3px;
+  opacity: 0.7;
+}
+
+.nm-sep {
+  height: 1px;
+  background: var(--border);
+  margin: 3px 8px;
+}
+
+.nm-opt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 10px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.nm-opt:hover {
+  background: var(--bg-nested);
+}
+
+.nm-opt.active {
+  color: var(--accent-orange);
+}
+
+.nm-opt.unavailable {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.nm-opt-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+  min-width: 0;
+}
+
+.nm-opt-name {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.62rem;
+  line-height: 1.2;
+}
+
+.nm-opt-desc {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.5rem;
+  color: var(--text-muted);
+  line-height: 1.2;
+}
+
+.nm-opt.active .nm-opt-desc {
+  color: color-mix(in srgb, var(--accent-orange) 60%, var(--text-muted));
+}
+
+.nm-badge {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.45rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  flex-shrink: 0;
 }

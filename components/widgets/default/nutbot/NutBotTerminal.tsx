@@ -3,22 +3,15 @@ import "./NutBotTerminal.css";
 import "./creator/WidgetCreatorPanel.css";
 import "./chat/NutBotChat.css";
 
-// NutBot's full terminal: an ambient log ticker, a conversational chat tab
-// (talks to Bonfire/local LLM or a CLI harness fallback), one or more REAL cross-platform
-// shell tabs (each a live pty on the host via /api/nutbot-shell), and the widget
-// creator. Lives in the face widget's click-to-expand overlay, so the shells
-// only mount when the terminal is actually open.
-//
-// Shell tabs stay mounted (hidden with display:none) while you switch tabs, so
-// the underlying pty session and its scrollback survive — a tab is only torn
-// down when you close it.
+// NutBot's full terminal: log, chat, shells (sidebar + live pty), and widget creator.
+// Shell sessions stay mounted (display:none) when not active so the pty + scrollback survive.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Maximize2, Minimize2, Plus, X } from "lucide-react";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
-import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
-import { HarnessPill } from "@/components/widgets/default/nutbot/creator/HarnessPill";
+import { NutBotModelPicker } from "@/components/widgets/default/nutbot/NutBotModelPicker";
+import { ShellsScreen } from "@/components/widgets/default/nutbot/ShellsScreen";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
@@ -32,27 +25,26 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.1 custom llm ready...",
+  "[info] nutbot v2.2 ready",
 ];
 
-type TabKind = "log" | "chat" | "shell" | "creator";
-type TerminalTab = { id: string; title: string; kind: TabKind };
+type MainTab = "log" | "chat" | "shells" | "creator";
 type LogLine = { id: number; text: string };
 
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
-const INITIAL_TABS: TerminalTab[] = [
-  { id: "log", title: "log", kind: "log" },
-  { id: "chat", title: "chat", kind: "chat" },
-  { id: "shell-1", title: "shell 1", kind: "shell" },
-  { id: "creator", title: "creator", kind: "creator" },
-];
+
+function sanitizeTab(raw: string | null): MainTab {
+  if (raw === "log" || raw === "chat" || raw === "shells" || raw === "creator") return raw;
+  // old shell-N ids map to shells
+  if (raw?.startsWith("shell")) return "shells";
+  return "log";
+}
 
 export function NutBotTerminal() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
   const { focusWidgetId, enterFocusMode, exitFocusMode } = useLayout();
   const isFocusMode = focusWidgetId === "nutbot";
 
-  // Escape exits focus mode so the user is never stuck
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && isFocusMode) exitFocusMode();
@@ -60,10 +52,10 @@ export function NutBotTerminal() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFocusMode, exitFocusMode]);
+
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
-  const skipTabWrite = useRef(true);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -77,29 +69,23 @@ export function NutBotTerminal() {
     return () => clearInterval(id);
   }, []);
 
-  const [tabs, setTabs] = useState<TerminalTab[]>(() => INITIAL_TABS);
-  const [activeTab, setActiveTab] = useState("log");
-  const shellCount = useRef(1);
+  const [activeTab, setActiveTab] = useState<MainTab>("log");
+  const skipTabWrite = useRef(true);
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    let restoreTimer: number | undefined;
+    let t: number | undefined;
     try {
       const stored = sessionStorage.getItem(NUTBOT_TAB_KEY);
-      if (stored && INITIAL_TABS.some((tab) => tab.id === stored)) {
-        restoreTimer = window.setTimeout(() => {
-          skipTabWrite.current = false;
-          setActiveTab(stored);
-        }, 0);
-      } else {
+      const tab = sanitizeTab(stored);
+      t = window.setTimeout(() => {
         skipTabWrite.current = false;
-      }
+        setActiveTab(tab);
+      }, 0);
     } catch {
       skipTabWrite.current = false;
     }
-    return () => {
-      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
-    };
+    return () => { if (t !== undefined) window.clearTimeout(t); };
   }, []);
 
   useEffect(() => {
@@ -111,79 +97,71 @@ export function NutBotTerminal() {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [logLines, activeTab]);
 
-  function addShellTab() {
-    shellCount.current += 1;
-    const id = `shell-${shellCount.current}`;
-    const title = `shell ${shellCount.current}`;
-    // insert the new shell just before the creator tab so creator stays last
-    setTabs((prev) => {
-      const creatorIdx = prev.findIndex((t) => t.kind === "creator");
-      const tab: TerminalTab = { id, title, kind: "shell" };
-      if (creatorIdx === -1) return [...prev, tab];
-      return [...prev.slice(0, creatorIdx), tab, ...prev.slice(creatorIdx)];
-    });
-    setActiveTab(id);
-  }
-
-  function closeTab(id: string) {
-    setTabs((prev) => prev.filter((tab) => tab.id !== id));
-    setActiveTab((current) => (current === id ? "log" : current));
-  }
-
-  const activeKind = tabs.find((t) => t.id === activeTab)?.kind ?? "log";
-  const shellTabs = tabs.filter((t) => t.kind === "shell");
+  const isShells   = activeTab === "shells";
+  const isCreator  = activeTab === "creator";
+  const isChat     = activeTab === "chat";
 
   return (
     <div className="nutbot-terminal">
+      {/* ── single combined row: title + tabs + controls ── */}
       <div className="term-row">
+        <span className="term-title">NUTBOT V2.2</span>
+
         <div className="term-tabs">
-          {tabs.map((tab) => (
+          {(["log", "chat", "shells", "creator"] as MainTab[]).map((tab) => (
             <button
-              key={tab.id}
+              key={tab}
               type="button"
-              className={`term-tab${activeTab === tab.id ? " active" : ""}`}
-              onClick={() => setActiveTab(tab.id)}
+              className={`term-tab${activeTab === tab ? " active" : ""}`}
+              onClick={() => setActiveTab(tab)}
             >
-              {tab.title}
-              {/* only shell tabs are closeable, and never the last remaining one */}
-              {tab.kind === "shell" && shellTabs.length > 1 && (
-                <X
-                  size={10}
-                  strokeWidth={2}
-                  className="term-tab-close"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    closeTab(tab.id);
-                  }}
+              {/* sliding background pill — layoutId makes Framer animate it between tabs */}
+              {activeTab === tab && (
+                <motion.div
+                  layoutId="term-tab-bg"
+                  className="term-tab-bg"
+                  transition={{ type: "spring", stiffness: 500, damping: 32, mass: 0.6 }}
                 />
               )}
+              <span className="term-tab-content">
+                {tab === "log"     && <span className="term-tab-icon">◈</span>}
+                {tab === "chat"    && <span className="term-tab-icon">◎</span>}
+                {tab === "shells"  && <span className="term-tab-icon">⌨</span>}
+                {tab === "creator" && <span className="term-tab-icon">✦</span>}
+                {tab}
+              </span>
             </button>
           ))}
-          <button type="button" className="term-tab term-tab-add" onClick={addShellTab} aria-label="new shell tab">
-            <Plus size={12} strokeWidth={2} />
-          </button>
         </div>
 
-        <button
-          type="button"
-          className={`term-focus-btn${isFocusMode ? " active" : ""}`}
-          onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
-          aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
-          title={isFocusMode ? "exit focus mode (Esc)" : "focus mode"}
-        >
-          {isFocusMode ? <Minimize2 size={11} strokeWidth={2} /> : <Maximize2 size={11} strokeWidth={2} />}
-        </button>
-        <HarnessPill />
-        <div className="nutbot-v2-scale nutbot-v2-scale-nano">
-          <NutBotFaceV2 compact />
+        <div className="term-row-right">
+          <NutBotModelPicker />
+          <button
+            type="button"
+            className={`term-focus-btn${isFocusMode ? " active" : ""}`}
+            onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
+            aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
+            title={isFocusMode ? "exit focus mode (Esc)" : "focus mode"}
+          >
+            {isFocusMode ? <Minimize2 size={11} strokeWidth={2} /> : <Maximize2 size={11} strokeWidth={2} />}
+          </button>
+          <div className="nutbot-v2-scale nutbot-v2-scale-nano">
+            <NutBotFaceV2 compact />
+          </div>
         </div>
       </div>
 
+      {/* ── body ── */}
       <div
-        className={`term-body${activeKind === "shell" ? " term-body-real" : ""}${activeKind === "creator" ? " term-body-creator" : ""}${activeKind === "chat" ? " term-body-chat" : ""}`}
+        className={[
+          "term-body",
+          isShells  ? "term-body-shells"  : "",
+          isCreator ? "term-body-creator" : "",
+          isChat    ? "term-body-chat"    : "",
+        ].filter(Boolean).join(" ")}
         ref={bodyRef}
       >
-        {activeKind === "log" && (
+        {activeTab === "log" && (
           <AnimatePresence initial={false}>
             {logLines.map((line) => (
               <motion.div
@@ -199,9 +177,11 @@ export function NutBotTerminal() {
           </AnimatePresence>
         )}
 
-        {activeKind === "chat" && <NutBotChat />}
+        {activeTab === "chat" && <NutBotChat />}
 
-        {activeKind === "creator" && (
+        {activeTab === "shells" && <ShellsScreen />}
+
+        {activeTab === "creator" && (
           prefs.creatorEnabled ? (
             <WidgetCreatorPanel />
           ) : (
@@ -213,18 +193,6 @@ export function NutBotTerminal() {
             </div>
           )
         )}
-
-        {/* shells stay mounted across tab switches so their pty + scrollback
-            persist; only the active one is visible */}
-        {shellTabs.map((tab) => (
-          <div
-            key={tab.id}
-            className="term-shell-pane"
-            style={{ display: activeTab === tab.id ? "block" : "none" }}
-          >
-            <RealShell />
-          </div>
-        ))}
       </div>
     </div>
   );

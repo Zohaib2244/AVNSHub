@@ -22,6 +22,7 @@ import {
 } from "@/config/widgets";
 import type { RegionId } from "@/config/slotLayout";
 import { WidgetContext } from "@/components/framework/WidgetContext";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 const CANVAS_OUTRO_DURATION = 0.24;
 
@@ -106,8 +107,11 @@ export function WidgetShell({
   const flags = manifest.flags ?? {};
   const Icon = manifest.icon;
 
+  const { keyboardFocusWidgetId, setKeyboardFocusWidgetId } = useLayout();
+  const isFocused = keyboardFocusWidgetId === manifest.id;
+
   const hoverExpanded = config?.hoverExpanded ?? false;
-  const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot };
+  const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot, isFocused };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
   // "auto" inherits the global widget backdrop default (independent from the
@@ -152,6 +156,9 @@ export function WidgetShell({
       id={manifest.id}
       className="capsule"
       data-size={size}
+      data-kb-widget={manifest.id}
+      data-kb-focus={isFocused ? "true" : undefined}
+      onPointerDown={() => setKeyboardFocusWidgetId(manifest.id)}
       initial={{ opacity: 0, scale: 0.92 }}
       animate={{ opacity: 1, scale: 1 }}
       exit="exit"

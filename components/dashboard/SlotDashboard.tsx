@@ -71,7 +71,7 @@ export function SlotDashboard() {
     () => getCanvases().activeId,
     () => getServerCanvases().activeId,
   );
-  const { editMode, focusWidgetId, isInstalling } = useLayout();
+  const { editMode, focusWidgetId, isInstalling, setKeyboardFocusWidgetId } = useLayout();
   const isFocusMode = focusWidgetId !== null;
 
   const frameRef = useRef<HTMLDivElement>(null);
@@ -206,7 +206,16 @@ export function SlotDashboard() {
     <div className="slot-page mx-auto max-w-[1800px] px-5 py-6" style={{ position: "relative" }}>
       <div className="frame frame-with-tabs">
         <HubCorePanel />
-        <div className="frame-inner">
+        <div
+          className="frame-inner"
+          onPointerDown={(e) => {
+            // clicking the bare canvas background clears keyboard widget focus;
+            // clicks on a widget bubble up but are caught by data-kb-widget check
+            if (!(e.target as Element).closest("[data-kb-widget]")) {
+              setKeyboardFocusWidgetId(null);
+            }
+          }}
+        >
           {/* keyed by canvas so switching canvases fully unmounts the old
               widget tree (fade out) and mounts the new one (cascade in) —
               even when a widget id happens to exist in both canvases. Only

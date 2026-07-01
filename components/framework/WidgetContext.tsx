@@ -26,6 +26,11 @@ export type WidgetCtx = {
       On Expand uses the surrounding SlotRegion rects rather than widget
       content state. */
   slot?: { region: RegionId; colSpan: number; rowSpan: number };
+  /** true when the user has clicked this widget, giving it keyboard input
+      capture. Use this to gate keyboard listeners so they only fire when the
+      widget is active — prevents unintended triggers when typing elsewhere.
+      Pattern: useEffect(() => { if (!isFocused) return; ... }, [isFocused]) */
+  isFocused?: boolean;
 };
 
 export const WidgetContext = createContext<WidgetCtx | null>(null);

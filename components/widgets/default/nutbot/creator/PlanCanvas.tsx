@@ -4,31 +4,22 @@ import { useRef, useState } from "react";
 import { Hammer, Send, Square, Wand2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
+import { useEffect } from "react";
+import {
+  updateProject,
+  setWorkingProjectId,
+  projectPlanSidKey,
+  projectPlanMessagesKey,
+  type WidgetBrief,
+} from "@/lib/widget-creator/projectStore";
 
-export type WidgetBrief = {
-  title: string;
-  slug: string;
-  icon?: string;
-  sizes?: string[];
-  sContent?: string;
-  mContent?: string;
-  lContent?: string;
-  dataSource?: string;
-  dataShape?: string;
-  concept: string;
-};
+// Re-export so consumers that import from PlanCanvas keep working
+export type { WidgetBrief };
 
 type Message =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
   | { role: "error"; text: string };
-
-const SESSION_KEY = "nutmag-plan-session-id";
-
-function loadSessionId(): string | null {
-  if (typeof window === "undefined") return null;
-  try { return sessionStorage.getItem(SESSION_KEY); } catch { return null; }
-}
 
 function extractBrief(text: string): WidgetBrief | null {
   const match = text.match(/```widget-brief\s*\n([\s\S]*?)```/);
@@ -41,14 +32,31 @@ function stripBrief(text: string): string {
 }
 
 type Props = {
+  projectId: string;
   activeHarness: HarnessId;
   onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
 };
 
-export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
+export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: Props) {
+  const sidKey  = projectPlanSidKey(projectId);
+  const msgsKey = projectPlanMessagesKey(projectId);
+
+  function loadSessionId(): string | null {
+    if (typeof window === "undefined") return null;
+    try { return sessionStorage.getItem(sidKey); } catch { return null; }
+  }
+
+  function loadMessages(): Message[] {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(msgsKey);
+      return raw ? (JSON.parse(raw) as Message[]) : [];
+    } catch { return []; }
+  }
+
   const [sessionId, setSessionId] = useState<string | null>(loadSessionId);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -56,6 +64,11 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
+
+  // persist messages so they survive mode switches (PlanCanvas unmounts/remounts)
+  useEffect(() => {
+    try { localStorage.setItem(msgsKey, JSON.stringify(messages)); } catch {}
+  }, [messages, msgsKey]);
 
   function scrollBottom() {
     requestAnimationFrame(() => {
@@ -69,7 +82,8 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
     setHistory([]);
     setActiveBrief(null);
     setSessionId(null);
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    try { sessionStorage.removeItem(sidKey); } catch {}
+    try { localStorage.removeItem(msgsKey); } catch {}
   }
 
   async function send() {
@@ -80,6 +94,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setIsLoading(true);
     emitWorking();
+    setWorkingProjectId(projectId);
     scrollBottom();
 
     const currentHistory = history;
@@ -106,6 +121,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
         setMessages((prev) => [...prev, { role: "error", text: `server error ${res.status}` }]);
         setIsLoading(false);
         clearSignal();
+        setWorkingProjectId(null);
         return;
       }
 
@@ -146,7 +162,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
             const convId = (data.conversation_id as string | undefined) ?? null;
             if (convId) {
               setSessionId(convId);
-              try { sessionStorage.setItem(SESSION_KEY, convId); } catch {}
+              try { sessionStorage.setItem(sidKey, convId); } catch {}
             }
             setMessages((prev) => {
               const idx = assistantIdxRef.current;
@@ -157,7 +173,10 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
               return updated;
             });
             const brief = extractBrief(accText);
-            if (brief) setActiveBrief(brief);
+            if (brief) {
+              setActiveBrief(brief);
+              updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+            }
             setHistory((prev) => [
               ...prev,
               { role: "user", text: userText },
@@ -175,6 +194,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
     } finally {
       setIsLoading(false);
       clearSignal();
+      setWorkingProjectId(null);
       abortRef.current = null;
       setMessages((prev) => {
         const idx = assistantIdxRef.current;
@@ -193,6 +213,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
     abortRef.current?.abort();
     setIsLoading(false);
     clearSignal();
+    setWorkingProjectId(null);
   }
 
   return (
@@ -256,7 +277,7 @@ export function PlanCanvas({ activeHarness, onBuild, onVisualize }: Props) {
                 type="button"
                 className="wc-brief-action-btn wc-brief-build-btn"
                 onClick={() => onBuild(activeBrief)}
-                title="pre-fill create settings and switch to build mode"
+                title="pre-fill build settings and switch to build mode"
               >
                 <Hammer size={10} strokeWidth={2} />
                 build this

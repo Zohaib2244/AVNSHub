@@ -295,10 +295,15 @@ body {
   height: 100%;
 }
 
+html {
+  font-size: 17px;
+}
+
 body {
   background: var(--bg-page);
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
+  font-weight: 500;
   transition: background-color 0.3s ease, color 0.3s ease;
   overflow-x: hidden;
 }
@@ -1022,6 +1027,12 @@ html[data-backdrop="glass"] .frame {
 
 .block:hover {
   border-color: var(--accent-orange);
+  box-shadow: 5px 5px 0 var(--shadow);
+}
+
+/* keyboard focus: widget that currently captures keyboard input */
+.capsule[data-kb-focus="true"] .block {
+  border-color: color-mix(in srgb, var(--accent-orange) 70%, var(--border));
   box-shadow: 5px 5px 0 var(--shadow);
 }
 
@@ -2457,4 +2468,90 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 @keyframes installing-pulse {
   0%, 100% { opacity: 0.25; transform: scale(0.75); }
   50%       { opacity: 1;    transform: scale(1.15); }
+}
+
+/* ── HubDialog — AVN Hub confirmation modal ─────────────────────── */
+
+.hub-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  background: color-mix(in srgb, var(--bg-page) 70%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.hub-dialog {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 5px 5px 0 var(--shadow);
+  padding: 22px 24px 20px;
+  max-width: 360px;
+  width: 100%;
+}
+
+.hub-dialog-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+}
+
+.hub-dialog-body {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.72rem;
+  line-height: 1.55;
+  color: var(--text-muted);
+  margin: 0 0 18px;
+}
+
+.hub-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.hub-dialog-cancel {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.hub-dialog-cancel:hover {
+  border-color: var(--text-muted);
+  color: var(--text-primary);
+}
+
+.hub-dialog-confirm {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 5px 14px;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent-orange);
+  background: var(--accent-orange);
+  color: var(--bg-card);
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+  font-weight: 600;
+}
+
+.hub-dialog-confirm:hover {
+  opacity: 0.88;
 }

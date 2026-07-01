@@ -3,7 +3,7 @@
 import "./NutBotChat.css";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ChevronDown, RotateCcw, Send, Square } from "lucide-react";
+import { RotateCcw, Send, Square } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { clearSignal, emitThinking, emitSpeaking, emitBrowsing, emitError } from "@/lib/nutbotSignal";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs, type ChatBackend } from "@/lib/prefs";
@@ -28,7 +28,6 @@ const CONV_KEY = "nutmag-nutbot-conv";
 const CONV_BACKEND_KEY = "nutmag-nutbot-conv-backend";
 const NSFW_KEY = "nutmag-nutbot-nsfw";
 const SEARCH_KEY = "nutmag-nutbot-search";
-const HARNESS_IDS: HarnessId[] = ["claude", "codex", "opencode"];
 
 function readSession(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -67,7 +66,6 @@ export function NutBotChat() {
   const [backendState, setBackendState] = useState<BackendState>(
     prefs.chatBackend === "off" ? { kind: "disabled" } : { kind: "checking", label: "checking backend" },
   );
-  const [backendMenuOpen, setBackendMenuOpen] = useState(false);
   const [harnessStatuses, setHarnessStatuses] = useState<HarnessStatus[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(() => readSession(CONV_KEY));
   const [conversationBackend, setConversationBackend] = useState<ConcreteBackend | null>(() => readStoredBackend());
@@ -78,7 +76,6 @@ export function NutBotChat() {
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
   const hydratedConvRef = useRef<string | null>(null);
-  const backendMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -108,24 +105,6 @@ export function NutBotChat() {
     } catch {}
   }, [conversationId, conversationBackend]);
 
-  useEffect(() => {
-    if (!backendMenuOpen) return;
-    function handler(e: MouseEvent) {
-      if (backendMenuRef.current && !backendMenuRef.current.contains(e.target as Node)) {
-        setBackendMenuOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [backendMenuOpen]);
-
-  useEffect(() => {
-    if (!backendMenuOpen || harnessStatuses.length > 0) return;
-    fetch("/api/widget-creator/harnesses")
-      .then((res) => res.json())
-      .then((data: HarnessStatus[]) => setHarnessStatuses(data))
-      .catch(() => {});
-  }, [backendMenuOpen, harnessStatuses.length]);
 
   useEffect(() => {
     if (prefs.chatBackend === "off") {
@@ -407,13 +386,8 @@ export function NutBotChat() {
       clearSignal();
     }
     setPrefs({ chatBackend: backend });
-    setBackendMenuOpen(false);
   }
 
-  const backendButtonLabel =
-    prefs.chatBackend === "auto" && backendState.kind === "ready" && backendState.autoFallback
-      ? `auto > ${backendLabel(backendState.backend)}`
-      : backendLabel(prefs.chatBackend);
   const inputDisabled = sending || backendState.kind !== "ready";
   const placeholder =
     backendState.kind === "disabled"
@@ -489,70 +463,6 @@ export function NutBotChat() {
       </div>
 
       <div className="nb-chat-toolbar">
-        <div className="hp-root nb-backend-picker" ref={backendMenuRef}>
-          <button
-            type="button"
-            className={`hp-pill${backendMenuOpen ? " open" : ""}`}
-            onClick={() => setBackendMenuOpen((open) => !open)}
-            aria-label="select chat backend"
-          >
-            <span className={`hp-dot${backendState.kind === "offline" || backendState.kind === "disabled" ? " unavailable" : ""}`} />
-            chat {backendButtonLabel}
-            <ChevronDown size={9} strokeWidth={2} className={backendMenuOpen ? "hp-chevron open" : "hp-chevron"} />
-          </button>
-
-          {backendMenuOpen && (
-            <div className="hp-popover">
-              <div className="hp-popover-head">chat backend</div>
-              <button
-                type="button"
-                className={`hp-item hp-item-button${prefs.chatBackend === "auto" ? " active" : ""}`}
-                onClick={() => chooseBackend("auto")}
-              >
-                <span className="hp-dot" />
-                <span className="hp-item-label">auto</span>
-                {prefs.chatBackend === "auto" && <span className="hp-badge active">active</span>}
-              </button>
-              <button
-                type="button"
-                className={`hp-item hp-item-button${prefs.chatBackend === "bonfire" ? " active" : ""}`}
-                onClick={() => chooseBackend("bonfire")}
-              >
-                <span className="hp-dot" />
-                <span className="hp-item-label">bonfire</span>
-                {prefs.chatBackend === "bonfire" && <span className="hp-badge active">active</span>}
-              </button>
-              {HARNESS_IDS.map((id) => {
-                const status = harnessStatuses.find((s) => s.id === id);
-                const unavailable = status?.available === false;
-                return (
-                  <button
-                    type="button"
-                    key={id}
-                    className={`hp-item hp-item-button${prefs.chatBackend === id ? " active" : ""}${unavailable ? " unavailable" : ""}`}
-                    onClick={() => chooseBackend(id)}
-                    title={unavailable ? "not found on PATH" : undefined}
-                  >
-                    <span className={`hp-dot${unavailable ? " unavailable" : ""}`} />
-                    <span className="hp-item-label">{HARNESS_ADAPTERS[id]?.label ?? id}</span>
-                    {unavailable && <span className="hp-badge">not installed</span>}
-                    {prefs.chatBackend === id && <span className="hp-badge active">active</span>}
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                className={`hp-item hp-item-button${prefs.chatBackend === "off" ? " active" : ""}`}
-                onClick={() => chooseBackend("off")}
-              >
-                <span className="hp-dot unavailable" />
-                <span className="hp-item-label">off</span>
-                {prefs.chatBackend === "off" && <span className="hp-badge active">active</span>}
-              </button>
-            </div>
-          )}
-        </div>
-
         {bonfireActive && (
           <>
             <button

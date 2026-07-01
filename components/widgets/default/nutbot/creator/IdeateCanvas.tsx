@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Square, RefreshCw, Hammer, Plus, Minus } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
+import {
+  updateProject,
+  setWorkingProjectId,
+  projectIdeateSidKey,
+  projectIdeateKey,
+} from "@/lib/widget-creator/projectStore";
 
 type Variation = { index: number; file: string; html: string };
 type Round = { prompt: string; variations: Variation[] };
@@ -16,12 +22,10 @@ type Phase =
   | { id: "error"; message: string };
 
 type Props = {
+  projectId: string;
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
-  /** hands a finalized variation's raw HTML up to the panel, which switches
-      into create mode and pre-fills the build prompt */
   onFinalize: (html: string) => void;
-  /** pre-fills the prompt textarea — used when "Visualize" is clicked from Plan mode */
   initialPrompt?: string;
 };
 
@@ -32,32 +36,6 @@ const PHASE_LABEL: Record<Phase["id"], string> = {
   done: "done",
   error: "error",
 };
-
-const SESSION_KEY = "nutmag-ideate-session";
-const ROUNDS_KEY = "nutmag-ideate-rounds";
-
-function loadSessionId(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    const existing = sessionStorage.getItem(SESSION_KEY);
-    if (existing) return existing;
-  } catch {}
-  const id = crypto.randomUUID();
-  try {
-    sessionStorage.setItem(SESSION_KEY, id);
-  } catch {}
-  return id;
-}
-
-function loadRounds(): Round[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const saved = sessionStorage.getItem(ROUNDS_KEY);
-    return saved ? (JSON.parse(saved) as Round[]) : [];
-  } catch {
-    return [];
-  }
-}
 
 function StatusBar({ phase }: { phase: Phase }) {
   const isActive = phase.id === "connecting" || phase.id === "generating";
@@ -110,11 +88,7 @@ async function streamIdeate(
       if (!dataStr) continue;
 
       let payload: Record<string, unknown>;
-      try {
-        payload = JSON.parse(dataStr);
-      } catch {
-        continue;
-      }
+      try { payload = JSON.parse(dataStr); } catch { continue; }
 
       if (event === "status") {
         const type = payload.type as string;
@@ -128,15 +102,37 @@ async function streamIdeate(
       } else if (event === "error") {
         result = { ok: false, message: payload.message as string };
       }
-      // "chunk" events (the harness's raw thinking/tool stream) are intentionally
-      // not surfaced here — the body shows a variation gallery, not a transcript.
     }
   }
 
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialPrompt }: Props) {
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt }: Props) {
+  const sidKey    = projectIdeateSidKey(projectId);
+  const roundsKey = projectIdeateKey(projectId);
+
+  function loadSessionId(): string {
+    if (typeof window === "undefined") return "";
+    try {
+      const existing = sessionStorage.getItem(sidKey);
+      if (existing) return existing;
+    } catch {}
+    const id = crypto.randomUUID();
+    try { sessionStorage.setItem(sidKey, id); } catch {}
+    return id;
+  }
+
+  function loadRounds(): Round[] {
+    if (typeof window === "undefined") return [];
+    try {
+      const saved = localStorage.getItem(roundsKey);
+      return saved ? (JSON.parse(saved) as Round[]) : [];
+    } catch {
+      return [];
+    }
+  }
+
   const [sessionId, setSessionId] = useState(loadSessionId);
   const [rounds, setRounds] = useState<Round[]>(loadRounds);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
@@ -148,10 +144,8 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      sessionStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds));
-    } catch {}
-  }, [rounds]);
+    try { localStorage.setItem(roundsKey, JSON.stringify(rounds)); } catch {}
+  }, [rounds, roundsKey]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -172,6 +166,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
     setPrompt("");
     setPhase({ id: "connecting", harness: activeHarness });
     emitWorking();
+    setWorkingProjectId(projectId);
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -186,6 +181,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
 
       if (!result.ok) {
         clearSignal();
+        setWorkingProjectId(null);
         setPhase({ id: "error", message: result.message });
         return;
       }
@@ -198,10 +194,13 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
       );
 
       setRounds((prev) => [...prev, { prompt: userPrompt, variations }]);
+      updateProject(projectId, { hasIdeateRounds: true });
       setPhase({ id: "done" });
       clearSignal();
+      setWorkingProjectId(null);
     } catch (err) {
       clearSignal();
+      setWorkingProjectId(null);
       if ((err as Error).name === "AbortError") {
         setPhase({ id: "idle" });
       } else {
@@ -219,6 +218,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
     setRegeneratingFile(null);
     setPhase({ id: "connecting", harness: activeHarness });
     emitWorking();
+    setWorkingProjectId(projectId);
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -233,6 +233,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
 
       if (!result.ok) {
         clearSignal();
+        setWorkingProjectId(null);
         setPhase({ id: "error", message: result.message });
         return;
       }
@@ -246,8 +247,10 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
       );
       setPhase({ id: "done" });
       clearSignal();
+      setWorkingProjectId(null);
     } catch (err) {
       clearSignal();
+      setWorkingProjectId(null);
       if ((err as Error).name === "AbortError") {
         setPhase({ id: "idle" });
       } else {
@@ -261,6 +264,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
   function stop() {
     abortRef.current?.abort();
     clearSignal();
+    setWorkingProjectId(null);
     setPhase({ id: "idle" });
   }
 
@@ -270,8 +274,8 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
     fetch(`/api/widget-creator/ideate/file?session=${oldSessionId}`, { method: "DELETE" }).catch(() => {});
     const id = crypto.randomUUID();
     try {
-      sessionStorage.setItem(SESSION_KEY, id);
-      sessionStorage.removeItem(ROUNDS_KEY);
+      sessionStorage.setItem(sidKey, id);
+      localStorage.removeItem(roundsKey);
     } catch {}
     setSessionId(id);
     setRounds([]);
@@ -332,10 +336,7 @@ export function IdeateCanvas({ activeHarness, harnessChain, onFinalize, initialP
                         <button
                           type="button"
                           className="wc-ideate-action-btn"
-                          onClick={() => {
-                            setRegeneratingFile(v.file);
-                            setRegenPrompt("");
-                          }}
+                          onClick={() => { setRegeneratingFile(v.file); setRegenPrompt(""); }}
                           disabled={isGenerating}
                           title="regenerate this variation"
                         >

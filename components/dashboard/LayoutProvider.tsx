@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import {
   addWidget,
   getLayout,
@@ -11,6 +11,7 @@ import {
   updateInstance,
   type LayoutState,
 } from "@/lib/layout";
+import { HubDialog } from "@/components/framework/HubDialog";
 
 type LayoutContextValue = {
   layout: LayoutState;
@@ -39,6 +40,10 @@ type LayoutContextValue = {
       canvas is locked and visually disabled until the page reloads */
   isInstalling: boolean;
   setInstalling: (v: boolean) => void;
+  /** keyboard focus: the widget that currently captures keyboard events;
+      set by clicking a widget, cleared by Escape or clicking outside */
+  keyboardFocusWidgetId: string | null;
+  setKeyboardFocusWidgetId: (id: string | null) => void;
 };
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
@@ -49,10 +54,23 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [activePopover, setActivePopover] = useState<string | null>(null);
   const [focusWidgetId, setFocusWidgetId] = useState<string | null>(null);
   const [isInstalling, setInstalling] = useState(false);
+  const [keyboardFocusWidgetId, setKeyboardFocusWidgetId] = useState<string | null>(null);
+
+  // Escape clears keyboard focus (lets widgets release keyboard capture)
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && keyboardFocusWidgetId !== null) {
+        setKeyboardFocusWidgetId(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [keyboardFocusWidgetId]);
 
   // entering edit mode always exits focus mode — can't do both at once
   const startEdit = useCallback(() => {
     setFocusWidgetId(null);
+    setKeyboardFocusWidgetId(null);
     setEditMode(true);
   }, []);
   // leaving edit mode hides every gear/add affordance — drop any open popover
@@ -82,9 +100,12 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         exitFocusMode,
         isInstalling,
         setInstalling,
+        keyboardFocusWidgetId,
+        setKeyboardFocusWidgetId,
       }}
     >
       {children}
+      <HubDialog />
     </LayoutContext.Provider>
   );
 }
