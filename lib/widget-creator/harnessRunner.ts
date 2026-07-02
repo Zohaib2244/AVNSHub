@@ -4,6 +4,9 @@
 // afterward (tsc + registry vs. nothing).
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
+import { unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { lineSignalsLimit, type LimitReason } from "@/lib/widget-creator/limitDetection";
 
@@ -13,6 +16,15 @@ export type SSEWriter = (data: string) => void;
 
 export function sendEvent(write: SSEWriter, event: string, payload: Record<string, unknown>) {
   write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
+function windowsPromptFileArg(sendablePrompt: string) {
+  const promptPath = join(tmpdir(), `avnhub-prompt-${randomUUID()}.md`);
+  writeFileSync(promptPath, sendablePrompt, "utf8");
+  return {
+    promptPath,
+    arg: `Read the UTF-8 prompt file at this exact path and follow the instructions in it exactly: ${promptPath}`,
+  };
 }
 
 // --- Session ID extraction (mirrors lib/nutbot/chatHarness.ts) ---
@@ -76,6 +88,15 @@ export function runHarness(
   newSessionId?: string;
 }> {
   return new Promise((resolve) => {
+    let tempPromptPath: string | undefined;
+
+    const cleanupTempPrompt = () => {
+      if (!tempPromptPath) return;
+      const path = tempPromptPath;
+      tempPromptPath = undefined;
+      try { unlinkSync(path); } catch {}
+    };
+
     const isResume = adapter.id === "claude" && Boolean(opts?.sessionId);
 
     // Resume turn → short instruction only (model already has full context
@@ -115,7 +136,22 @@ export function runHarness(
         ];
       }
     } else if (adapter.promptViaArg) {
-      args = [...adapter.args, sendablePrompt];
+      if (process.platform === "win32") {
+        // Plain NutBot chat's opencode path has the same promptViaArg bug
+        // class; this fix is scoped to Widget Creator generation/ideation.
+        try {
+          const promptFile = windowsPromptFileArg(sendablePrompt);
+          tempPromptPath = promptFile.promptPath;
+          args = [...adapter.args, promptFile.arg];
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          sendEvent(write, "error", { message: `Failed to prepare ${adapter.id} prompt file: ${message}` });
+          resolve({ status: "error" });
+          return;
+        }
+      } else {
+        args = [...adapter.args, sendablePrompt];
+      }
     } else {
       args = [...adapter.args];
     }
@@ -181,6 +217,7 @@ export function runHarness(
     });
 
     child.on("close", (code, killSignal) => {
+      cleanupTempPrompt();
       if (buffer) processLine(buffer);
       // Order matters: an aborted child also exits nonzero — if the exit-code
       // branch ran first, a user pressing stop would be treated as a harness
@@ -198,6 +235,7 @@ export function runHarness(
     });
 
     child.on("error", (err) => {
+      cleanupTempPrompt();
       const hint = (err as NodeJS.ErrnoException).code === "ENOENT"
         ? ` — is the "${adapter.command}" CLI installed and on PATH?`
         : "";
