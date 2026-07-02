@@ -1,0 +1,11 @@
+{
+  "title": "Pomodoro Timer",
+  "iconName": "Timer",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "focusDuration", "label": "focus duration (min)", "type": "number", "default": 25, "min": 1, "max": 120 },
+    { "key": "breakDuration", "label": "break duration (min)", "type": "number", "default": 5, "min": 1, "max": 60 }
+  ]
+}
