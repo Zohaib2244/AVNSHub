@@ -34,10 +34,15 @@ export function RealShell() {
       const styles = getComputedStyle(document.documentElement);
       const fontFamily = styles.getPropertyValue("--font-jetbrains-mono").trim() || "monospace";
 
+      // .term-xterm's font-size is calc(<rem> * --nb-scale), so focus mode's
+      // scale bump flows through to the pty text too
+      const readFontPx = () => Math.round(parseFloat(getComputedStyle(container).fontSize)) || 12;
+
       const term = new Terminal({
         convertEol: false,
         fontFamily: `${fontFamily}, monospace`,
-        fontSize: 12,
+        fontSize: readFontPx(),
+        fontWeight: 500,
         cursorBlink: true,
         theme: {
           background: styles.getPropertyValue("--bg-nested").trim() || "#1a1610",
@@ -101,6 +106,8 @@ export function RealShell() {
       //    hide via display:none → block, and window resize)
       const resizeObs = new ResizeObserver(() => {
         if (container.offsetParent === null) return; // hidden (display:none) — skip
+        const px = readFontPx();
+        if (term.options.fontSize !== px) term.options.fontSize = px;
         safeFit();
         pushResize();
       });

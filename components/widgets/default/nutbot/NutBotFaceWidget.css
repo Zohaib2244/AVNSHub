@@ -20,8 +20,9 @@
 }
 
 .nutbot-mini-ticker {
-  font-size: 0.62rem;
-  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: color-mix(in srgb, var(--text-muted) 52%, var(--text-primary));
   min-height: 1.2em;
   white-space: nowrap;
   overflow: hidden;
@@ -31,8 +32,8 @@
 
 .nutbot-mini-hint {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: 0.6rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--text-muted-dim);
+  color: var(--text-muted);
 }

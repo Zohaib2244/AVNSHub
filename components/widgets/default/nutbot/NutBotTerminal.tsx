@@ -31,7 +31,27 @@ export const LOG_MESSAGES = [
 type MainTab = "log" | "chat" | "shells" | "creator";
 type LogLine = { id: number; text: string };
 
+// "[ok] spotify.auth ... connected" → colored tag + rest (see .term-tag-*)
+function renderLogLine(text: string) {
+  const m = text.match(/^\[(\w+)\]\s?(.*)$/);
+  if (!m) return text;
+  return (
+    <>
+      <span className={`term-tag term-tag-${m[1]}`}>[{m[1]}]</span> {m[2]}
+    </>
+  );
+}
+
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
+const TAB_ORDER: MainTab[] = ["log", "chat", "shells", "creator"];
+
+// direction-aware crossfade+slide — tabs to the right slide in from the
+// right (and push the outgoing tab left), tabs to the left do the reverse
+const TAB_PANEL_VARIANTS = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 10 }),
+  center: { opacity: 1, x: 0 },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -10 }),
+};
 
 function sanitizeTab(raw: string | null): MainTab {
   if (raw === "log" || raw === "chat" || raw === "shells" || raw === "creator") return raw;
@@ -101,6 +121,17 @@ export function NutBotTerminal() {
   const isCreator  = activeTab === "creator";
   const isChat     = activeTab === "chat";
 
+  // track which direction the active tab moved so the panel slides the
+  // right way (mutated during render — read-only derived value, no re-render needed)
+  const tabDirRef = useRef(0);
+  const prevTabRef = useRef<MainTab>(activeTab);
+  if (prevTabRef.current !== activeTab) {
+    const prevIdx = TAB_ORDER.indexOf(prevTabRef.current);
+    const nextIdx = TAB_ORDER.indexOf(activeTab);
+    tabDirRef.current = nextIdx > prevIdx ? 1 : -1;
+    prevTabRef.current = activeTab;
+  }
+
   return (
     <div className="nutbot-terminal">
       {/* ── single combined row: title + tabs + controls ── */}
@@ -161,38 +192,54 @@ export function NutBotTerminal() {
         ].filter(Boolean).join(" ")}
         ref={bodyRef}
       >
-        {activeTab === "log" && (
-          <AnimatePresence initial={false}>
-            {logLines.map((line) => (
-              <motion.div
-                key={line.id}
-                className="term-line"
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                {line.text}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
+        <AnimatePresence mode="wait" initial={false} custom={tabDirRef.current}>
+          <motion.div
+            key={activeTab}
+            className="term-tab-panel"
+            custom={tabDirRef.current}
+            variants={TAB_PANEL_VARIANTS}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {activeTab === "log" && (
+              <>
+                <AnimatePresence initial={false}>
+                  {logLines.map((line) => (
+                    <motion.div
+                      key={line.id}
+                      className="term-line"
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {renderLogLine(line.text)}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                <span className="term-caret" aria-hidden="true" />
+              </>
+            )}
 
-        {activeTab === "chat" && <NutBotChat />}
+            {activeTab === "chat" && <NutBotChat />}
 
-        {activeTab === "shells" && <ShellsScreen />}
+            {activeTab === "shells" && <ShellsScreen />}
 
-        {activeTab === "creator" && (
-          prefs.creatorEnabled ? (
-            <WidgetCreatorPanel />
-          ) : (
-            <div className="term-disabled">
-              <span>Widget Creator is turned off</span>
-              <button type="button" className="term-disabled-btn" onClick={() => setPrefs({ creatorEnabled: true })}>
-                turn on
-              </button>
-            </div>
-          )
-        )}
+            {activeTab === "creator" && (
+              prefs.creatorEnabled ? (
+                <WidgetCreatorPanel />
+              ) : (
+                <div className="term-disabled">
+                  <span>Widget Creator is turned off</span>
+                  <button type="button" className="term-disabled-btn" onClick={() => setPrefs({ creatorEnabled: true })}>
+                    turn on
+                  </button>
+                </div>
+              )
+            )}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );

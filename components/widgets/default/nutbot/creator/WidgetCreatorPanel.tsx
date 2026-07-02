@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { getPrefs, getServerPrefs, subscribePrefs } from "@/lib/prefs";
 import {
@@ -22,6 +23,16 @@ export type PanelMode = "create" | "edit" | "ideate" | "plan";
 type View = "list" | "picker" | "workspace";
 
 const REGISTRY_KEYS = Object.keys(customRegistryRaw as Record<string, unknown>);
+
+// drill-in/out navigation — deeper views (picker, workspace) slide in from
+// the right over the outgoing view; returning to the list reverses it
+const VIEW_ORDER: View[] = ["list", "picker", "workspace"];
+
+const VIEW_VARIANTS = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 28, scale: dir === 0 ? 1 : 0.98 }),
+  center: { opacity: 1, x: 0, scale: 1 },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -28, scale: dir === 0 ? 1 : 0.98 }),
+};
 
 export function WidgetCreatorPanel() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
@@ -68,6 +79,16 @@ export function WidgetCreatorPanel() {
   const allProjects = [...correctedProjects, ...virtualCreated];
   const activeProject = allProjects.find((p) => p.id === activeProjectId) ?? null;
 
+  // track drill direction for the transition (mutated during render — no re-render needed)
+  const viewDirRef = useRef(0);
+  const prevViewRef = useRef<View>(view);
+  if (prevViewRef.current !== view) {
+    const prevIdx = VIEW_ORDER.indexOf(prevViewRef.current);
+    const nextIdx = VIEW_ORDER.indexOf(view);
+    viewDirRef.current = nextIdx > prevIdx ? 1 : -1;
+    prevViewRef.current = view;
+  }
+
   function handleNewWidget() {
     setView("picker");
   }
@@ -92,29 +113,42 @@ export function WidgetCreatorPanel() {
 
   return (
     <div className="wc-panel">
-      {view === "list" && (
-        <CreatorProjectList
-          onNewWidget={handleNewWidget}
-          onOpenProject={handleOpenProject}
-        />
-      )}
+      <AnimatePresence mode="wait" initial={false} custom={viewDirRef.current}>
+        <motion.div
+          key={view}
+          className="wc-view"
+          custom={viewDirRef.current}
+          variants={VIEW_VARIANTS}
+          initial="enter"
+          animate="center"
+          exit="exit"
+          transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+        >
+          {view === "list" && (
+            <CreatorProjectList
+              onNewWidget={handleNewWidget}
+              onOpenProject={handleOpenProject}
+            />
+          )}
 
-      {view === "picker" && (
-        <CreatorEntryPicker
-          onPick={handlePick}
-          onBack={() => setView("list")}
-        />
-      )}
+          {view === "picker" && (
+            <CreatorEntryPicker
+              onPick={handlePick}
+              onBack={() => setView("list")}
+            />
+          )}
 
-      {view === "workspace" && activeProject && (
-        <CreatorWorkspace
-          key={activeProject.id}
-          project={activeProject}
-          onBack={handleBack}
-          activeHarness={prefs.activeHarness}
-          harnessChain={prefs.harnessChain}
-        />
-      )}
+          {view === "workspace" && activeProject && (
+            <CreatorWorkspace
+              key={activeProject.id}
+              project={activeProject}
+              onBack={handleBack}
+              activeHarness={prefs.activeHarness}
+              harnessChain={prefs.harnessChain}
+            />
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }

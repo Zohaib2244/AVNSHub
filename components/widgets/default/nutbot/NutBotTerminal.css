@@ -12,6 +12,23 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
+  /* every font-size inside the terminal (log/chat/shells/creator) is written
+     as calc(<rem> * var(--nb-scale)) so focus mode can scale all type at once */
+  --nb-scale: 1;
+  /* readable secondary text: --text-muted pulled toward --text-primary.
+     Several palettes (raspberry, plum, …) have a muted tone too close to the
+     card background for the terminal's dense small type — every "muted" use
+     inside NutBot goes through this instead */
+  --nb-muted: color-mix(in srgb, var(--text-muted) 52%, var(--text-primary));
+  /* mono content runs at weight 500 for legibility; DotGothic16 only ships
+     400 — block synthetic bold so the pixel-font labels don't render smeared */
+  font-synthesis: none;
+}
+
+/* focus mode (the ⤢ button) hands NutBot the whole frame — scale the content
+   up with it instead of stretching the same tiny text across a huge card */
+.slot-frame[data-focus-mode="true"] .nutbot-terminal {
+  --nb-scale: 1.3;
 }
 
 .nutbot-terminal > .term-body {
@@ -33,14 +50,14 @@
 
 .term-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: calc(0.62rem * var(--nb-scale, 1));
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   padding: 0 10px 0 2px;
   white-space: nowrap;
   flex-shrink: 0;
-  opacity: 0.65;
+  opacity: 0.9;
   border-right: 1px solid var(--border);
   align-self: stretch;
   display: flex;
@@ -71,14 +88,14 @@
   align-items: center;
   justify-content: center;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.55rem;
+  font-size: calc(0.64rem * var(--nb-scale, 1));
   letter-spacing: 0.11em;
   text-transform: uppercase;
   padding: 0 11px;
-  height: 34px;
+  height: calc(34px * var(--nb-scale, 1));
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s;
   white-space: nowrap;
@@ -114,7 +131,7 @@
 
 .term-tab-icon {
   opacity: 0.65;
-  font-size: 0.62rem;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
 }
 
 .term-tab.active .term-tab-icon {
@@ -126,7 +143,10 @@
 .term-body {
   height: 112px;
   overflow-y: auto;
-  font-size: 0.72rem;
+  font-size: calc(0.8rem * var(--nb-scale, 1));
+  /* JetBrains Mono variable — 500 reads much better at these sizes; DotGothic
+     labels are protected by font-synthesis: none on .nutbot-terminal above */
+  font-weight: 500;
   line-height: 1.55;
   color: var(--text-primary);
   background: var(--bg-nested);
@@ -141,6 +161,22 @@
   padding: 0;
 }
 
+/* ── tab panel — the animated wrapper around each tab's content ─── */
+
+.term-tab-panel {
+  min-height: 0;
+}
+
+.term-body-shells .term-tab-panel,
+.term-body-chat .term-tab-panel,
+.term-body-creator .term-tab-panel {
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .term-body.term-body-real {
   height: 260px;
   overflow: hidden;
@@ -150,11 +186,36 @@
 .term-xterm {
   width: 100%;
   height: 100%;
+  /* not styling DOM text — RealShell reads this computed font-size and feeds
+     it to xterm's fontSize option, so the pty scales with --nb-scale too */
+  font-size: calc(0.8rem * var(--nb-scale, 1));
 }
 
 .term-line {
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* [ok] / [info] / [warn] prefixes on the log tab */
+.term-tag       { font-weight: 600; }
+.term-tag-ok    { color: var(--accent-cyan); }
+.term-tag-info  { color: var(--accent-orange); }
+.term-tag-warn,
+.term-tag-error { color: var(--status-down, #c0392b); }
+
+/* blinking block caret at the end of the log */
+.term-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  vertical-align: text-bottom;
+  background: var(--accent-orange);
+  animation: term-caret-blink 0.9s step-end infinite;
+}
+
+@keyframes term-caret-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
 }
 
 .term-disabled {
@@ -164,13 +225,13 @@
   gap: 7px;
   height: 100%;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.65rem;
-  color: var(--text-muted);
+  font-size: calc(0.74rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
 }
 
 .term-disabled-btn {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: calc(0.62rem * var(--nb-scale, 1));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 7px;
@@ -186,7 +247,7 @@
   color: var(--bg-card);
 }
 
-.term-output { color: var(--text-muted); }
+.term-output { color: var(--nb-muted, var(--text-muted)); }
 
 .term-prompt {
   display: flex;
@@ -206,7 +267,7 @@
   border: none;
   outline: none;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: calc(0.78rem * var(--nb-scale, 1));
   color: var(--text-primary);
   caret-color: var(--accent-orange);
 }
@@ -217,12 +278,12 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  width: 22px;
-  height: 22px;
+  width: calc(22px * var(--nb-scale, 1));
+  height: calc(22px * var(--nb-scale, 1));
   border-radius: 5px;
   border: 1px solid var(--border);
   background: var(--bg-nested);
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
 }
@@ -246,7 +307,7 @@
 }
 
 .shells-sidebar {
-  width: 140px;
+  width: calc(140px * var(--nb-scale, 1));
   flex-shrink: 0;
   border-right: 1px solid var(--border);
   display: flex;
@@ -265,10 +326,10 @@
 
 .shells-sidebar-label {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.5rem;
+  font-size: calc(0.6rem * var(--nb-scale, 1));
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
 }
 
 .shells-new-btn {
@@ -279,9 +340,9 @@
   border-radius: 4px;
   border: 1px solid var(--border);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.48rem;
+  font-size: calc(0.58rem * var(--nb-scale, 1));
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
@@ -328,7 +389,7 @@
 .shells-row-name {
   flex: 1;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.6rem;
+  font-size: calc(0.68rem * var(--nb-scale, 1));
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
@@ -344,7 +405,7 @@
   border-radius: 3px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   opacity: 0;
   transition: opacity 0.12s, color 0.12s;
@@ -383,13 +444,13 @@
   align-items: center;
   gap: 5px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.58rem;
+  font-size: calc(0.66rem * var(--nb-scale, 1));
   letter-spacing: 0.04em;
   padding: 3px 8px;
   border-radius: 5px;
   border: 1px solid var(--border);
   background: var(--bg-nested);
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -413,14 +474,14 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
-  background: var(--text-muted);
+  background: var(--nb-muted, var(--text-muted));
 }
 
 .nm-dot-orange  { background: var(--accent-orange); }
 .nm-dot-cyan    { background: var(--accent-cyan); }
 .nm-dot-purple  { background: #8b5cf6; }
 .nm-dot-green   { background: #4caf74; }
-.nm-dot-muted   { background: var(--text-muted); }
+.nm-dot-muted   { background: var(--nb-muted, var(--text-muted)); }
 
 .nm-dropdown {
   position: absolute;
@@ -438,10 +499,10 @@
 
 .nm-group-label {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.46rem;
+  font-size: calc(0.56rem * var(--nb-scale, 1));
   letter-spacing: 0.13em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   padding: 5px 10px 3px;
   opacity: 0.7;
 }
@@ -490,30 +551,30 @@
 
 .nm-opt-name {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.62rem;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
   line-height: 1.2;
 }
 
 .nm-opt-desc {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.5rem;
-  color: var(--text-muted);
+  font-size: calc(0.6rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
   line-height: 1.2;
 }
 
 .nm-opt.active .nm-opt-desc {
-  color: color-mix(in srgb, var(--accent-orange) 60%, var(--text-muted));
+  color: color-mix(in srgb, var(--accent-orange) 60%, var(--nb-muted, var(--text-muted)));
 }
 
 .nm-badge {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.45rem;
+  font-size: calc(0.56rem * var(--nb-scale, 1));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 1px 4px;
   border-radius: 3px;
   background: var(--bg-nested);
   border: 1px solid var(--border);
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   flex-shrink: 0;
 }

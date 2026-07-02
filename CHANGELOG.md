@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0-alpha.2] — 2026-07-02
+
+### Changed
+- **NutBot terminal readability pass.** Every screen (log / chat / shells / creator) gets bigger, bolder type: font sizes bumped across the board (the smallest chips go from ~7px to ~9px), mono content runs at JetBrains Mono weight 500 (with `font-synthesis: none` so DotGothic16 labels don't get smeared synthetic bold), and all secondary text uses a new `--nb-muted` color — `--text-muted` pulled 48% toward `--text-primary` — so it stays legible on palettes like raspberry/plum where the stock muted tone merges with the card background.
+- **Focus mode now scales NutBot's content.** All terminal font sizes and key control dimensions are written as `calc(<base> * var(--nb-scale))`; the ⤢ focus mode sets `--nb-scale: 1.3`, so text, tabs, buttons, the shells sidebar, ideate preview cards — and the real pty (xterm reads its font size from `.term-xterm`'s computed CSS and refits on resize) — all grow with the widget instead of stretching tiny text across the full frame.
+- **NutBot motion polish.** Log-tab `[ok]`/`[info]` prefixes are color-coded with a blinking block caret at the end; creator project rows get a staggered entrance and a hover slide; the in-progress pipeline chip's dot pulses; chat/creator messages fade-slide in on arrival.
+- **NutBot navigation transitions.** Three distinct, direction-aware transitions replace instant snaps: the main terminal tabs (log/chat/shells/creator) crossfade+slide horizontally; the Widget Creator's project list ↔ picker/workspace navigation gets a deeper horizontal drill-in/out slide; and switching Plan/Ideate/Build pipeline stages within a project gets its own vertical fade-slide, so each navigation depth reads as visually distinct.
+
 ## [2.3.0-alpha.1] — 2026-07-02
 
 ### Added
