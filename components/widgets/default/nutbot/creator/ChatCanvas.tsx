@@ -10,9 +10,11 @@ import {
   unplaceWidgetTemporarily,
   restorePlacementSnapshot,
   getPlacementSnapshot,
+  getRegionsThatFitWidget,
   type PlacementSnapshot,
 } from "@/lib/slotLayout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { getManifest } from "@/config/widgets";
 import { isValidSlug } from "@/lib/widget-creator/slug";
 import {
   updateProject,
@@ -41,7 +43,8 @@ type Message =
   | { role: "tsc_errors"; errors: string[] }
   | { role: "audit"; files: string[] }
   | { role: "ok"; text: string }
-  | { role: "error"; text: string };
+  | { role: "error"; text: string }
+  | { role: "action"; text: string; action: "reload" | "open-widget-manager" | "sync-skills" };
 
 type DoneRecord = { slug: string; registered: boolean };
 
@@ -127,16 +130,53 @@ export function ChatCanvas({
   const [adding, setAdding] = useState(false);
   const [editHidden, setEditHidden] = useState(false);
   const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
-  const { setInstalling } = useLayout();
+  const { setInstalling, setHubCoreTab } = useLayout();
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
+  const hasDesignReference = Boolean(settings.designReferenceHtml);
 
   function fail(message: string) {
     clearSignal();
     setWorkingProjectId(null);
     setPhase({ id: "error", message });
     setMessages((prev) => [...prev, { role: "error", text: message }]);
+  }
+
+  function placementFailureMessage(slug: string): Message {
+    const manifest = getManifest(slug);
+    if (!manifest) {
+      return {
+        role: "action",
+        action: "reload",
+        text: `"${slug}" was installed, but it is not in the loaded registry yet.`,
+      };
+    }
+
+    if (getRegionsThatFitWidget(slug).length === 0) {
+      return {
+        role: "action",
+        action: "open-widget-manager",
+        text: `"${manifest.title}" is installed, but no canvas region has room for it.`,
+      };
+    }
+
+    return {
+      role: "error",
+      text: `couldn't place "${slug}" automatically. Try add to layout again, or reload the page if the registry just changed.`,
+    };
+  }
+
+  function reportPlacementFailure(slug: string) {
+    setMessages((prev) => [...prev, placementFailureMessage(slug)]);
+  }
+
+  function runMessageAction(action: "reload" | "open-widget-manager" | "sync-skills") {
+    if (action === "reload") {
+      window.location.reload();
+    } else if (action === "open-widget-manager") {
+      setHubCoreTab("widgets");
+    }
   }
 
   // if this canvas is unmounted mid-generation (e.g. canvas switch), abort and clear the lock
@@ -184,7 +224,8 @@ export function ChatCanvas({
 
   async function generate() {
     const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
-    if (!prompt.trim() || inFlight) return;
+    const promptText = prompt.trim();
+    if ((!promptText && !hasDesignReference) || inFlight) return;
 
     const validationError = validateSettings(settings);
     if (validationError) {
@@ -192,7 +233,7 @@ export function ChatCanvas({
       return;
     }
 
-    const userText = prompt.trim();
+    const userText = promptText || "(build from the finalized design reference)";
     setPrompt("");
 
     const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
@@ -233,7 +274,7 @@ export function ChatCanvas({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings,
-          prompt: userText,
+          prompt: promptText,
           harness: activeHarness,
           harnessChain,
           sessionId: sessionForRequest ?? undefined,
@@ -402,7 +443,6 @@ export function ChatCanvas({
     setDoneWidgetId(null);
     setAdded(false);
     setPendingRegistration(false);
-    onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
     updateProject(projectId, { pendingInstall: undefined, buildSession: undefined });
     try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
     removeProjectBlob(MESSAGES_KEY);
@@ -444,13 +484,7 @@ export function ChatCanvas({
         }
       } else {
         setAdding(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "error",
-            text: `"${slug}" was installed but couldn't be auto-placed — every region may be full. Try the Widget Manager.`,
-          },
-        ]);
+        reportPlacementFailure(slug);
       }
     })();
     return () => { cancelled = true; };
@@ -506,6 +540,7 @@ export function ChatCanvas({
     setInstalling(false);
     setAdding(false);
     if (ok) setAdded(true);
+    else reportPlacementFailure(slug);
   }
 
   async function handleAddToLayout() {
@@ -517,13 +552,7 @@ export function ChatCanvas({
     if (ok) {
       setAdded(true);
     } else {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "error",
-          text: `couldn't place "${slug}" on the canvas — every region may be full. Try the Widget Manager, or reload the page.`,
-        },
-      ]);
+      reportPlacementFailure(slug);
     }
   }
 
@@ -640,6 +669,21 @@ export function ChatCanvas({
               </div>
             );
           }
+          if (msg.role === "action") {
+            const label = msg.action === "reload"
+              ? "reload"
+              : msg.action === "open-widget-manager"
+                ? "open widget manager"
+                : "regenerate skills";
+            return (
+              <div key={i} className="wc-msg wc-msg-action">
+                <span>{msg.text}</span>
+                <button type="button" className="wc-msg-action-btn" onClick={() => runMessageAction(msg.action)}>
+                  {label}
+                </button>
+              </div>
+            );
+          }
           return null;
         })}
 
@@ -692,7 +736,13 @@ export function ChatCanvas({
         )}
         <textarea
           className="wc-chat-input"
-          placeholder={isGenerating ? "generating..." : "describe your widget... (shift+enter for newline)"}
+          placeholder={
+            isGenerating
+              ? "generating..."
+              : hasDesignReference
+                ? "optional notes — or just hit send to build the finalized mockup"
+                : "describe your widget... (shift+enter for newline)"
+          }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -709,7 +759,7 @@ export function ChatCanvas({
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
           onClick={isGenerating ? stop : generate}
           aria-label={isGenerating ? "stop" : "generate"}
-          disabled={!isGenerating && !prompt.trim()}
+          disabled={!isGenerating && !prompt.trim() && !hasDesignReference}
         >
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>

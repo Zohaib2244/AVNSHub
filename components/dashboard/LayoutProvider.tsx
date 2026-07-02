@@ -1,6 +1,16 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction,
+} from "react";
 import {
   addWidget,
   getLayout,
@@ -12,6 +22,8 @@ import {
   type LayoutState,
 } from "@/lib/layout";
 import { HubDialog } from "@/components/framework/HubDialog";
+
+export type HubCoreTab = "settings" | "widgets";
 
 type LayoutContextValue = {
   layout: LayoutState;
@@ -44,6 +56,9 @@ type LayoutContextValue = {
       set by clicking a widget, cleared by Escape or clicking outside */
   keyboardFocusWidgetId: string | null;
   setKeyboardFocusWidgetId: (id: string | null) => void;
+  /** Allows widgets/tools to open Hub Core to a specific tab. */
+  hubCoreTab: HubCoreTab | null;
+  setHubCoreTab: Dispatch<SetStateAction<HubCoreTab | null>>;
 };
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
@@ -55,6 +70,7 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [focusWidgetId, setFocusWidgetId] = useState<string | null>(null);
   const [isInstalling, setInstalling] = useState(false);
   const [keyboardFocusWidgetId, setKeyboardFocusWidgetId] = useState<string | null>(null);
+  const [hubCoreTab, setHubCoreTab] = useState<HubCoreTab | null>(null);
 
   // Escape clears keyboard focus (lets widgets release keyboard capture)
   useEffect(() => {
@@ -102,6 +118,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         setInstalling,
         keyboardFocusWidgetId,
         setKeyboardFocusWidgetId,
+        hubCoreTab,
+        setHubCoreTab,
       }}
     >
       {children}

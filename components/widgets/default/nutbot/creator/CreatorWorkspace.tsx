@@ -41,9 +41,6 @@ const PIB_VARIANTS = {
   exit: (dir: number) => ({ opacity: 0, y: dir * -10 }),
 };
 
-const FINALIZE_PROMPT =
-  "Build this widget to match the finalized mockup exactly — recreate the layout, spacing, colors, and animations using the framework's real CSS variables and per-size (useWidget().size) branching instead of the mockup's static hardcoded boxes.";
-
 type Props = {
   project: WidgetProject;
   onBack: () => void;
@@ -93,10 +90,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   const [ideateInitialPrompt, setIdeateInitialPrompt] = useState<string | undefined>(undefined);
   const [ideateNonce, setIdeateNonce] = useState(0);
 
-  // ideate → build bridge
-  const [buildInitialPrompt, setBuildInitialPrompt] = useState<string | undefined>(undefined);
-  const [finalizeNonce, setFinalizeNonce] = useState(0);
-
   function handlePlanBuild(brief: WidgetBrief) {
     const patch: Partial<GenerateSettings> = {
       name: brief.title,
@@ -140,8 +133,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
         editSlug: undefined,
       },
     });
-    setBuildInitialPrompt(FINALIZE_PROMPT);
-    setFinalizeNonce((n) => n + 1);
   }
 
   function patchBuildSettings(patch: Partial<GenerateSettings>) {
@@ -364,13 +355,12 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
               {mode === "build" && (
                 <ChatCanvas
-                  key={finalizeNonce > 0 ? `build-${project.id}-${finalizeNonce}` : `build-${project.id}`}
+                  key={`build-${project.id}`}
                   projectId={project.id}
                   settings={effectiveBuildSettings}
                   onSettingsChange={patchBuildSettings}
                   activeHarness={activeHarness}
                   harnessChain={harnessChain}
-                  initialPrompt={finalizeNonce > 0 ? buildInitialPrompt : undefined}
                   brief={project.brief}
                   entryMode={project.entryMode}
                   buildSession={project.buildSession}

@@ -22,16 +22,23 @@ export type { WidgetBrief };
 type Message =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
+  | { role: "brief"; brief: WidgetBrief }
   | { role: "error"; text: string };
 
+const BRIEF_RE = /```widget-brief\s*\n([\s\S]*?)```/;
+
 function extractBrief(text: string): WidgetBrief | null {
-  const match = text.match(/```widget-brief\s*\n([\s\S]*?)```/);
+  const match = text.match(BRIEF_RE);
   if (!match) return null;
   try { return JSON.parse(match[1].trim()) as WidgetBrief; } catch { return null; }
 }
 
+function hasBriefBlock(text: string): boolean {
+  return BRIEF_RE.test(text);
+}
+
 function stripBrief(text: string): string {
-  return text.replace(/```widget-brief[\s\S]*?```/g, "").trim();
+  return extractBrief(text) ? text.replace(/```widget-brief[\s\S]*?```/g, "").trim() : text;
 }
 
 function historyFromMessages(messages: Message[]): Array<{ role: "user" | "assistant"; text: string }> {
@@ -40,6 +47,145 @@ function historyFromMessages(messages: Message[]): Array<{ role: "user" | "assis
       ? [{ role: msg.role, text: msg.text }]
       : []
   ));
+}
+
+function briefSizeText(brief: WidgetBrief): string {
+  return (brief.sizes ?? []).join(", ");
+}
+
+function parseSizes(value: string): string[] | undefined {
+  const sizes = value
+    .split(/[,\s]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter((s) => s === "S" || s === "M" || s === "L");
+  return sizes.length ? Array.from(new Set(sizes)) : undefined;
+}
+
+function draftFromBrief(brief: WidgetBrief) {
+  return {
+    title: brief.title,
+    slug: brief.slug,
+    icon: brief.icon ?? "",
+    sizes: briefSizeText(brief),
+    concept: brief.concept,
+    sContent: brief.sContent ?? "",
+    mContent: brief.mContent ?? "",
+    lContent: brief.lContent ?? "",
+    dataShape: brief.dataShape ?? "",
+  };
+}
+
+function BriefCard({
+  brief,
+  onBuild,
+  onVisualize,
+  onSave,
+}: {
+  brief: WidgetBrief;
+  onBuild: (brief: WidgetBrief) => void;
+  onVisualize: (brief: WidgetBrief) => void;
+  onSave: (brief: WidgetBrief) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(() => draftFromBrief(brief));
+
+  function save() {
+    const next: WidgetBrief = {
+      ...brief,
+      title: draft.title.trim() || brief.title,
+      slug: draft.slug.trim() || brief.slug,
+      icon: draft.icon.trim() || undefined,
+      sizes: parseSizes(draft.sizes),
+      concept: draft.concept.trim() || brief.concept,
+      sContent: draft.sContent.trim() || undefined,
+      mContent: draft.mContent.trim() || undefined,
+      lContent: draft.lContent.trim() || undefined,
+      dataShape: draft.dataShape.trim() || undefined,
+    };
+    onSave(next);
+    setDraft(draftFromBrief(next));
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="wc-brief-card wc-brief-card-editing">
+        <div className="wc-brief-edit-grid">
+          <input className="wc-input" value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} placeholder="title" />
+          <input className="wc-input" value={draft.slug} onChange={(e) => setDraft((d) => ({ ...d, slug: e.target.value }))} placeholder="slug" />
+          <input className="wc-input" value={draft.icon} onChange={(e) => setDraft((d) => ({ ...d, icon: e.target.value }))} placeholder="icon" />
+          <input className="wc-input" value={draft.sizes} onChange={(e) => setDraft((d) => ({ ...d, sizes: e.target.value }))} placeholder="S, M, L" />
+        </div>
+        <textarea className="wc-textarea" value={draft.concept} onChange={(e) => setDraft((d) => ({ ...d, concept: e.target.value }))} rows={2} placeholder="concept" />
+        <div className="wc-brief-edit-grid">
+          <textarea className="wc-textarea" value={draft.sContent} onChange={(e) => setDraft((d) => ({ ...d, sContent: e.target.value }))} rows={2} placeholder="S content" />
+          <textarea className="wc-textarea" value={draft.mContent} onChange={(e) => setDraft((d) => ({ ...d, mContent: e.target.value }))} rows={2} placeholder="M content" />
+          <textarea className="wc-textarea" value={draft.lContent} onChange={(e) => setDraft((d) => ({ ...d, lContent: e.target.value }))} rows={2} placeholder="L content" />
+          <textarea className="wc-textarea" value={draft.dataShape} onChange={(e) => setDraft((d) => ({ ...d, dataShape: e.target.value }))} rows={2} placeholder="data shape" />
+        </div>
+        <div className="wc-brief-actions">
+          <button type="button" className="wc-brief-action-btn wc-brief-build-btn" onClick={save}>save</button>
+          <button
+            type="button"
+            className="wc-brief-action-btn"
+            onClick={() => {
+              setDraft(draftFromBrief(brief));
+              setEditing(false);
+            }}
+          >
+            cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="wc-brief-card">
+      <div className="wc-brief-header">
+        <span className="wc-brief-title">{brief.title}</span>
+        <div className="wc-brief-meta">
+          {(brief.sizes ?? []).map((s) => (
+            <span key={s} className="wc-brief-tag">{s}</span>
+          ))}
+          {brief.slug && <span className="wc-brief-tag">#{brief.slug}</span>}
+        </div>
+      </div>
+      {brief.concept && (
+        <p className="wc-brief-concept">{brief.concept}</p>
+      )}
+      <div className="wc-brief-actions">
+        <button
+          type="button"
+          className="wc-brief-action-btn wc-brief-build-btn"
+          onClick={() => onBuild(brief)}
+          title="pre-fill build settings and switch to build mode"
+        >
+          <Hammer size={10} strokeWidth={2} />
+          build this
+        </button>
+        <button
+          type="button"
+          className="wc-brief-action-btn wc-brief-viz-btn"
+          onClick={() => onVisualize(brief)}
+          title="generate HTML/CSS mockups from this concept"
+        >
+          <Wand2 size={10} strokeWidth={2} />
+          visualize first
+        </button>
+        <button
+          type="button"
+          className="wc-brief-action-btn"
+          onClick={() => {
+            setDraft(draftFromBrief(brief));
+            setEditing(true);
+          }}
+        >
+          edit
+        </button>
+      </div>
+    </div>
+  );
 }
 
 type Props = {
@@ -59,7 +205,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
   const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(msgsKey) ?? []);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [activeBrief, setActiveBrief] = useState<WidgetBrief | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -93,7 +238,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
   function clearChat() {
     if (isLoading) return;
     setMessages([]);
-    setActiveBrief(null);
     updateProject(projectId, { planSessionId: undefined });
     removeProjectBlob(msgsKey);
   }
@@ -102,7 +246,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
     if (!prompt.trim() || isLoading) return;
     const userText = prompt.trim();
     setPrompt("");
-    setActiveBrief(null);
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setIsLoading(true);
     emitWorking();
@@ -185,8 +328,10 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
             });
             const brief = extractBrief(accText);
             if (brief) {
-              setActiveBrief(brief);
+              setMessages((prev) => [...prev, { role: "brief", brief }]);
               updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+            } else if (hasBriefBlock(accText)) {
+              setMessages((prev) => [...prev, { role: "error", text: "couldn't parse the widget brief JSON — the raw block is left above" }]);
             }
           } else if (frame.type === "error") {
             setMessages((prev) => [...prev, { role: "error", text: frame.data as string }]);
@@ -260,6 +405,29 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
             );
           }
 
+          if (msg.role === "brief") {
+            return (
+              <BriefCard
+                key={i}
+                brief={msg.brief}
+                onBuild={(brief) => {
+                  updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+                  onBuild(brief);
+                }}
+                onVisualize={(brief) => {
+                  updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+                  onVisualize(brief);
+                }}
+                onSave={(brief) => {
+                  setMessages((prev) => prev.map((entry, idx) => (
+                    idx === i && entry.role === "brief" ? { role: "brief", brief } : entry
+                  )));
+                  updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+                }}
+              />
+            );
+          }
+
           if (msg.role === "error") {
             return (
               <div key={i} className="wc-msg wc-msg-error">
@@ -270,43 +438,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
 
           return null;
         })}
-
-        {activeBrief && !isLoading && (
-          <div className="wc-brief-card">
-            <div className="wc-brief-header">
-              <span className="wc-brief-title">{activeBrief.title}</span>
-              <div className="wc-brief-meta">
-                {(activeBrief.sizes ?? []).map((s) => (
-                  <span key={s} className="wc-brief-tag">{s}</span>
-                ))}
-                {activeBrief.slug && <span className="wc-brief-tag">#{activeBrief.slug}</span>}
-              </div>
-            </div>
-            {activeBrief.concept && (
-              <p className="wc-brief-concept">{activeBrief.concept}</p>
-            )}
-            <div className="wc-brief-actions">
-              <button
-                type="button"
-                className="wc-brief-action-btn wc-brief-build-btn"
-                onClick={() => onBuild(activeBrief)}
-                title="pre-fill build settings and switch to build mode"
-              >
-                <Hammer size={10} strokeWidth={2} />
-                build this
-              </button>
-              <button
-                type="button"
-                className="wc-brief-action-btn wc-brief-viz-btn"
-                onClick={() => onVisualize(activeBrief)}
-                title="generate HTML/CSS mockups from this concept"
-              >
-                <Wand2 size={10} strokeWidth={2} />
-                visualize first
-              </button>
-            </div>
-          </div>
-        )}
 
         {isLoading && (
           <div className="wc-generating-hint">

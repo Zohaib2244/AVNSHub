@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
@@ -74,10 +74,12 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
   const [slug, setSlug] = useState(id);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const [prevId, setPrevId] = useState(id);
 
   // re-derive the form whenever the target widget changes (picker switch)
-  useEffect(() => {
+  if (id !== prevId) {
     const next = RAW_REGISTRY[id];
+    setPrevId(id);
     setTitle(next?.title ?? "");
     setIconName(next?.iconName ?? "");
     setSizes(next?.sizes ?? ["S", "M", "L"]);
@@ -87,7 +89,7 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
     setSlug(id);
     setStatus("idle");
     setError("");
-  }, [id]);
+  }
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -237,6 +239,12 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
 
 export function SettingsPane({ settings, onChange, mode, onModeChange, showModeToggle = true, disabled = false }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
+  const [slugTouched, setSlugTouched] = useState(() => Boolean(settings.slug) && settings.slug !== slugify(settings.name ?? ""));
+  const [prevIdentity, setPrevIdentity] = useState({ name: settings.name, slug: settings.slug });
+  if (settings.name !== prevIdentity.name || settings.slug !== prevIdentity.slug) {
+    setPrevIdentity({ name: settings.name, slug: settings.slug });
+    setSlugTouched(Boolean(settings.slug) && settings.slug !== slugify(settings.name ?? ""));
+  }
   const isCreateMode = mode === "create";
   const isEditMode = mode === "edit";
   const isIdeateMode = mode === "ideate";
@@ -352,7 +360,7 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
                 value={settings.name ?? ""}
                 onChange={(e) => {
                   const name = e.target.value;
-                  onChange({ name, slug: slugify(name) });
+                  onChange(slugTouched ? { name } : { name, slug: slugify(name) });
                 }}
               />
             </div>
@@ -376,7 +384,10 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
               className="wc-input"
               placeholder="auto-derived"
               value={settings.slug ?? ""}
-              onChange={(e) => onChange({ slug: e.target.value })}
+              onChange={(e) => {
+                setSlugTouched(true);
+                onChange({ slug: e.target.value });
+              }}
             />
           </div>
         </Section>

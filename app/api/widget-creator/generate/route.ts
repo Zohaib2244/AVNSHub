@@ -260,6 +260,12 @@ export async function POST(req: Request) {
     }
   }
 
+  const effectivePrompt = userPrompt.trim()
+    || (settings.designReferenceHtml ? "Build the widget from the finalized design reference." : "");
+  if (!effectivePrompt) {
+    return sseError("describe the widget to build, or attach a finalized design reference first");
+  }
+
   // Guard against a desynced client sending a "create" (no editSlug) for a
   // slug that already exists — without this, a stale `settings.slug` left
   // over from a prior edit session would look like a brand-new widget to the
@@ -278,7 +284,7 @@ export async function POST(req: Request) {
     return sseError(`slug "${settings.slug}" collides with an existing app/api route — pick another slug`);
   }
 
-  const corePrompt = buildCorePrompt(settings, userPrompt);
+  const corePrompt = buildCorePrompt(settings, effectivePrompt);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
@@ -339,7 +345,7 @@ export async function POST(req: Request) {
       // context, so just send the bare user instruction. Full prompt is still
       // used for fallback harnesses that don't share the claude session.
       const resumePrompt = incomingSessionId
-        ? userPrompt
+        ? effectivePrompt
         : undefined;
 
       const { outcome, sessionId: outSessionId } = await runHarnessChain(
