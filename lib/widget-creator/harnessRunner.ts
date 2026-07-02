@@ -4,6 +4,9 @@
 // afterward (tsc + registry vs. nothing).
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
+import { unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { lineSignalsLimit, type LimitReason } from "@/lib/widget-creator/limitDetection";
 
@@ -13,6 +16,15 @@ export type SSEWriter = (data: string) => void;
 
 export function sendEvent(write: SSEWriter, event: string, payload: Record<string, unknown>) {
   write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
+}
+
+function windowsPromptFileArg(sendablePrompt: string) {
+  const promptPath = join(tmpdir(), `avnhub-prompt-${randomUUID()}.md`);
+  writeFileSync(promptPath, sendablePrompt, "utf8");
+  return {
+    promptPath,
+    arg: `Read the UTF-8 prompt file at this exact path and follow the instructions in it exactly: ${promptPath}`,
+  };
 }
 
 // --- Session ID extraction (mirrors lib/nutbot/chatHarness.ts) ---
@@ -53,18 +65,12 @@ function extractSessionIdFromLine(line: string): string | null {
 
 // --- Per-run options (only meaningful for the claude adapter) ---
 export type HarnessOpts = {
-  /** Move the stable authoring-guide doc into claude's --append-system-prompt
-      so it's in the cacheable system-prefix rather than the user turn.
-      Non-Windows only (cmd.exe ARG_MAX would truncate it). */
-  systemPrompt?: string;
-  /** Lean user prompt that omits the doc (used when systemPrompt is set, so
-      the doc isn't sent twice). Falls back to the main prompt if absent. */
-  claudePrompt?: string;
   /** Existing session ID — causes claude to use --resume instead of -p so
       the model continues from its prior context. */
   sessionId?: string;
-  /** Short user instruction for resume turns. Replaces claudePrompt/prompt
-      when sessionId is set and this is provided. */
+  /** Short user instruction for resume turns. Replaces `prompt` when
+      sessionId is set and this is provided — the model already has full
+      context (including the avn-widget-build skill, loaded on turn 1). */
   resumePrompt?: string;
 };
 
@@ -75,18 +81,28 @@ export function runHarness(
   signal: AbortSignal,
   continuationNote?: string,
   opts?: HarnessOpts,
-): Promise<{ status: "done" | "limit" | "error"; limitReason?: LimitReason; newSessionId?: string }> {
+): Promise<{
+  status: "done" | "limit" | "error" | "aborted";
+  limitReason?: LimitReason;
+  errorReason?: string;
+  newSessionId?: string;
+}> {
   return new Promise((resolve) => {
+    let tempPromptPath: string | undefined;
+
+    const cleanupTempPrompt = () => {
+      if (!tempPromptPath) return;
+      const path = tempPromptPath;
+      tempPromptPath = undefined;
+      try { unlinkSync(path); } catch {}
+    };
+
     const isResume = adapter.id === "claude" && Boolean(opts?.sessionId);
 
-    // Pick the most specific prompt available:
-    //   resume turn → short instruction only (model already has full context)
-    //   claude first turn with system prompt → lean prompt (doc is in sys prompt)
-    //   everything else → full prompt
-    const activePrompt =
-      isResume && opts?.resumePrompt != null ? opts.resumePrompt :
-      adapter.id === "claude" && !isResume && opts?.claudePrompt != null ? opts.claudePrompt :
-      prompt;
+    // Resume turn → short instruction only (model already has full context
+    // from turn 1, including the avn-widget-build skill it loaded then).
+    // Everything else → full prompt.
+    const activePrompt = isResume && opts?.resumePrompt != null ? opts.resumePrompt : prompt;
 
     const sendablePrompt = continuationNote
       ? `${continuationNote}\n\n${activePrompt}`
@@ -118,15 +134,24 @@ export function runHarness(
           "--verbose",
           "--permission-mode", "bypassPermissions",
         ];
-        // Move the stable authoring guide into the system-prompt block on
-        // non-Windows. On Windows (shell: true → cmd.exe 8191-char ARG_MAX)
-        // keep it in the user prompt via stdin to avoid truncation.
-        if (opts?.systemPrompt && process.platform !== "win32") {
-          args = args.concat(["--append-system-prompt", opts.systemPrompt]);
-        }
       }
     } else if (adapter.promptViaArg) {
-      args = [...adapter.args, sendablePrompt];
+      if (process.platform === "win32") {
+        // Plain NutBot chat's opencode path has the same promptViaArg bug
+        // class; this fix is scoped to Widget Creator generation/ideation.
+        try {
+          const promptFile = windowsPromptFileArg(sendablePrompt);
+          tempPromptPath = promptFile.promptPath;
+          args = [...adapter.args, promptFile.arg];
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          sendEvent(write, "error", { message: `Failed to prepare ${adapter.id} prompt file: ${message}` });
+          resolve({ status: "error" });
+          return;
+        }
+      } else {
+        args = [...adapter.args, sendablePrompt];
+      }
     } else {
       args = [...adapter.args];
     }
@@ -191,16 +216,26 @@ export function runHarness(
       if (reason && !limitReason) limitReason = reason;
     });
 
-    child.on("close", () => {
+    child.on("close", (code, killSignal) => {
+      cleanupTempPrompt();
       if (buffer) processLine(buffer);
-      resolve(
-        limitReason
-          ? { status: "limit", limitReason }
-          : { status: "done", newSessionId: newSessionId ?? undefined },
-      );
+      // Order matters: an aborted child also exits nonzero — if the exit-code
+      // branch ran first, a user pressing stop would be treated as a harness
+      // failure and spawn the next harness in the chain.
+      if (signal.aborted) {
+        resolve({ status: "aborted" });
+      } else if (limitReason) {
+        resolve({ status: "limit", limitReason });
+      } else if (code !== 0) {
+        // code === null means killed by an external signal (not our abort)
+        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}` });
+      } else {
+        resolve({ status: "done", newSessionId: newSessionId ?? undefined });
+      }
     });
 
     child.on("error", (err) => {
+      cleanupTempPrompt();
       const hint = (err as NodeJS.ErrnoException).code === "ENOENT"
         ? ` — is the "${adapter.command}" CLI installed and on PATH?`
         : "";
@@ -216,9 +251,9 @@ export function runHarness(
 
 /** Run the harness fallback chain.
  *
- *  `opts` (system prompt + session resume) applies ONLY to the first harness.
- *  Fallback harnesses always receive the full prompt with no session context —
- *  they don't share session state with the harness that hit the limit.
+ *  `opts` (session resume) applies ONLY to the first harness. Fallback
+ *  harnesses always receive the full prompt with no session context — they
+ *  don't share session state with the harness that hit the limit.
  *
  *  `partialWork`, if given, is read at each switch and embedded into the
  *  continuation note so a fallback continues from the exact on-disk file state
@@ -234,7 +269,7 @@ export async function runHarnessChain(
   signal: AbortSignal,
   partialWork?: () => string,
   opts?: HarnessOpts,
-): Promise<{ outcome: "done" | "failed"; sessionId?: string }> {
+): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string }> {
   const startIdx = chain.indexOf(requestedHarness);
   const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
 
@@ -246,28 +281,32 @@ export async function runHarnessChain(
     const adapter = HARNESS_ADAPTERS[harnessId];
     if (!adapter) continue;
 
-    // opts (system prompt + session resume) only apply to the first harness.
-    // Fallback harnesses always start fresh with the full prompt.
+    // opts (session resume) only apply to the first harness. Fallback
+    // harnesses always start fresh with the full prompt.
     const harnessOpts = i === 0 ? opts : undefined;
 
-    const { status, limitReason, newSessionId } = await runHarness(
+    const { status, limitReason, errorReason, newSessionId } = await runHarness(
       adapter, fullPrompt, write, signal, continuationNote, harnessOpts,
     );
 
     if (newSessionId) capturedSessionId = newSessionId;
+
+    // User stop — terminal. No switch/error events, and critically no
+    // fallback: pressing stop must never spawn the next harness.
+    if (status === "aborted") return { outcome: "aborted" };
 
     if (status === "limit" || status === "error") {
       const nextId = orderedChain[i + 1];
       if (nextId) {
         const reason = status === "limit"
           ? (limitReason === "quota" ? "rate limit / quota reached" : limitReason === "overload" ? "upstream service overloaded (not your quota)" : "unknown")
-          : "failed to start";
+          : errorReason ?? "failed to start";
         sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-        if (status === "limit") {
-          // A limit means the previous CLI actually ran and may have written
-          // partial work. Hand that work to the fallback inline so it doesn't
-          // re-read it from disk. (A "failed to start" never touched disk, so
-          // there is nothing to carry — leave the note undefined.)
+        if (status === "limit" || errorReason) {
+          // The previous CLI actually ran (limit, or started-then-crashed) and
+          // may have written partial work. Hand that work to the fallback
+          // inline so it doesn't re-read it from disk. (A "failed to start"
+          // never touched disk, so there is nothing to carry.)
           const partial = partialWork?.().trim();
           continuationNote = partial
             ? `The previous harness (${harnessId}) started but hit: ${reason}. It had already written the file(s) below. CONTINUE from this exact on-disk state and finish the remaining work — do NOT re-read these from disk, do NOT restart from scratch:\n\n${partial}`
@@ -279,6 +318,10 @@ export async function runHarnessChain(
       }
       if (status === "limit") {
         sendEvent(write, "error", { message: `All harnesses hit a limit (${limitReason ?? "unknown"}). Try again later.` });
+      } else if (errorReason) {
+        // Chain exhausted on a crash — previously this path ended silently
+        // and the client stream just stopped with no explanation.
+        sendEvent(write, "error", { message: `All harnesses failed (last: ${harnessId} ${errorReason}). Check the CLI installs and try again.` });
       }
       return { outcome: "failed" };
     }

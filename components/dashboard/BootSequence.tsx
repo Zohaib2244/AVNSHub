@@ -11,7 +11,7 @@ import { getPrefs } from "@/lib/prefs";
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 const LINES = [
-  { text: "AVN HUB / v2.2.0-alpha.1  ——  IDENTITY RUNTIME", type: "header" },
+  { text: "AVN HUB / v2.3.0-alpha.2  ——  IDENTITY RUNTIME", type: "header" },
   { text: "────────────────────────────────────────", type: "divider" },
   { text: "  init display drivers            OK", type: "ok" },
   { text: "  mount /dev/homelab              OK", type: "ok" },

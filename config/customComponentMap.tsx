@@ -18,6 +18,9 @@ const _quick_links = lazy(() => import("@/components/widgets/custom/quick-links/
 const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
 const _verlet_sim = lazy(() => import("@/components/widgets/custom/verlet-sim/VerletSimWidget").then((m) => ({ default: m.VerletSimWidget })));
 const _world_clock = lazy(() => import("@/components/widgets/custom/world-clock/WorldClockWidget").then((m) => ({ default: m.WorldClockWidget })));
+const _spotify_visualizer = lazy(() => import("@/components/widgets/custom/spotify-visualizer/SpotifyVisualizerWidget").then((m) => ({ default: m.SpotifyVisualizerWidget })));
+const _office_time_tracker = lazy(() => import("@/components/widgets/custom/office-time-tracker/OfficeTimeTrackerWidget").then((m) => ({ default: m.OfficeTimeTrackerWidget })));
+const _pomodoro_timer = lazy(() => import("@/components/widgets/custom/pomodoro-timer/PomodoroTimerWidget").then((m) => ({ default: m.PomodoroTimerWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -30,5 +33,8 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "ambient-data": _ambient_data,
   "verlet-sim": _verlet_sim,
   "world-clock": _world_clock,
+  "spotify-visualizer": _spotify_visualizer,
+  "office-time-tracker": _office_time_tracker,
+  "pomodoro-timer": _pomodoro_timer,
 // --- custom-map end ---
 };

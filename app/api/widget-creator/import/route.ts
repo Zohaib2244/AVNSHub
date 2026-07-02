@@ -9,6 +9,7 @@ import {
   buildRegistryEntry,
   mergeWidgetManifest,
   findComponentModule,
+  removeRegistryEntry,
 } from "@/lib/widget-creator/customRegistry";
 
 const ROOT = process.cwd();
@@ -101,7 +102,11 @@ export async function POST(req: Request) {
 
   // register: JSON first, then the one lazy line (detect the real component file)
   upsertRegistryEntry(id, entry);
-  addToComponentMap(id, findComponentModule(id) ?? undefined);
+  const wired = addToComponentMap(id, findComponentModule(id) ?? undefined);
+  if (!wired.ok) {
+    removeRegistryEntry(id);
+    return NextResponse.json({ ok: false, error: wired.error }, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true, id, title: entry.title });
 }

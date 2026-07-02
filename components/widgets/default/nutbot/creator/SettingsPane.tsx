@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { ImageUploadSlot } from "./ImageUploadSlot";
@@ -9,6 +9,7 @@ import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
 import { renameWidgetPlacement } from "@/lib/slotLayout";
+import { LUCIDE_SUGGESTIONS } from "@/lib/widget-creator/lucideSuggestions";
 
 // kept in sync with PanelMode in WidgetCreatorPanel but defined locally to
 // avoid a circular import when SettingsPane is used from CreatorWorkspace
@@ -39,13 +40,6 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
     </div>
   );
 }
-
-const LUCIDE_SUGGESTIONS = [
-  "Box", "Cloud", "Cpu", "Database", "Globe", "HardDrive", "Heart", "Home",
-  "Music", "Rss", "Server", "Smile", "Star", "Sun", "Tv", "Zap",
-  "Activity", "Bell", "Camera", "Clock", "Code", "Eye", "Film",
-  "Map", "Package", "Terminal", "Wifi", "Wind",
-];
 
 const SIZE_OPTIONS = ["S", "M", "L"] as const;
 const ORI_OPTIONS = ["h", "v"] as const;
@@ -80,10 +74,12 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
   const [slug, setSlug] = useState(id);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [error, setError] = useState("");
+  const [prevId, setPrevId] = useState(id);
 
   // re-derive the form whenever the target widget changes (picker switch)
-  useEffect(() => {
+  if (id !== prevId) {
     const next = RAW_REGISTRY[id];
+    setPrevId(id);
     setTitle(next?.title ?? "");
     setIconName(next?.iconName ?? "");
     setSizes(next?.sizes ?? ["S", "M", "L"]);
@@ -93,7 +89,7 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
     setSlug(id);
     setStatus("idle");
     setError("");
-  }, [id]);
+  }
 
   function toggle(list: string[], setList: (v: string[]) => void, value: string) {
     const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -243,6 +239,12 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
 
 export function SettingsPane({ settings, onChange, mode, onModeChange, showModeToggle = true, disabled = false }: Props) {
   const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
+  const [slugTouched, setSlugTouched] = useState(() => Boolean(settings.slug) && settings.slug !== slugify(settings.name ?? ""));
+  const [prevIdentity, setPrevIdentity] = useState({ name: settings.name, slug: settings.slug });
+  if (settings.name !== prevIdentity.name || settings.slug !== prevIdentity.slug) {
+    setPrevIdentity({ name: settings.name, slug: settings.slug });
+    setSlugTouched(Boolean(settings.slug) && settings.slug !== slugify(settings.name ?? ""));
+  }
   const isCreateMode = mode === "create";
   const isEditMode = mode === "edit";
   const isIdeateMode = mode === "ideate";
@@ -358,7 +360,7 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
                 value={settings.name ?? ""}
                 onChange={(e) => {
                   const name = e.target.value;
-                  onChange({ name, slug: slugify(name) });
+                  onChange(slugTouched ? { name } : { name, slug: slugify(name) });
                 }}
               />
             </div>
@@ -382,7 +384,10 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
               className="wc-input"
               placeholder="auto-derived"
               value={settings.slug ?? ""}
-              onChange={(e) => onChange({ slug: e.target.value })}
+              onChange={(e) => {
+                setSlugTouched(true);
+                onChange({ slug: e.target.value });
+              }}
             />
           </div>
         </Section>

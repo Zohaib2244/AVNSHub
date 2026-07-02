@@ -7,9 +7,9 @@ This folder is the long-form documentation for AVN Hub. The root README stays sh
 | Doc | Purpose |
 | --- | --- |
 | [SETUP.md](SETUP.md) | Install, runtime model, environment variables, Docker, and Tailscale |
-| [FEATURES.md](FEATURES.md) | Product tour with screenshots |
-| [AVN_HUB.md](AVN_HUB.md) | Hub Core, layout, theme, preferences, persistence, and runtime reference |
+| [FEATURES.md](FEATURES.md) | Product tour with screenshots and core UX overview |
 | [CREATING_WIDGETS.md](CREATING_WIDGETS.md) | Widget authoring rules for humans and LLMs |
+| [WIDGET_CREATOR_GUIDE.md](WIDGET_CREATOR_GUIDE.md) | Step-by-step guide to the in-app Widget Creator (Plan / Ideate / Build) — no coding required |
 | [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md) | Optional local LLM setup through Bonfire plus CLI chat fallback |
 
 ## Specialized Docs
@@ -23,5 +23,6 @@ This folder is the long-form documentation for AVN Hub. The root README stays sh
 ## Source Of Truth
 
 - Use [CREATING_WIDGETS.md](CREATING_WIDGETS.md) for widget authoring behavior.
-- Use [AVN_HUB.md](AVN_HUB.md) for layout, Hub Core, localStorage keys, and persistence behavior.
+- Use [FEATURES.md](FEATURES.md) for the product overview and core UX concepts.
 - Use [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md) for chat backend setup.
+- Use `CLAUDE.md` for broad architecture notes and historical context for coding agents.

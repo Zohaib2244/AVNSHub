@@ -2,7 +2,7 @@
 
 NutBot chat is optional. AVN Hub runs normally if no chat backend is configured; the chat tab will show an offline or disabled state while the rest of the dashboard keeps working.
 
-There are two supported backend paths:
+There are two optional backend paths:
 
 - **Bonfire local/custom LLM**: best if you want a self-hosted, steerable GGUF model with NutBot's NSFW and web-search toggles.
 - **CLI harness fallback**: easiest if you already have `claude`, `codex`, or `opencode` installed and authenticated on the machine running AVN Hub.

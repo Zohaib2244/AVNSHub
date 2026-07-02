@@ -4,7 +4,7 @@ import "./creator/WidgetCreatorPanel.css";
 import "./chat/NutBotChat.css";
 
 // NutBot's full terminal: log, chat, shells (sidebar + live pty), and widget creator.
-// Shell sessions stay mounted (display:none) when not active so the pty + scrollback survive.
+// Visited tabs stay mounted (display:none when inactive) so ptys and streams survive tab switches.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -25,13 +25,25 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.2 ready",
+  "[info] nutbot v2.3 ready",
 ];
 
 type MainTab = "log" | "chat" | "shells" | "creator";
 type LogLine = { id: number; text: string };
 
+// "[ok] spotify.auth ... connected" → colored tag + rest (see .term-tag-*)
+function renderLogLine(text: string) {
+  const m = text.match(/^\[(\w+)\]\s?(.*)$/);
+  if (!m) return text;
+  return (
+    <>
+      <span className={`term-tag term-tag-${m[1]}`}>[{m[1]}]</span> {m[2]}
+    </>
+  );
+}
+
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
+const TAB_ORDER: MainTab[] = ["log", "chat", "shells", "creator"];
 
 function sanitizeTab(raw: string | null): MainTab {
   if (raw === "log" || raw === "chat" || raw === "shells" || raw === "creator") return raw;
@@ -70,6 +82,7 @@ export function NutBotTerminal() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
+  const [mountedTabs, setMountedTabs] = useState<Set<MainTab>>(() => new Set(["log"]));
   const skipTabWrite = useRef(true);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -100,12 +113,28 @@ export function NutBotTerminal() {
   const isShells   = activeTab === "shells";
   const isCreator  = activeTab === "creator";
   const isChat     = activeTab === "chat";
+  const activeTabIndex = TAB_ORDER.indexOf(activeTab);
+
+  if (!mountedTabs.has(activeTab)) {
+    const next = new Set(mountedTabs);
+    next.add(activeTab);
+    setMountedTabs(next);
+  }
+
+  function panelAnimate(tab: MainTab) {
+    if (tab === activeTab) return { opacity: 1, x: 0, display: "flex" };
+    return {
+      opacity: 0,
+      x: 10 * Math.sign(TAB_ORDER.indexOf(tab) - activeTabIndex),
+      transitionEnd: { display: "none" },
+    };
+  }
 
   return (
     <div className="nutbot-terminal">
       {/* ── single combined row: title + tabs + controls ── */}
       <div className="term-row">
-        <span className="term-title">NUTBOT V2.2</span>
+        <span className="term-title">NUTBOT V2.3</span>
 
         <div className="term-tabs">
           {(["log", "chat", "shells", "creator"] as MainTab[]).map((tab) => (
@@ -161,38 +190,51 @@ export function NutBotTerminal() {
         ].filter(Boolean).join(" ")}
         ref={bodyRef}
       >
-        {activeTab === "log" && (
-          <AnimatePresence initial={false}>
-            {logLines.map((line) => (
-              <motion.div
-                key={line.id}
-                className="term-line"
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.2 }}
-              >
-                {line.text}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        )}
+        {TAB_ORDER.map((tab) => mountedTabs.has(tab) && (
+          <motion.div
+            key={tab}
+            className="term-tab-panel"
+            initial={false}
+            animate={panelAnimate(tab)}
+            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+          >
+            {tab === "log" && (
+              <>
+                <AnimatePresence initial={false}>
+                  {logLines.map((line) => (
+                    <motion.div
+                      key={line.id}
+                      className="term-line"
+                      initial={{ opacity: 0, x: -6 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {renderLogLine(line.text)}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+                <span className="term-caret" aria-hidden="true" />
+              </>
+            )}
 
-        {activeTab === "chat" && <NutBotChat />}
+            {tab === "chat" && <NutBotChat />}
 
-        {activeTab === "shells" && <ShellsScreen />}
+            {tab === "shells" && <ShellsScreen />}
 
-        {activeTab === "creator" && (
-          prefs.creatorEnabled ? (
-            <WidgetCreatorPanel />
-          ) : (
-            <div className="term-disabled">
-              <span>Widget Creator is turned off</span>
-              <button type="button" className="term-disabled-btn" onClick={() => setPrefs({ creatorEnabled: true })}>
-                turn on
-              </button>
-            </div>
-          )
-        )}
+            {tab === "creator" && (
+              prefs.creatorEnabled ? (
+                <WidgetCreatorPanel />
+              ) : (
+                <div className="term-disabled">
+                  <span>Widget Creator is turned off</span>
+                  <button type="button" className="term-disabled-btn" onClick={() => setPrefs({ creatorEnabled: true })}>
+                    turn on
+                  </button>
+                </div>
+              )
+            )}
+          </motion.div>
+        ))}
       </div>
     </div>
   );

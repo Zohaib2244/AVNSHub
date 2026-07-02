@@ -28,6 +28,7 @@ import { WIDGETS, getManifest, resolveSettings, type SettingsValues } from "@/co
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
 import { DEFAULT_CANVAS_ID, getActiveCanvasId, slotLayoutKey, subscribeCanvases } from "@/lib/canvases";
+import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
 
@@ -294,11 +295,13 @@ export function getServerSlotLayout(): SlotLayoutState {
 }
 
 function persist() {
+  const key = slotLayoutKey(currentCanvasId ?? getActiveCanvasId());
   try {
-    localStorage.setItem(slotLayoutKey(currentCanvasId ?? getActiveCanvasId()), JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
   } catch {
     // storage full/blocked — state still applies for this session
   }
+  pushToServer(key, state);
 }
 
 function commit(next: SlotLayoutState) {
@@ -323,7 +326,35 @@ subscribeCanvases(() => {
   currentCanvasId = activeId;
   state = loadForCanvas(activeId);
   listeners.forEach((listener) => listener());
+  syncWithServer();
 });
+
+// Reconcile the active canvas's layout with the server: on load, on canvas
+// switch (above), and every 15s thereafter (skipped while the tab is
+// hidden). A fresh install/canvas has nothing on the server yet, in which
+// case we seed it with whatever's local.
+async function syncWithServer() {
+  const key = slotLayoutKey(currentCanvasId ?? getActiveCanvasId());
+  const remote = await pullFromServer<SlotLayoutState>(key);
+  if (remote === undefined) {
+    pushToServer(key, getSlotLayout());
+    return;
+  }
+  const clean = sanitize(remote);
+  if (!clean || JSON.stringify(clean) === JSON.stringify(getSlotLayout())) return;
+  state = clean;
+  try {
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch {
+    // storage full/blocked — the reconciled value still applies for this session
+  }
+  listeners.forEach((listener) => listener());
+}
+
+if (typeof window !== "undefined") {
+  syncWithServer();
+  pollWhileVisible(syncWithServer);
+}
 
 /** widgets that aren't placed in any region — the candidates offered by the
     placement popover */
@@ -505,6 +536,7 @@ export function resetSlotLayout() {
   } catch {
     // ignore
   }
+  deleteFromServer(slotLayoutKey(id));
   listeners.forEach((listener) => listener());
 }
 

@@ -1,11 +1,13 @@
 {
   "name": "avn-hub",
-  "version": "2.2.0-alpha.1",
+  "version": "2.3.0-alpha.2",
   "private": true,
   "scripts": {
+    "predev": "npm run db:setup",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "db:setup": "prisma generate && prisma migrate deploy",
     "stop": "node scripts/stop-services.mjs all",
     "stop:hub": "node scripts/stop-services.mjs hub",
     "stop:nutbot-llm": "node scripts/stop-services.mjs llm",
@@ -13,21 +15,26 @@
     "lint": "eslint",
     "mock:homelab": "node scripts/mock-homelab-server.mjs",
     "spotify:auth": "node scripts/spotify-auth.mjs",
-    "nutbot:shell": "node scripts/nutbot-shell-server.mjs"
+    "nutbot:shell": "node scripts/nutbot-shell-server.mjs",
+    "sync:widget-skill": "node scripts/sync-widget-skill.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
+    "@prisma/client": "^7.8.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "adm-zip": "^0.5.17",
+    "better-sqlite3": "^12.11.1",
     "framer-motion": "^12.40.0",
     "html-to-image": "^1.11.13",
     "lucide-react": "^0.545.0",
     "next": "16.2.7",
     "node-pty": "^1.1.0",
     "pino": "^10.3.1",
+    "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "systeminformation": "^5.31.9"

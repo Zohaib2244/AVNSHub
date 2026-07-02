@@ -9,17 +9,14 @@ import {
   findComponentModule,
   sanitizeComponentMap,
   registerCustomWidget,
+  isValidCustomWidgetId,
 } from "@/lib/widget-creator/customRegistry";
+import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
+import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
+import { snapshotGitStatus, unexpectedChanges } from "@/lib/widget-creator/gitAudit";
+import { readProjectSpec, writeProjectSpec, buildProjectSpecMarkdown, type ProjectSpecMeta } from "@/lib/widget-creator/projectSpec";
 
 const REPO_ROOT = process.cwd();
-
-function readDoc(relPath: string): string {
-  try {
-    return readFileSync(join(REPO_ROOT, relPath), "utf-8");
-  } catch {
-    return "";
-  }
-}
 
 function readExistingWidget(slug: string): string {
   try {
@@ -75,23 +72,21 @@ function deleteWidgetBackups(slug: string): void {
   } catch {}
 }
 
-// The authoring guide — stable 24KB doc. Returned separately so callers can
-// send it via --append-system-prompt (cacheable system prefix on claude) rather
-// than embedding it in the user turn on every request.
-function buildSystemPrompt(): string {
-  return readDoc("docs/CREATING_WIDGETS.md");
-}
-
-// Core user-facing prompt. `includeDoc` controls whether the authoring guide
-// is embedded (needed for codex/opencode which have no system-prompt flag) or
-// omitted (when it's already in claude's --append-system-prompt).
-function buildCorePrompt(settings: GenerateSettings, userPrompt: string, includeDoc: boolean): string {
+// Core user-facing prompt. The authoring guide itself lives in the
+// "avn-widget-build" harness skill (.claude/skills/, .agents/skills/ — see
+// scripts/sync-widget-skill.mjs, which regenerates it from
+// docs/CREATING_WIDGETS.md) rather than being embedded here: claude, codex,
+// and opencode all discover and load project-local skills in their headless
+// invocation modes (verified directly against each CLI), so there's no need
+// to pass ~6K tokens of guide text on every single turn.
+function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string {
   const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
   const slug = settings.editSlug ?? settings.slug ?? "";
   const comp = slug ? componentName(slug) : "<Pascal>Widget";
   const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
+  const existingSpec = isEdit ? readProjectSpec(settings.editSlug!) : null;
 
   // In edit mode the only settings that still apply are slug + the freeform
   // description/data fields actually describing this edit — name/icon/sizes/
@@ -124,7 +119,12 @@ You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT
 - Overwrite \`components/widgets/custom/${settings.editSlug}/${comp}.tsx\` with the updated component (keep the named export \`export function ${comp}() { ... }\`)
 - If sizes / icon / settings-schema change, also overwrite \`components/widgets/custom/${settings.editSlug}/manifest.json\` to match
 - DO NOT touch any file under \`config/\` - the registration is managed automatically. The slug must stay the same.
+${existingSpec ? `
+## Project spec (authoritative — read this instead of exploring/guessing)
 
+This describes the widget's intent and settings as of its last successful build. You do NOT need to Glob or Read other widgets' folders to understand what this one is for.
+
+${existingSpec}` : ""}
 ## Current implementation (modify this)
 
 \`\`\`tsx
@@ -132,22 +132,22 @@ ${existingCode || "(could not read existing file - write a corrected version)"}
 \`\`\``
     : `## Your task - creating a new widget
 
-Write a new widget following the rules in the authoring guide. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
+Write a new widget following the rules in the \`avn-widget-build\` skill. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
 - \`${comp}.tsx\` - the component, with a named export \`export function ${comp}() { ... }\`
 - \`manifest.json\` - the widget's manifest data (see "Required output" below)
 
 Do NOT touch \`config/customWidgets.ts\`, \`config/customRegistry.json\`, \`config/customComponentMap.tsx\`, \`config/widgets.tsx\`, \`lib/layout.ts\`, or any other shared/core file - the registration into those is handled automatically after you finish. Existing custom widget ids: ${existingIds.length ? existingIds.join(", ") : "(none)"}.
 
-The authoring guide (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - write directly from the guide and the spec in this prompt.`;
+The \`avn-widget-build\` skill (including its minimal complete example) is the full spec for this pattern. You do NOT need to Glob or Read other folders under \`components/widgets/custom/\` to infer conventions - load the skill and write directly from it plus the spec in this prompt.`;
 
-  const docSection = includeDoc
-    ? `\n## Authoring guide (follow exactly)\n\n${buildSystemPrompt()}\n`
-    : "";
+  const skillSection = `\n## Authoring rules
+
+Load the \`avn-widget-build\` skill now and follow it exactly - it covers the config/widgets.tsx manifest pattern, the custom-widget split-registry pattern, per-size layout, the settings schema, design tokens, and a minimal complete example.\n`;
 
   return `You are generating a widget for the AVN Hub project - a living personal dashboard built with Next.js, Tailwind, and Framer Motion.
 
 ${taskSection}
-${docSection}
+${skillSection}
 ## Widget spec from the user
 
 ${settingsSummary || "(No structured settings provided - infer from the prompt below.)"}
@@ -239,8 +239,32 @@ export async function POST(req: Request) {
         the model continues from its existing context instead of re-reading the
         full authoring guide + widget spec. Absent on the first turn. */
     sessionId?: string;
+    /** carried over from the project's Plan-mode brief, if any — folded into
+        the widget's SPEC.md so intent survives independent of the harness
+        session or the browser's localStorage */
+    projectMeta?: ProjectSpecMeta;
   };
-  const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain, sessionId: incomingSessionId } = body;
+  const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain, sessionId: incomingSessionId, projectMeta } = body;
+
+  const sseError = (message: string, code?: string) =>
+    new Response(`event: error\ndata: ${JSON.stringify(code ? { message, code } : { message })}\n\n`, {
+      headers: { "Content-Type": "text/event-stream" },
+    });
+
+  // Server-side slug validation — the client validates too, but slug/editSlug
+  // are joined straight into filesystem paths (readExistingWidget,
+  // readProjectSpec, backups), so never trust the client's copy of the check.
+  for (const [label, value] of [["slug", settings.slug], ["editSlug", settings.editSlug]] as const) {
+    if (value && !isValidCustomWidgetId(value)) {
+      return sseError(`invalid ${label} "${value}" — use only lowercase letters, numbers, and hyphens`);
+    }
+  }
+
+  const effectivePrompt = userPrompt.trim()
+    || (settings.designReferenceHtml ? "Build the widget from the finalized design reference." : "");
+  if (!effectivePrompt) {
+    return sseError("describe the widget to build, or attach a finalized design reference first");
+  }
 
   // Guard against a desynced client sending a "create" (no editSlug) for a
   // slug that already exists — without this, a stale `settings.slug` left
@@ -250,24 +274,41 @@ export async function POST(req: Request) {
   const targetId = settings.editSlug ?? settings.slug;
   const existedBeforeThisRun = Boolean(targetId && readRegistry()[targetId]);
   if (!settings.editSlug && settings.slug && existedBeforeThisRun) {
-    return new Response(
-      `event: error\ndata: ${JSON.stringify({
-        message: `A widget with id "${settings.slug}" already exists. Switch to edit mode to modify it instead of creating a new one.`,
-      })}\n\n`,
-      { headers: { "Content-Type": "text/event-stream" } },
-    );
+    return sseError(`A widget with id "${settings.slug}" already exists. Switch to edit mode to modify it instead of creating a new one.`);
   }
 
-  // Full prompt (doc included) — used for codex/opencode and fallbacks.
-  // Lean prompt (doc excluded) — used for claude's user turn when the doc goes
-  // via --append-system-prompt into the cacheable system-prefix instead.
-  const fullPrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ true);
-  const claudePrompt = buildCorePrompt(settings, userPrompt, /* includeDoc */ false);
+  // A create whose slug matches an existing app/api route (e.g. "uptime")
+  // would let the generated route overwrite a core one — reject up front.
+  if (!settings.editSlug && settings.slug && !existedBeforeThisRun
+      && existsSync(join(REPO_ROOT, "app/api", settings.slug))) {
+    return sseError(`slug "${settings.slug}" collides with an existing app/api route — pick another slug`);
+  }
+
+  const corePrompt = buildCorePrompt(settings, effectivePrompt);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
   const requestedHarness: HarnessId = bodyHarness ?? settings.harness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? settings.harnessChain ?? HARNESS_CHAIN_DEFAULT;
+
+  // The prompt only ever tells the harness to "load the avn-widget-build
+  // skill" — it doesn't carry the authoring rules itself (see
+  // docs/CREATING_WIDGETS.md's skill section). If the skill file isn't
+  // actually there, generation must not silently proceed with a harness that
+  // has no idea what the framework rules are.
+  const skillError = checkSkillOrError("avn-widget-build", requestedHarness);
+  if (skillError) {
+    return sseError(skillError, "skill-missing");
+  }
+
+  // One generation at a time, enforced where it actually matters — two
+  // concurrent harnesses race on customComponentMap.tsx read-modify-writes,
+  // registry JSON, and each other's tsc checks. (The client-side
+  // workingProjectId lock is per-tab and can't see other tabs/devices.)
+  const lock = acquireGenerationLock("generate");
+  if (!lock.ok) {
+    return sseError(describeBusyError(lock.holder, lock.ageMs));
+  }
 
   const encoder = new TextEncoder();
   const abortController = new AbortController();
@@ -282,11 +323,17 @@ export async function POST(req: Request) {
         }
       };
 
+      try {
+
       // For edits: snapshot the existing .tsx files before spawning the harness.
       // If the harness deletes the file to "rewrite from scratch" and then gets
       // cut off (rate limit, error), restoreMissingWidgetFiles() puts the last
       // working version back so the site never reaches "module not found".
       if (existedBeforeThisRun && targetId) backupWidgetFiles(targetId);
+
+      // Write-audit snapshot — taken after sanitizeComponentMap() and the
+      // backups above so this run's own bookkeeping never shows up in the diff.
+      const gitBefore = await snapshotGitStatus();
 
       // On a mid-run harness switch, hand the fallback whatever this widget's
       // files currently hold on disk (empty until something is written) so it
@@ -298,17 +345,35 @@ export async function POST(req: Request) {
       // context, so just send the bare user instruction. Full prompt is still
       // used for fallback harnesses that don't share the claude session.
       const resumePrompt = incomingSessionId
-        ? userPrompt
+        ? effectivePrompt
         : undefined;
 
       const { outcome, sessionId: outSessionId } = await runHarnessChain(
-        fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { systemPrompt: buildSystemPrompt(), claudePrompt, sessionId: incomingSessionId, resumePrompt },
+        corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
+        { sessionId: incomingSessionId, resumePrompt },
       );
 
+      // Audit what the harness actually touched — the prompt tells it to stay
+      // inside the widget's own folders, but bypassPermissions enforces
+      // nothing. Runs before registration/SPEC writes so those never appear.
+      // A user abort skips it (a killed run's partial writes aren't a policy
+      // violation worth alarming about).
+      if (outcome !== "aborted") {
+        const gitAfter = await snapshotGitStatus();
+        const unexpected = unexpectedChanges(gitBefore, gitAfter, [
+          ...(targetId ? [`components/widgets/custom/${targetId}/`, `app/api/${targetId}/`] : []),
+          "config/customRegistry.json",
+          "config/customComponentMap.tsx",
+          ".nutbot-ideate/",
+        ]);
+        if (unexpected.length > 0) {
+          sendEvent(write, "audit", { unexpectedFiles: unexpected });
+        }
+      }
+
       if (outcome !== "done") {
-        // Harness chain failed entirely — restore the backup so a previously
-        // working edit stays working rather than disappearing from the site.
+        // Harness chain failed (or was stopped) — restore the backup so a
+        // previously working edit stays working rather than disappearing.
         if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
       }
 
@@ -357,7 +422,7 @@ export async function POST(req: Request) {
 
         if (ok) {
           sendEvent(write, "status", { type: "tsc_check" });
-          const tscResult = await runTscCheck();
+          const tscResult = await runTscCheck(targetId);
           if (tscResult.errors.length > 0) {
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
             // Restore the backup if the harness left the .tsx missing (deleted
@@ -373,6 +438,12 @@ export async function POST(req: Request) {
             // tsc clean — safe to drop the safety backup
             if (existedBeforeThisRun && targetId) deleteWidgetBackups(targetId);
             const doneSlug = settings.editSlug ?? settings.slug ?? null;
+            // Keep SPEC.md current so the next turn — a fresh session, a
+            // different device, or a "virtual" edit with no local project
+            // history — has full intent/settings context without exploring.
+            if (doneSlug) {
+              writeProjectSpec(doneSlug, buildProjectSpecMarkdown(doneSlug, settings, projectMeta));
+            }
             // Include sessionId so ChatCanvas can --resume on the next
             // refinement turn instead of re-sending the full ~6K-token prompt.
             sendEvent(write, "status", {
@@ -383,6 +454,12 @@ export async function POST(req: Request) {
             });
           }
         }
+      }
+
+      } finally {
+        // Always release — a client abort flows cancel() → abort → the chain
+        // resolves ("aborted") → here, so the lock can't leak on disconnect.
+        releaseGenerationLock();
       }
 
       controller.close();
@@ -401,7 +478,7 @@ export async function POST(req: Request) {
   });
 }
 
-async function runTscCheck(): Promise<{ errors: string[] }> {
+async function runTscCheck(targetId?: string): Promise<{ errors: string[] }> {
   return new Promise((resolve) => {
     const child = spawn("npx", ["tsc", "--noEmit", "--pretty", "false"], {
       cwd: REPO_ROOT,
@@ -418,13 +495,19 @@ async function runTscCheck(): Promise<{ errors: string[] }> {
       if (code === 0) {
         resolve({ errors: [] });
       } else {
-        // Only surface errors that actually point at the custom widget tree —
+        // Only surface errors that actually point at this widget's own tree —
         // a non-zero exit can come from pre-existing/unrelated project errors
         // (e.g. a stale .next/types/validator.ts referencing a route deleted by
         // a previous widget). Those must NOT count against this widget, or a
         // perfectly valid generation gets its registration rolled back for an
-        // error it didn't cause.
-        const lines = output.split("\n").filter((l) => l.includes("components/widgets/custom") || l.includes("config/custom"));
+        // error it didn't cause. The widget's own generated app/api/<slug>
+        // route IS part of its tree (the prompt invites writing one), so its
+        // errors must not slip past this gate.
+        const lines = output.split("\n").filter((l) =>
+          l.includes("components/widgets/custom")
+          || l.includes("config/custom")
+          || (targetId ? l.includes(`app/api/${targetId}/`) : false),
+        );
         resolve({ errors: lines });
       }
     });

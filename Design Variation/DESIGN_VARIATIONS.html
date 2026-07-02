@@ -1,0 +1,1278 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AVN Hub â€” Dark + Light Variations</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&display=swap" rel="stylesheet" />
+<script src="https://unpkg.com/lucide@latest"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'JetBrains Mono', monospace;
+  padding: 0;
+}
+
+/* â”€â”€ page sections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+.section-dark  { background: #0e0c09; padding: 44px 36px; }
+.section-light { background: #e2d9c8; padding: 44px 36px; }
+
+.section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 36px;
+  padding-bottom: 16px;
+}
+.section-dark  .section-head { border-bottom: 1px solid #2a2216; }
+.section-light .section-head { border-bottom: 1px solid #c4b89e; }
+
+.section-title {
+  font-family: 'DotGothic16', monospace;
+  font-size: 1rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.section-dark  .section-title { color: #e8dfc8; }
+.section-light .section-title { color: #1c1810; }
+
+.section-sub { font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; }
+.section-dark  .section-sub { color: #3a3020; }
+.section-light .section-sub { color: #9a8870; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 32px;
+  max-width: 1360px;
+  margin: 0 auto;
+}
+.card-wrap { display: flex; flex-direction: column; gap: 10px; }
+.card-label { display: flex; align-items: baseline; gap: 8px; }
+
+.section-dark  .card-letter { font-family: 'DotGothic16', monospace; font-size: 0.7rem; letter-spacing: 0.2em; color: #ff6b2b; text-transform: uppercase; }
+.section-light .card-letter { font-family: 'DotGothic16', monospace; font-size: 0.7rem; letter-spacing: 0.2em; color: #c84a12; text-transform: uppercase; }
+.section-dark  .card-name   { font-size: 0.65rem; color: #3a3020; letter-spacing: 0.1em; text-transform: uppercase; }
+.section-light .card-name   { font-size: 0.65rem; color: #9a8870; letter-spacing: 0.1em; text-transform: uppercase; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   ICONS â€” Lucide SVGs injected via JS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.ico {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 6px;
+  position: relative;
+  top: -1px;
+  flex-shrink: 0;
+}
+
+/* dark label icons */
+.de-lbl .ico, .df-lbl .ico, .dg-lbl .ico, .dh-lbl .ico { color: #4a4030; }
+.df-pill .ico { color: #ff6b2b; margin-right: 5px; }
+
+/* light label icons */
+.le-lbl .ico, .lf-lbl .ico, .lg-lbl .ico, .lh-lbl .ico { color: #9a8870; }
+.lf-pill .ico { color: #e05a18; margin-right: 5px; }
+
+/* identity-area icons */
+.de-link .ico, .de-stat-ico { color: #4a4030; }
+.le-link .ico, .le-stat-ico { color: #9a8870; }
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   SHARED HELPERS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.eq { display: flex; gap: 3px; align-items: flex-end; height: 20px; margin-bottom: 8px; }
+.eq-bar { width: 3px; border-radius: 1px; animation: eqani 0.85s ease-in-out infinite alternate; }
+.eq-bar:nth-child(2) { animation-delay: 0.1s; }
+.eq-bar:nth-child(3) { animation-delay: 0.2s; }
+.eq-bar:nth-child(4) { animation-delay: 0.3s; }
+@keyframes eqani { from { height: 3px; } to { height: 20px; } }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   DARK â€” E: FLOATING CARDS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.de {
+  background: #13100c;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.de-id {
+  background: #1e1a14;
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #3d3220;
+  box-shadow: 3px 3px 0 #070604;
+}
+.de-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #e8dfc8; letter-spacing: 0.04em; }
+.de-tag  { font-size: 0.75rem; color: #4a4030; letter-spacing: 0.06em; font-style: italic; margin-top: 6px; }
+.de-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.de-link { display: flex; align-items: center; font-size: 0.7rem; color: #4a4030; letter-spacing: 0.08em; text-transform: uppercase; }
+.de-badge { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; background: #ff6b2b; color: #13100c; border-radius: 99px; }
+
+.de-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.de-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.de-card { background: #1e1a14; border-radius: 10px; padding: 14px 16px; border: 1.5px solid #3d3220; box-shadow: 3px 3px 0 #070604; }
+.de-lbl  { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #4a4030; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.de-val  { font-size: 1.25rem; color: #e8dfc8; line-height: 1.3; font-weight: 500; }
+.de-val.o { color: #ff6b2b; }
+.de-val.t { color: #00b4c8; }
+.de-sub  { font-size: 0.75rem; color: #4a4030; margin-top: 4px; }
+.de-eq-bar { background: #ff6b2b; }
+.de-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.de-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #4a4030; }
+.de-dot { width: 7px; height: 7px; border-radius: 50%; background: #1c6b30; }
+.de-dot.w { background: #c84a12; }
+.de-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.de-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #2e2618; color: #4a4030; }
+.de-chip.on { border-color: #e8dfc8; color: #e8dfc8; }
+.de-stat { font-size: 2.2rem; color: #00b4c8; font-family: 'DotGothic16', monospace; line-height: 1; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LIGHT â€” E: FLOATING CARDS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.le {
+  background: #d8cfbc;
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.le-id {
+  background: #f5f0e6;
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #7a6a52;
+  box-shadow: 3px 3px 0 #a89878;
+}
+.le-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #1c1810; letter-spacing: 0.04em; }
+.le-tag  { font-size: 0.75rem; color: #9a8870; letter-spacing: 0.06em; font-style: italic; margin-top: 6px; }
+.le-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.le-link { display: flex; align-items: center; font-size: 0.7rem; color: #9a8870; letter-spacing: 0.08em; text-transform: uppercase; }
+.le-badge { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; background: #e05a18; color: #f5f0e6; border-radius: 99px; }
+
+.le-row  { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.le-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.le-card { background: #f5f0e6; border-radius: 10px; padding: 14px 16px; border: 1.5px solid #7a6a52; box-shadow: 3px 3px 0 #a89878; }
+.le-lbl  { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #9a8870; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.le-val  { font-size: 1.25rem; color: #1c1810; line-height: 1.3; font-weight: 500; }
+.le-val.o { color: #e05a18; }
+.le-val.t { color: #00768a; }
+.le-sub  { font-size: 0.75rem; color: #9a8870; margin-top: 4px; }
+.le-eq-bar { background: #e05a18; }
+.le-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.le-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #9a8870; }
+.le-dot { width: 7px; height: 7px; border-radius: 50%; background: #1a5e28; }
+.le-dot.w { background: #c84a12; }
+.le-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.le-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #d4c8b0; color: #9a8870; background: #ede4d0; }
+.le-chip.on { border-color: #1c1810; color: #1c1810; background: transparent; }
+.le-stat { font-size: 2.2rem; color: #00768a; font-family: 'DotGothic16', monospace; line-height: 1; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   DARK â€” F: SECTIONED PILL LABELS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.df {
+  background: #1a1610;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1.5px solid #3d3220;
+  box-shadow: 4px 4px 0 #070604;
+}
+.df-top {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid #2a2216;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.df-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #e8dfc8; letter-spacing: 0.04em; }
+.df-handle { font-size: 0.7rem; color: #4a4030; letter-spacing: 0.08em; margin-top: 6px; }
+.df-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.df-tagline { font-size: 0.75rem; color: #4a4030; font-style: italic; }
+.df-live { display: inline-flex; align-items: center; background: #ff6b2b; color: #1a1610; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; }
+.df-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 18px; }
+.df-sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.df-pill { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; background: #252018; color: #ff6b2b; font-family: 'DotGothic16', monospace; }
+.df-line { flex: 1; height: 1px; background: #2a2216; }
+.df-meta { font-size: 0.62rem; color: #3a3020; letter-spacing: 0.08em; }
+.df-inner { display: grid; gap: 10px; }
+.df-2 { grid-template-columns: 1fr 1fr; }
+.df-field { background: #13100c; border-radius: 8px; padding: 14px 16px; border: 1.5px solid #3d3220; box-shadow: 2px 2px 0 #070604; }
+.df-lbl { display: flex; align-items: center; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #3a3020; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.df-val { font-size: 1.2rem; color: #e8dfc8; line-height: 1.3; font-weight: 500; }
+.df-val.o { color: #ff6b2b; }
+.df-val.t { color: #00b4c8; }
+.df-sub { font-size: 0.72rem; color: #4a4030; margin-top: 4px; }
+.df-eq-bar { background: #ff6b2b; }
+.df-svc-row { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
+.df-svc { display: flex; align-items: center; gap: 5px; font-size: 0.68rem; color: #4a4030; }
+.df-dot { width: 7px; height: 7px; border-radius: 50%; background: #1c6b30; }
+.df-dot.w { background: #c84a12; }
+.df-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.df-chip { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #2a2216; color: #3a3020; }
+.df-chip.on { border-color: #e8dfc8; color: #e8dfc8; }
+.df-footer { padding: 12px 20px; border-top: 1px solid #2a2216; display: flex; justify-content: space-between; }
+.df-foot { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.df-foot.l { color: #3a3020; }
+.df-foot.r { color: #4a4030; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LIGHT â€” F: SECTIONED PILL LABELS
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.lf {
+  background: #f5f0e6;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1.5px solid #7a6a52;
+  box-shadow: 4px 4px 0 #a89878;
+}
+.lf-top {
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid #d4c8b0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  background: #faf6f0;
+}
+.lf-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #1c1810; letter-spacing: 0.04em; }
+.lf-handle { font-size: 0.7rem; color: #9a8870; letter-spacing: 0.08em; margin-top: 6px; }
+.lf-right { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.lf-tagline { font-size: 0.75rem; color: #9a8870; font-style: italic; }
+.lf-live { display: inline-flex; align-items: center; background: #e05a18; color: #faf6f0; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; }
+.lf-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 18px; }
+.lf-sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.lf-pill { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; background: #ede4d0; color: #e05a18; font-family: 'DotGothic16', monospace; border: 1px solid #d4c8b0; }
+.lf-line { flex: 1; height: 1px; background: #d4c8b0; }
+.lf-meta { font-size: 0.62rem; color: #b0a090; letter-spacing: 0.08em; }
+.lf-inner { display: grid; gap: 10px; }
+.lf-2 { grid-template-columns: 1fr 1fr; }
+.lf-field { background: #ede8da; border-radius: 8px; padding: 14px 16px; border: 1.5px solid #7a6a52; box-shadow: 2px 2px 0 #a89878; }
+.lf-lbl { display: flex; align-items: center; font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #9a8870; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.lf-val { font-size: 1.2rem; color: #1c1810; line-height: 1.3; font-weight: 500; }
+.lf-val.o { color: #e05a18; }
+.lf-val.t { color: #00768a; }
+.lf-sub { font-size: 0.72rem; color: #9a8870; margin-top: 4px; }
+.lf-eq-bar { background: #e05a18; }
+.lf-svc-row { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 6px; }
+.lf-svc { display: flex; align-items: center; gap: 5px; font-size: 0.68rem; color: #9a8870; }
+.lf-dot { width: 7px; height: 7px; border-radius: 50%; background: #1a5e28; }
+.lf-dot.w { background: #c84a12; }
+.lf-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.lf-chip { font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #d4c8b0; color: #9a8870; background: #f5f0e6; }
+.lf-chip.on { border-color: #1c1810; color: #1c1810; background: transparent; }
+.lf-footer { padding: 12px 20px; border-top: 1px solid #d4c8b0; display: flex; justify-content: space-between; background: #f0ead8; }
+.lf-foot { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.lf-foot.l { color: #9a8870; }
+.lf-foot.r { color: #b0a090; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   DARK â€” G: CHUNKY BLOCKS WITH ACCENT BORDER
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.dg {
+  background: #13100c;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dg-namecard {
+  background: #1e1a14;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #3d3220;
+  box-shadow: 3px 3px 0 #070604;
+}
+.dg-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #e8dfc8; letter-spacing: 0.04em; }
+.dg-sub  { font-size: 0.75rem; color: #4a4030; letter-spacing: 0.04em; margin-top: 4px; }
+.dg-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.dg-tagline { font-size: 0.75rem; color: #4a4030; font-style: italic; }
+.dg-badge { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; background: #ff6b2b; color: #13100c; }
+.dg-two { display: flex; align-items: flex-start; gap: 10px; }
+.dg-block { background: #1e1a14; border-radius: 12px; padding: 14px 16px; border: 1.5px solid #3d3220; box-shadow: 3px 3px 0 #070604; }
+.dg-block.al { border-left: 3px solid #ff6b2b; }
+.dg-lbl { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #4a4030; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.dg-val { font-size: 1.25rem; color: #e8dfc8; line-height: 1.3; font-weight: 500; }
+.dg-val.o { color: #ff6b2b; }
+.dg-val.t { color: #00b4c8; }
+.dg-stat { font-size: 2.2rem; color: #00b4c8; font-family: 'DotGothic16', monospace; margin-bottom: 4px; line-height: 1; }
+.dg-eq-bar { background: #ff6b2b; }
+.dg-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.dg-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #4a4030; }
+.dg-dot { width: 7px; height: 7px; border-radius: 50%; background: #1c6b30; }
+.dg-dot.w { background: #c84a12; }
+.dg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.dg-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #2a2216; color: #3a3020; }
+.dg-chip.on { border-color: #e8dfc8; color: #e8dfc8; }
+
+/* hover-to-expand capsules */
+.dg-two .dg-block {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0%;
+  min-width: 0;
+}
+.dg-two:hover .dg-block { flex-grow: 0.65; }
+.dg-two .dg-block:hover { flex-grow: 2.5; }
+.dg-block {
+  cursor: pointer;
+  overflow: hidden;
+  transition: flex-grow 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.dg-block:hover { border-color: #ff6b2b; box-shadow: 5px 5px 0 #070604; }
+.dg-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dg-more {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.45s ease, opacity 0.3s ease, margin-top 0.45s ease;
+}
+.dg-block:hover .dg-more { max-height: 240px; opacity: 1; margin-top: 10px; }
+.dg-more-head { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #3a3020; padding-top: 10px; margin-bottom: 6px; border-top: 1px solid #2a2216; font-family: 'DotGothic16', monospace; }
+.dg-more-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.7rem; color: #e8dfc8; padding: 3px 0; white-space: nowrap; }
+.dg-more-row span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.dg-more-meta { color: #4a4030; flex-shrink: 0; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LIGHT â€” G: CHUNKY BLOCKS WITH ACCENT BORDER
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.lg {
+  background: #d8cfbc;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lg-namecard {
+  background: #f5f0e6;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #7a6a52;
+  box-shadow: 3px 3px 0 #a89878;
+}
+.lg-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #1c1810; letter-spacing: 0.04em; }
+.lg-sub  { font-size: 0.75rem; color: #9a8870; letter-spacing: 0.04em; margin-top: 4px; }
+.lg-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.lg-tagline { font-size: 0.75rem; color: #9a8870; font-style: italic; }
+.lg-badge { display: inline-flex; align-items: center; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; padding: 4px 12px; border-radius: 99px; background: #e05a18; color: #f5f0e6; }
+.lg-two { display: flex; align-items: flex-start; gap: 10px; }
+.lg-block { background: #f5f0e6; border-radius: 12px; padding: 14px 16px; border: 1.5px solid #7a6a52; box-shadow: 3px 3px 0 #a89878; }
+.lg-block.al { border-left: 3px solid #e05a18; }
+.lg-lbl { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #9a8870; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.lg-val { font-size: 1.25rem; color: #1c1810; line-height: 1.3; font-weight: 500; }
+.lg-val.o { color: #e05a18; }
+.lg-val.t { color: #00768a; }
+.lg-stat { font-size: 2.2rem; color: #00768a; font-family: 'DotGothic16', monospace; margin-bottom: 4px; line-height: 1; }
+.lg-eq-bar { background: #e05a18; }
+.lg-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.lg-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #9a8870; }
+.lg-dot { width: 7px; height: 7px; border-radius: 50%; background: #1a5e28; }
+.lg-dot.w { background: #c84a12; }
+.lg-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.lg-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #d4c8b0; color: #9a8870; background: #ede8da; }
+.lg-chip.on { border-color: #1c1810; color: #1c1810; background: transparent; }
+
+/* hover-to-expand capsules */
+.lg-two .lg-block {
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0%;
+  min-width: 0;
+}
+.lg-two:hover .lg-block { flex-grow: 0.65; }
+.lg-two .lg-block:hover { flex-grow: 2.5; }
+.lg-block {
+  cursor: pointer;
+  overflow: hidden;
+  transition: flex-grow 0.4s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease, box-shadow 0.25s ease;
+}
+.lg-block:hover { border-color: #e05a18; box-shadow: 5px 5px 0 #a89878; }
+.lg-val { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-more {
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 0.45s ease, opacity 0.3s ease, margin-top 0.45s ease;
+}
+.lg-block:hover .lg-more { max-height: 240px; opacity: 1; margin-top: 10px; }
+.lg-more-head { font-size: 0.6rem; letter-spacing: 0.14em; text-transform: uppercase; color: #9a8870; padding-top: 10px; margin-bottom: 6px; border-top: 1px solid #d4c8b0; font-family: 'DotGothic16', monospace; }
+.lg-more-row { display: flex; justify-content: space-between; gap: 12px; font-size: 0.7rem; color: #1c1810; padding: 3px 0; white-space: nowrap; }
+.lg-more-row span:first-child { overflow: hidden; text-overflow: ellipsis; }
+.lg-more-meta { color: #9a8870; flex-shrink: 0; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   DARK â€” H: ANNOTATION BUBBLES
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.dh {
+  background: #13100c;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dh-id {
+  background: #1e1a14;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #3d3220;
+  border-left: 3px solid #ff6b2b;
+  box-shadow: 3px 3px 0 #070604;
+}
+.dh-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #e8dfc8; letter-spacing: 0.04em; }
+.dh-logo-tag { font-size: 0.7rem; color: #4a4030; letter-spacing: 0.06em; margin-top: 6px; }
+.dh-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.dh-tagline { font-size: 0.75rem; color: #4a4030; font-style: italic; }
+.dh-live { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: #ff6b2b; border: 1px solid #3a2218; padding: 4px 12px; border-radius: 99px; }
+.dh-ldot { width: 6px; height: 6px; border-radius: 50%; background: #ff6b2b; animation: dp 2s ease-in-out infinite; }
+@keyframes dp { 0%,100%{ opacity:.4; } 50%{ opacity:1; } }
+.dh-row  { display: grid; gap: 10px; }
+.dh-row2 { grid-template-columns: 1fr 1fr; }
+.dh-bubble { background: #1a1610; border-radius: 10px; padding: 14px 16px; border: 1.5px solid #3d3220; box-shadow: 3px 3px 0 #070604; }
+.dh-bubble.ho { border-color: #5a3018; }
+.dh-bubble.ht { border-color: #0d3a48; }
+.dh-lbl { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #3a3020; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.dh-val { font-size: 1.25rem; color: #e8dfc8; line-height: 1.3; font-weight: 500; }
+.dh-val.o { color: #ff6b2b; }
+.dh-val.t { color: #00b4c8; }
+.dh-sub { font-size: 0.75rem; color: #3a3020; margin-top: 4px; }
+.dh-eq-bar { background: #ff6b2b; }
+.dh-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.dh-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #3a3020; }
+.dh-dot { width: 7px; height: 7px; border-radius: 50%; background: #1c6b30; }
+.dh-dot.w { background: #c84a12; }
+.dh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dh-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #2a2216; color: #3a3020; }
+.dh-chip.on { border-color: #e8dfc8; color: #e8dfc8; }
+.dh-stat { font-size: 2.2rem; color: #00b4c8; font-family: 'DotGothic16', monospace; line-height: 1; }
+
+
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   LIGHT â€” H: ANNOTATION BUBBLES
+â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
+.lh {
+  background: #d8cfbc;
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.lh-id {
+  background: #faf6f0;
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border: 1.5px solid #7a6a52;
+  border-left: 3px solid #e05a18;
+  box-shadow: 3px 3px 0 #a89878;
+}
+.lh-logo { font-family: 'DotGothic16', monospace; font-size: 1.7rem; color: #1c1810; letter-spacing: 0.04em; }
+.lh-logo-tag { font-size: 0.7rem; color: #9a8870; letter-spacing: 0.06em; margin-top: 6px; }
+.lh-right { display: flex; flex-direction: column; align-items: flex-end; gap: 7px; }
+.lh-tagline { font-size: 0.75rem; color: #9a8870; font-style: italic; }
+.lh-live { display: flex; align-items: center; gap: 6px; font-size: 0.65rem; letter-spacing: 0.12em; text-transform: uppercase; color: #e05a18; border: 1px solid #e0c0a8; padding: 4px 12px; border-radius: 99px; }
+.lh-ldot { width: 6px; height: 6px; border-radius: 50%; background: #e05a18; animation: lp 2s ease-in-out infinite; }
+@keyframes lp { 0%,100%{ opacity:.4; } 50%{ opacity:1; } }
+.lh-row  { display: grid; gap: 10px; }
+.lh-row2 { grid-template-columns: 1fr 1fr; }
+.lh-bubble { background: #f5f0e6; border-radius: 10px; padding: 14px 16px; border: 1.5px solid #7a6a52; box-shadow: 3px 3px 0 #a89878; }
+.lh-bubble.ho { border-color: #b07040; background: #fdf8f2; }
+.lh-bubble.ht { border-color: #4a9090; background: #f2f9fa; }
+.lh-lbl { display: flex; align-items: center; font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: #b0a090; margin-bottom: 8px; font-family: 'DotGothic16', monospace; }
+.lh-val { font-size: 1.25rem; color: #1c1810; line-height: 1.3; font-weight: 500; }
+.lh-val.o { color: #e05a18; }
+.lh-val.t { color: #00768a; }
+.lh-sub { font-size: 0.75rem; color: #9a8870; margin-top: 4px; }
+.lh-eq-bar { background: #e05a18; }
+.lh-svc-row { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-top: 6px; }
+.lh-svc { display: flex; align-items: center; gap: 5px; font-size: 0.7rem; color: #9a8870; }
+.lh-dot { width: 7px; height: 7px; border-radius: 50%; background: #1a5e28; }
+.lh-dot.w { background: #c84a12; }
+.lh-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.lh-chip { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 10px; border-radius: 99px; border: 1px solid #d4c8b0; color: #9a8870; background: #ede8da; }
+.lh-chip.on { border-color: #1c1810; color: #1c1810; background: transparent; }
+.lh-stat { font-size: 2.2rem; color: #00768a; font-family: 'DotGothic16', monospace; line-height: 1; }
+</style>
+</head>
+<body>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• DARK MODE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="section-dark">
+  <div class="section-head">
+    <div class="section-title">Dark Mode</div>
+    <div class="section-sub">warm dark Â· #13100c bg Â· cream text</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- DARK E -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">E</span>
+        <span class="card-name">Floating Cards</span>
+      </div>
+      <div class="de">
+        <div class="de-id">
+          <div>
+            <div class="de-logo">AVN Hub</div>
+            <div class="de-tag">building things at 2am</div>
+          </div>
+          <div class="de-right">
+            <div class="de-link">GitHub Â· Homelab</div>
+            <div class="de-badge">live</div>
+          </div>
+        </div>
+        <div class="de-row">
+          <div class="de-card">
+            <div class="de-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar de-eq-bar" style="height:7px;"></div>
+              <div class="eq-bar de-eq-bar" style="height:11px;"></div>
+              <div class="eq-bar de-eq-bar" style="height:4px;"></div>
+              <div class="eq-bar de-eq-bar" style="height:9px;"></div>
+            </div>
+            <div class="de-val">Nightcall</div>
+            <div class="de-sub">Kavinsky Â· Outrun</div>
+          </div>
+          <div class="de-card">
+            <div class="de-lbl">currently playing</div>
+            <div class="de-val">Hollow Knight</div>
+            <div class="de-sub">2.4h session Â· 48h total</div>
+          </div>
+        </div>
+        <div class="de-card">
+          <div class="de-lbl">currently building</div>
+          <div class="de-val o">AVN Hub â€” living identity artifact</div>
+          <div class="de-sub">last commit 4h ago Â· main</div>
+        </div>
+        <div class="de-row3">
+          <div class="de-card">
+            <div class="de-lbl">uptime</div>
+            <div class="de-stat">99.6%</div>
+            <div class="de-sub">14d 6h</div>
+          </div>
+          <div class="de-card" style="grid-column:span 2;">
+            <div class="de-lbl">services</div>
+            <div class="de-svc-row">
+              <div class="de-svc"><div class="de-dot"></div>Navidrome</div>
+              <div class="de-svc"><div class="de-dot"></div>Vaultwarden</div>
+              <div class="de-svc"><div class="de-dot w"></div>Jellyfin</div>
+              <div class="de-svc"><div class="de-dot"></div>Uptime</div>
+            </div>
+          </div>
+        </div>
+        <div class="de-card">
+          <div class="de-lbl">stack</div>
+          <div class="de-chips">
+            <div class="de-chip on">Unity</div>
+            <div class="de-chip on">TypeScript</div>
+            <div class="de-chip">Python</div>
+            <div class="de-chip on">Docker</div>
+            <div class="de-chip">Claude Code</div>
+            <div class="de-chip on">Next.js</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK F -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">F</span>
+        <span class="card-name">Sectioned Pill Labels</span>
+      </div>
+      <div class="df">
+        <div class="df-top">
+          <div>
+            <div class="df-logo">AVN Hub</div>
+            <div class="df-handle">github Â· homelab Â· docker Â· tailscale</div>
+          </div>
+          <div class="df-right">
+            <div class="df-tagline">building things at 2am</div>
+            <div class="df-live">live</div>
+          </div>
+        </div>
+        <div class="df-body">
+          <div>
+            <div class="df-sec-head">
+              <div class="df-pill">Music</div>
+              <div class="df-line"></div>
+              <div class="df-meta">Last.fm</div>
+            </div>
+            <div class="df-inner df-2">
+              <div class="df-field">
+                <div class="df-lbl">now playing</div>
+                <div class="eq">
+                  <div class="eq-bar df-eq-bar" style="height:5px;"></div>
+                  <div class="eq-bar df-eq-bar" style="height:10px;"></div>
+                  <div class="eq-bar df-eq-bar" style="height:3px;"></div>
+                  <div class="eq-bar df-eq-bar" style="height:8px;"></div>
+                </div>
+                <div class="df-val">Nightcall</div>
+                <div class="df-sub">Kavinsky Â· Outrun</div>
+              </div>
+              <div class="df-field">
+                <div class="df-lbl">currently playing</div>
+                <div class="df-val">Hollow Knight</div>
+                <div class="df-sub">2.4h Â· 48h total</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="df-sec-head">
+              <div class="df-pill">Build</div>
+              <div class="df-line"></div>
+              <div class="df-meta">main Â· 4h ago</div>
+            </div>
+            <div class="df-inner">
+              <div class="df-field">
+                <div class="df-lbl">currently building</div>
+                <div class="df-val o">AVN Hub â€” living identity artifact</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="df-sec-head">
+              <div class="df-pill">Homelab</div>
+              <div class="df-line"></div>
+              <div class="df-meta">99.6% Â· 14d 6h</div>
+            </div>
+            <div class="df-inner df-2">
+              <div class="df-field">
+                <div class="df-lbl">services</div>
+                <div class="df-svc-row">
+                  <div class="df-svc"><div class="df-dot"></div>Navidrome</div>
+                  <div class="df-svc"><div class="df-dot"></div>Vaultwarden</div>
+                  <div class="df-svc"><div class="df-dot w"></div>Jellyfin</div>
+                  <div class="df-svc"><div class="df-dot"></div>Uptime</div>
+                </div>
+              </div>
+              <div class="df-field">
+                <div class="df-lbl">stack</div>
+                <div class="df-chips">
+                  <div class="df-chip on">Unity</div>
+                  <div class="df-chip on">TS</div>
+                  <div class="df-chip">Python</div>
+                  <div class="df-chip on">Docker</div>
+                  <div class="df-chip">Claude</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="df-footer">
+          <div class="df-foot l">avn-hub Â· self-hosted</div>
+          <div class="df-foot r">refreshed 8s ago</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK G -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">G</span>
+        <span class="card-name">Chunky Blocks + Accent Border</span>
+      </div>
+      <div class="dg">
+        <div class="dg-namecard">
+          <div>
+            <div class="dg-logo">AVN Hub</div>
+            <div class="dg-sub">github Â· homelab Â· self-hosted Â· docker Â· tailscale</div>
+          </div>
+          <div class="dg-right">
+            <div class="dg-tagline">building things at 2am</div>
+            <div class="dg-badge">live</div>
+          </div>
+        </div>
+        <div class="dg-two">
+          <div class="dg-block al">
+            <div class="dg-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar dg-eq-bar" style="height:7px;"></div>
+              <div class="eq-bar dg-eq-bar" style="height:12px;"></div>
+              <div class="eq-bar dg-eq-bar" style="height:5px;"></div>
+              <div class="eq-bar dg-eq-bar" style="height:10px;"></div>
+            </div>
+            <div class="dg-val">Nightcall</div>
+            <div class="dg-sub">Kavinsky Â· Outrun</div>
+            <div class="dg-more">
+              <div class="dg-more-head">recently played</div>
+              <div class="dg-more-row"><span>Turbo Killer</span><span class="dg-more-meta">Carpenter Brut</span></div>
+              <div class="dg-more-row"><span>Genesis</span><span class="dg-more-meta">Justice</span></div>
+              <div class="dg-more-row"><span>Tonight</span><span class="dg-more-meta">Mr.Kitty</span></div>
+            </div>
+          </div>
+          <div class="dg-block">
+            <div class="dg-lbl">currently playing</div>
+            <div class="dg-val">Hollow Knight</div>
+            <div class="dg-sub">2.4h session Â· 48h total</div>
+            <div class="dg-more">
+              <div class="dg-more-head">recently played</div>
+              <div class="dg-more-row"><span>Hades</span><span class="dg-more-meta">62h total</span></div>
+              <div class="dg-more-row"><span>Celeste</span><span class="dg-more-meta">38h total</span></div>
+              <div class="dg-more-row"><span>Outer Wilds</span><span class="dg-more-meta">21h total</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="dg-block al">
+          <div class="dg-lbl">currently building</div>
+          <div class="dg-val o">AVN Hub â€” living identity artifact</div>
+          <div class="dg-sub">last commit 4h ago Â· main</div>
+          <div class="dg-more">
+            <div class="dg-more-head">recent commits</div>
+            <div class="dg-more-row"><span>fix: tailscale serve config</span><span class="dg-more-meta">2h ago</span></div>
+            <div class="dg-more-row"><span>feat: homelab status v2</span><span class="dg-more-meta">4h ago</span></div>
+            <div class="dg-more-row"><span>chore: dot-matrix logo svg</span><span class="dg-more-meta">1d ago</span></div>
+          </div>
+        </div>
+        <div class="dg-two">
+          <div class="dg-block">
+            <div class="dg-lbl">homelab</div>
+            <div class="dg-stat">99.6%</div>
+            <div class="dg-svc-row">
+              <div class="dg-svc"><div class="dg-dot"></div>Navidrome</div>
+              <div class="dg-svc"><div class="dg-dot"></div>Vault</div>
+              <div class="dg-svc"><div class="dg-dot w"></div>Jellyfin</div>
+              <div class="dg-svc"><div class="dg-dot"></div>Uptime</div>
+            </div>
+            <div class="dg-more">
+              <div class="dg-more-head">services</div>
+              <div class="dg-more-row"><span>Navidrome</span><span class="dg-more-meta">99.9% Â· 14d</span></div>
+              <div class="dg-more-row"><span>Vaultwarden</span><span class="dg-more-meta">100% Â· 14d</span></div>
+              <div class="dg-more-row"><span>Jellyfin</span><span class="dg-more-meta">98.2% Â· 14d</span></div>
+              <div class="dg-more-row"><span>Uptime Kuma</span><span class="dg-more-meta">99.9% Â· 14d</span></div>
+            </div>
+          </div>
+          <div class="dg-block">
+            <div class="dg-lbl">stack</div>
+            <div class="dg-chips">
+              <div class="dg-chip on">Unity</div>
+              <div class="dg-chip on">TypeScript</div>
+              <div class="dg-chip">Python</div>
+              <div class="dg-chip on">Docker</div>
+              <div class="dg-chip">Claude</div>
+              <div class="dg-chip on">Next.js</div>
+            </div>
+            <div class="dg-more">
+              <div class="dg-more-head">currently used for</div>
+              <div class="dg-more-row"><span>Unity</span><span class="dg-more-meta">game dev</span></div>
+              <div class="dg-more-row"><span>TypeScript</span><span class="dg-more-meta">this site</span></div>
+              <div class="dg-more-row"><span>Docker</span><span class="dg-more-meta">deploy</span></div>
+              <div class="dg-more-row"><span>Claude Code</span><span class="dg-more-meta">pair programming</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DARK H -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">H</span>
+        <span class="card-name">Annotation Bubbles</span>
+      </div>
+      <div class="dh">
+        <div class="dh-id">
+          <div>
+            <div class="dh-logo">AVN Hub</div>
+            <div class="dh-logo-tag">github Â· homelab Â· self-hosted</div>
+          </div>
+          <div class="dh-right">
+            <div class="dh-tagline">building things at 2am</div>
+            <div class="dh-live"><div class="dh-ldot"></div>live</div>
+          </div>
+        </div>
+        <div class="dh-row dh-row2">
+          <div class="dh-bubble ho">
+            <div class="dh-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar dh-eq-bar" style="height:5px;"></div>
+              <div class="eq-bar dh-eq-bar" style="height:9px;"></div>
+              <div class="eq-bar dh-eq-bar" style="height:3px;"></div>
+            </div>
+            <div class="dh-val">Nightcall</div>
+            <div class="dh-sub">Kavinsky Â· Outrun</div>
+          </div>
+          <div class="dh-bubble">
+            <div class="dh-lbl">currently playing</div>
+            <div class="dh-val">Hollow Knight</div>
+            <div class="dh-sub">2.4h Â· 48h total</div>
+          </div>
+        </div>
+        <div class="dh-bubble ho">
+          <div class="dh-lbl">currently building</div>
+          <div class="dh-val o">AVN Hub â€” living identity artifact</div>
+          <div class="dh-sub">last commit 4h ago Â· main</div>
+        </div>
+        <div class="dh-row dh-row2">
+          <div class="dh-bubble ht">
+            <div class="dh-lbl">homelab</div>
+            <div class="dh-stat">99.6%</div>
+            <div class="dh-svc-row">
+              <div class="dh-svc"><div class="dh-dot"></div>Navidrome</div>
+              <div class="dh-svc"><div class="dh-dot"></div>Vault</div>
+              <div class="dh-svc"><div class="dh-dot w"></div>Jellyfin</div>
+              <div class="dh-svc"><div class="dh-dot"></div>Uptime</div>
+            </div>
+          </div>
+          <div class="dh-bubble">
+            <div class="dh-lbl">stack</div>
+            <div class="dh-chips">
+              <div class="dh-chip on">Unity</div>
+              <div class="dh-chip on">TypeScript</div>
+              <div class="dh-chip">Python</div>
+              <div class="dh-chip on">Docker</div>
+              <div class="dh-chip">Claude</div>
+              <div class="dh-chip on">Next.js</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• LIGHT MODE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+<div class="section-light">
+  <div class="section-head">
+    <div class="section-title">Light Mode</div>
+    <div class="section-sub">warm cream Â· #e2d9c8 bg Â· dark brown text</div>
+  </div>
+
+  <div class="grid">
+
+    <!-- LIGHT E -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">E</span>
+        <span class="card-name">Floating Cards</span>
+      </div>
+      <div class="le">
+        <div class="le-id">
+          <div>
+            <div class="le-logo">AVN Hub</div>
+            <div class="le-tag">building things at 2am</div>
+          </div>
+          <div class="le-right">
+            <div class="le-link">GitHub Â· Homelab</div>
+            <div class="le-badge">live</div>
+          </div>
+        </div>
+        <div class="le-row">
+          <div class="le-card">
+            <div class="le-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar le-eq-bar" style="height:7px;"></div>
+              <div class="eq-bar le-eq-bar" style="height:11px;"></div>
+              <div class="eq-bar le-eq-bar" style="height:4px;"></div>
+              <div class="eq-bar le-eq-bar" style="height:9px;"></div>
+            </div>
+            <div class="le-val">Nightcall</div>
+            <div class="le-sub">Kavinsky Â· Outrun</div>
+          </div>
+          <div class="le-card">
+            <div class="le-lbl">currently playing</div>
+            <div class="le-val">Hollow Knight</div>
+            <div class="le-sub">2.4h session Â· 48h total</div>
+          </div>
+        </div>
+        <div class="le-card">
+          <div class="le-lbl">currently building</div>
+          <div class="le-val o">AVN Hub â€” living identity artifact</div>
+          <div class="le-sub">last commit 4h ago Â· main</div>
+        </div>
+        <div class="le-row3">
+          <div class="le-card">
+            <div class="le-lbl">uptime</div>
+            <div class="le-stat">99.6%</div>
+            <div class="le-sub">14d 6h</div>
+          </div>
+          <div class="le-card" style="grid-column:span 2;">
+            <div class="le-lbl">services</div>
+            <div class="le-svc-row">
+              <div class="le-svc"><div class="le-dot"></div>Navidrome</div>
+              <div class="le-svc"><div class="le-dot"></div>Vaultwarden</div>
+              <div class="le-svc"><div class="le-dot w"></div>Jellyfin</div>
+              <div class="le-svc"><div class="le-dot"></div>Uptime</div>
+            </div>
+          </div>
+        </div>
+        <div class="le-card">
+          <div class="le-lbl">stack</div>
+          <div class="le-chips">
+            <div class="le-chip on">Unity</div>
+            <div class="le-chip on">TypeScript</div>
+            <div class="le-chip">Python</div>
+            <div class="le-chip on">Docker</div>
+            <div class="le-chip">Claude Code</div>
+            <div class="le-chip on">Next.js</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIGHT F -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">F</span>
+        <span class="card-name">Sectioned Pill Labels</span>
+      </div>
+      <div class="lf">
+        <div class="lf-top">
+          <div>
+            <div class="lf-logo">AVN Hub</div>
+            <div class="lf-handle">github Â· homelab Â· docker Â· tailscale</div>
+          </div>
+          <div class="lf-right">
+            <div class="lf-tagline">building things at 2am</div>
+            <div class="lf-live">live</div>
+          </div>
+        </div>
+        <div class="lf-body">
+          <div>
+            <div class="lf-sec-head">
+              <div class="lf-pill">Music</div>
+              <div class="lf-line"></div>
+              <div class="lf-meta">Last.fm</div>
+            </div>
+            <div class="lf-inner lf-2">
+              <div class="lf-field">
+                <div class="lf-lbl">now playing</div>
+                <div class="eq">
+                  <div class="eq-bar lf-eq-bar" style="height:5px;"></div>
+                  <div class="eq-bar lf-eq-bar" style="height:10px;"></div>
+                  <div class="eq-bar lf-eq-bar" style="height:3px;"></div>
+                  <div class="eq-bar lf-eq-bar" style="height:8px;"></div>
+                </div>
+                <div class="lf-val">Nightcall</div>
+                <div class="lf-sub">Kavinsky Â· Outrun</div>
+              </div>
+              <div class="lf-field">
+                <div class="lf-lbl">currently playing</div>
+                <div class="lf-val">Hollow Knight</div>
+                <div class="lf-sub">2.4h Â· 48h total</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="lf-sec-head">
+              <div class="lf-pill">Build</div>
+              <div class="lf-line"></div>
+              <div class="lf-meta">main Â· 4h ago</div>
+            </div>
+            <div class="lf-inner">
+              <div class="lf-field">
+                <div class="lf-lbl">currently building</div>
+                <div class="lf-val o">AVN Hub â€” living identity artifact</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="lf-sec-head">
+              <div class="lf-pill">Homelab</div>
+              <div class="lf-line"></div>
+              <div class="lf-meta">99.6% Â· 14d 6h</div>
+            </div>
+            <div class="lf-inner lf-2">
+              <div class="lf-field">
+                <div class="lf-lbl">services</div>
+                <div class="lf-svc-row">
+                  <div class="lf-svc"><div class="lf-dot"></div>Navidrome</div>
+                  <div class="lf-svc"><div class="lf-dot"></div>Vaultwarden</div>
+                  <div class="lf-svc"><div class="lf-dot w"></div>Jellyfin</div>
+                  <div class="lf-svc"><div class="lf-dot"></div>Uptime</div>
+                </div>
+              </div>
+              <div class="lf-field">
+                <div class="lf-lbl">stack</div>
+                <div class="lf-chips">
+                  <div class="lf-chip on">Unity</div>
+                  <div class="lf-chip on">TS</div>
+                  <div class="lf-chip">Python</div>
+                  <div class="lf-chip on">Docker</div>
+                  <div class="lf-chip">Claude</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lf-footer">
+          <div class="lf-foot l">avn-hub Â· self-hosted</div>
+          <div class="lf-foot r">refreshed 8s ago</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIGHT G -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">G</span>
+        <span class="card-name">Chunky Blocks + Accent Border</span>
+      </div>
+      <div class="lg">
+        <div class="lg-namecard">
+          <div>
+            <div class="lg-logo">AVN Hub</div>
+            <div class="lg-sub">github Â· homelab Â· self-hosted Â· docker Â· tailscale</div>
+          </div>
+          <div class="lg-right">
+            <div class="lg-tagline">building things at 2am</div>
+            <div class="lg-badge">live</div>
+          </div>
+        </div>
+        <div class="lg-two">
+          <div class="lg-block al">
+            <div class="lg-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar lg-eq-bar" style="height:7px;"></div>
+              <div class="eq-bar lg-eq-bar" style="height:12px;"></div>
+              <div class="eq-bar lg-eq-bar" style="height:5px;"></div>
+              <div class="eq-bar lg-eq-bar" style="height:10px;"></div>
+            </div>
+            <div class="lg-val">Nightcall</div>
+            <div class="lg-sub">Kavinsky Â· Outrun</div>
+            <div class="lg-more">
+              <div class="lg-more-head">recently played</div>
+              <div class="lg-more-row"><span>Turbo Killer</span><span class="lg-more-meta">Carpenter Brut</span></div>
+              <div class="lg-more-row"><span>Genesis</span><span class="lg-more-meta">Justice</span></div>
+              <div class="lg-more-row"><span>Tonight</span><span class="lg-more-meta">Mr.Kitty</span></div>
+            </div>
+          </div>
+          <div class="lg-block">
+            <div class="lg-lbl">currently playing</div>
+            <div class="lg-val">Hollow Knight</div>
+            <div class="lg-sub">2.4h session Â· 48h total</div>
+            <div class="lg-more">
+              <div class="lg-more-head">recently played</div>
+              <div class="lg-more-row"><span>Hades</span><span class="lg-more-meta">62h total</span></div>
+              <div class="lg-more-row"><span>Celeste</span><span class="lg-more-meta">38h total</span></div>
+              <div class="lg-more-row"><span>Outer Wilds</span><span class="lg-more-meta">21h total</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="lg-block al">
+          <div class="lg-lbl">currently building</div>
+          <div class="lg-val o">AVN Hub â€” living identity artifact</div>
+          <div class="lg-sub">last commit 4h ago Â· main</div>
+          <div class="lg-more">
+            <div class="lg-more-head">recent commits</div>
+            <div class="lg-more-row"><span>fix: tailscale serve config</span><span class="lg-more-meta">2h ago</span></div>
+            <div class="lg-more-row"><span>feat: homelab status v2</span><span class="lg-more-meta">4h ago</span></div>
+            <div class="lg-more-row"><span>chore: dot-matrix logo svg</span><span class="lg-more-meta">1d ago</span></div>
+          </div>
+        </div>
+        <div class="lg-two">
+          <div class="lg-block">
+            <div class="lg-lbl">homelab</div>
+            <div class="lg-stat">99.6%</div>
+            <div class="lg-svc-row">
+              <div class="lg-svc"><div class="lg-dot"></div>Navidrome</div>
+              <div class="lg-svc"><div class="lg-dot"></div>Vault</div>
+              <div class="lg-svc"><div class="lg-dot w"></div>Jellyfin</div>
+              <div class="lg-svc"><div class="lg-dot"></div>Uptime</div>
+            </div>
+            <div class="lg-more">
+              <div class="lg-more-head">services</div>
+              <div class="lg-more-row"><span>Navidrome</span><span class="lg-more-meta">99.9% Â· 14d</span></div>
+              <div class="lg-more-row"><span>Vaultwarden</span><span class="lg-more-meta">100% Â· 14d</span></div>
+              <div class="lg-more-row"><span>Jellyfin</span><span class="lg-more-meta">98.2% Â· 14d</span></div>
+              <div class="lg-more-row"><span>Uptime Kuma</span><span class="lg-more-meta">99.9% Â· 14d</span></div>
+            </div>
+          </div>
+          <div class="lg-block">
+            <div class="lg-lbl">stack</div>
+            <div class="lg-chips">
+              <div class="lg-chip on">Unity</div>
+              <div class="lg-chip on">TypeScript</div>
+              <div class="lg-chip">Python</div>
+              <div class="lg-chip on">Docker</div>
+              <div class="lg-chip">Claude</div>
+              <div class="lg-chip on">Next.js</div>
+            </div>
+            <div class="lg-more">
+              <div class="lg-more-head">currently used for</div>
+              <div class="lg-more-row"><span>Unity</span><span class="lg-more-meta">game dev</span></div>
+              <div class="lg-more-row"><span>TypeScript</span><span class="lg-more-meta">this site</span></div>
+              <div class="lg-more-row"><span>Docker</span><span class="lg-more-meta">deploy</span></div>
+              <div class="lg-more-row"><span>Claude Code</span><span class="lg-more-meta">pair programming</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LIGHT H -->
+    <div class="card-wrap">
+      <div class="card-label">
+        <span class="card-letter">H</span>
+        <span class="card-name">Annotation Bubbles</span>
+      </div>
+      <div class="lh">
+        <div class="lh-id">
+          <div>
+            <div class="lh-logo">AVN Hub</div>
+            <div class="lh-logo-tag">github Â· homelab Â· self-hosted</div>
+          </div>
+          <div class="lh-right">
+            <div class="lh-tagline">building things at 2am</div>
+            <div class="lh-live"><div class="lh-ldot"></div>live</div>
+          </div>
+        </div>
+        <div class="lh-row lh-row2">
+          <div class="lh-bubble ho">
+            <div class="lh-lbl">now playing</div>
+            <div class="eq">
+              <div class="eq-bar lh-eq-bar" style="height:5px;"></div>
+              <div class="eq-bar lh-eq-bar" style="height:9px;"></div>
+              <div class="eq-bar lh-eq-bar" style="height:3px;"></div>
+            </div>
+            <div class="lh-val">Nightcall</div>
+            <div class="lh-sub">Kavinsky Â· Outrun</div>
+          </div>
+          <div class="lh-bubble">
+            <div class="lh-lbl">currently playing</div>
+            <div class="lh-val">Hollow Knight</div>
+            <div class="lh-sub">2.4h Â· 48h total</div>
+          </div>
+        </div>
+        <div class="lh-bubble ho">
+          <div class="lh-lbl">currently building</div>
+          <div class="lh-val o">AVN Hub â€” living identity artifact</div>
+          <div class="lh-sub">last commit 4h ago Â· main</div>
+        </div>
+        <div class="lh-row lh-row2">
+          <div class="lh-bubble ht">
+            <div class="lh-lbl">homelab</div>
+            <div class="lh-stat">99.6%</div>
+            <div class="lh-svc-row">
+              <div class="lh-svc"><div class="lh-dot"></div>Navidrome</div>
+              <div class="lh-svc"><div class="lh-dot"></div>Vault</div>
+              <div class="lh-svc"><div class="lh-dot w"></div>Jellyfin</div>
+              <div class="lh-svc"><div class="lh-dot"></div>Uptime</div>
+            </div>
+          </div>
+          <div class="lh-bubble">
+            <div class="lh-lbl">stack</div>
+            <div class="lh-chips">
+              <div class="lh-chip on">Unity</div>
+              <div class="lh-chip on">TypeScript</div>
+              <div class="lh-chip">Python</div>
+              <div class="lh-chip on">Docker</div>
+              <div class="lh-chip">Claude</div>
+              <div class="lh-chip on">Next.js</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+
+  // Map label text â†’ Lucide icon name
+  const iconMap = [
+    { match: 'now playing',        icon: 'music'       },
+    { match: 'currently playing',  icon: 'gamepad-2'   },
+    { match: 'currently building', icon: 'hammer'      },
+    { match: 'homelab',            icon: 'server'      },
+    { match: 'services',           icon: 'activity'    },
+    { match: 'stack',              icon: 'layers'      },
+    { match: 'uptime',             icon: 'clock-4'     },
+    { match: 'track',              icon: 'music'       },
+    { match: 'game',               icon: 'gamepad-2'   },
+    { match: 'project',            icon: 'hammer'      },
+    // pill labels
+    { match: 'music',              icon: 'music'       },
+    { match: 'build',              icon: 'hammer'      },
+    { match: 'gaming',             icon: 'gamepad-2'   },
+  ];
+
+  function prependIcon(el, iconName) {
+    const i = document.createElement('i');
+    i.dataset.lucide = iconName;
+    i.className = 'ico';
+    el.insertBefore(i, el.firstChild);
+  }
+
+  // Auto-inject into all field labels and pills
+  const labelSelectors = [
+    '.de-lbl', '.le-lbl',
+    '.df-lbl', '.lf-lbl',
+    '.df-pill', '.lf-pill',
+    '.dg-lbl', '.lg-lbl',
+    '.dh-lbl', '.lh-lbl',
+  ].join(', ');
+
+  document.querySelectorAll(labelSelectors).forEach(el => {
+    const text = el.textContent.trim().toLowerCase();
+    for (const { match, icon } of iconMap) {
+      if (text.includes(match)) {
+        prependIcon(el, icon);
+        break;
+      }
+    }
+  });
+
+  // GitHub icon in identity link rows
+  document.querySelectorAll('.de-link, .le-link').forEach(el => {
+    if (el.textContent.includes('GitHub')) {
+      prependIcon(el, 'github');
+    }
+  });
+
+  // Homelab icon in identity link rows
+  document.querySelectorAll('.de-link, .le-link').forEach(el => {
+    if (el.textContent.includes('Homelab')) {
+      prependIcon(el, 'server');
+    }
+  });
+
+  // Radio icon on live badges/pills (H-variant already has a pulse dot)
+  document.querySelectorAll(
+    '.de-badge, .le-badge, .df-live, .lf-live, ' +
+    '.dg-badge, .lg-badge'
+  ).forEach(el => prependIcon(el, 'radio'));
+
+  // Render all icons at size 14Ã—14, stroke 1.75
+  lucide.createIcons({ attrs: { width: 14, height: 14, 'stroke-width': 1.75 } });
+});
+</script>
+</body>
+</html>

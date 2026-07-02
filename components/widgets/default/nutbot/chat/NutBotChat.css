@@ -18,7 +18,7 @@
 
 .nb-chat-face {
   flex-shrink: 0;
-  width: 108px;
+  width: calc(108px * var(--nb-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,8 +38,8 @@
 .nb-chat-empty,
 .nb-chat-offline {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.62rem;
-  color: var(--text-muted);
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
   font-style: italic;
   padding: 8px 4px;
 }
@@ -54,14 +54,14 @@
   flex-wrap: wrap;
   gap: 6px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.62rem;
-  color: var(--text-muted);
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
   padding: 8px 4px;
 }
 
 .nb-inline-btn {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: calc(0.62rem * var(--nb-scale, 1));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 2px 6px;
@@ -79,12 +79,18 @@
 
 .nb-msg {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.65rem;
+  font-size: calc(0.74rem * var(--nb-scale, 1));
   line-height: 1.5;
   border-radius: 5px;
   padding: 5px 7px;
   white-space: pre-wrap;
   word-break: break-word;
+  animation: nb-msg-in 0.22s ease backwards;
+}
+
+@keyframes nb-msg-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
 }
 
 .nb-msg-user {
@@ -170,14 +176,14 @@
 
 .nb-toggle-btn {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.55rem;
+  font-size: calc(0.64rem * var(--nb-scale, 1));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--bg-nested);
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -193,14 +199,14 @@
   align-items: center;
   gap: 4px;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.55rem;
+  font-size: calc(0.64rem * var(--nb-scale, 1));
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: transparent;
-  color: var(--text-muted);
+  color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }
@@ -235,7 +241,7 @@
   border-radius: 6px;
   padding: 5px 8px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.65rem;
+  font-size: calc(0.74rem * var(--nb-scale, 1));
   color: var(--text-primary);
   outline: none;
   resize: none;
@@ -253,8 +259,8 @@
 
 .nb-send-btn {
   flex-shrink: 0;
-  width: 28px;
-  height: 28px;
+  width: calc(28px * var(--nb-scale, 1));
+  height: calc(28px * var(--nb-scale, 1));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -277,12 +283,12 @@
 }
 
 .nb-send-btn.stop {
-  border-color: var(--text-muted);
-  color: var(--text-muted);
+  border-color: var(--nb-muted, var(--text-muted));
+  color: var(--nb-muted, var(--text-muted));
 }
 
 .nb-send-btn.stop:hover {
-  background: var(--text-muted);
+  background: var(--nb-muted, var(--text-muted));
   color: var(--bg-card);
 }
 

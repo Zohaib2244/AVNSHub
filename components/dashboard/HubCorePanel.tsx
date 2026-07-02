@@ -91,9 +91,9 @@ import {
   subscribeSlotLayout,
 } from "@/lib/slotLayout";
 import { REGION_DIMS_BOUNDS, REGION_GRID, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
+import { syncDeletedWidget } from "@/lib/widget-creator/projectStore";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
-type HubCoreTab = "settings" | "widgets";
 type CanvasSettingsSection = "appearance" | "general" | "layout" | "canvases";
 type WidgetFilter = "all" | "system" | "custom";
 
@@ -141,13 +141,12 @@ function matchesWidgetSearch(id: string, query: string, meta?: string) {
 }
 
 export function HubCorePanel() {
-  const [activeTab, setActiveTab] = useState<HubCoreTab | null>(null);
   // accordion: only one settings section open at a time
   const [openSection, setOpenSection] = useState<CanvasSettingsSection | null>("appearance");
   const panelRef = useRef<HTMLDivElement>(null);
   const [snapState, setSnapState] = useState<"idle" | "busy" | "done">("idle");
 
-  const { editMode, startEdit, lockLayout } = useLayout();
+  const { editMode, startEdit, lockLayout, hubCoreTab: activeTab, setHubCoreTab: setActiveTab } = useLayout();
 
   async function handleSnapshot() {
     if (snapState !== "idle") return;
@@ -188,7 +187,7 @@ export function HubCorePanel() {
       document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [activeTab]);
+  }, [activeTab, setActiveTab]);
 
   return (
     <div ref={panelRef} className="hub-core hub-core-slot">
@@ -387,6 +386,7 @@ function WallpaperPicker({ canvasId }: { canvasId: string }) {
           {kind === "video" ? (
             <video src={url} className="wallpaper-thumb" autoPlay loop muted playsInline />
           ) : (
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="canvas wallpaper" className="wallpaper-thumb" />
           )}
           <button
@@ -805,6 +805,10 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
       if (!res.ok) {
         const payload = await res.json().catch(() => null) as { error?: string } | null;
         setDeleteError(payload?.error ?? `failed to delete ${id}`);
+      } else {
+        // reset the matching creator project (Created → In Progress) so it
+        // doesn't linger pointing at a widget that no longer exists
+        syncDeletedWidget(id);
       }
     } finally {
       setDeletingId(null);

@@ -1,0 +1,17 @@
+{
+  "title": "office time tracker",
+  "iconName": "Clock",
+  "sizes": [
+    "S",
+    "M",
+    "L"
+  ],
+  "orientations": [
+    "h"
+  ],
+  "defaults": {
+    "size": "M",
+    "orientation": "h"
+  },
+  "settings": []
+}

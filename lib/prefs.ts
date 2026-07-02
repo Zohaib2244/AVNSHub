@@ -1,8 +1,11 @@
 // Global hub preferences — mirrors the lib/theme.ts external-store pattern.
 // Server renders the defaults; the client lazily reads the saved values from
-// localStorage["nutmag-prefs"]. Written immediately on change.
+// localStorage["nutmag-prefs"]. Written immediately on change, and mirrored
+// to the shared-hub server (lib/serverSync.ts) so every browser/device
+// converges on the same prefs instead of each being stuck with its own.
 
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "./widget-creator/harnessAdapters";
+import { pollWhileVisible, pullFromServer, pushToServer } from "./serverSync";
 
 export type ChatBackend = "auto" | "bonfire" | HarnessId | "off";
 
@@ -86,6 +89,7 @@ export function setPrefs(patch: Partial<Prefs>) {
   } catch {
     // storage full/blocked — prefs still apply for this session
   }
+  pushToServer(STORAGE_KEY, prefs);
   listeners.forEach((listener) => listener());
 }
 
@@ -94,4 +98,29 @@ export function subscribePrefs(listener: () => void) {
   return () => {
     listeners.delete(listener);
   };
+}
+
+// Reconcile with the server: on load, and every 15s thereafter (skipped
+// while the tab is hidden). A fresh install has nothing on the server yet,
+// in which case we seed it with whatever's local (defaults, on a first run).
+async function syncWithServer() {
+  const remote = await pullFromServer<Prefs>(STORAGE_KEY);
+  if (remote === undefined) {
+    pushToServer(STORAGE_KEY, getPrefs());
+    return;
+  }
+  const clean = sanitize(remote);
+  if (JSON.stringify(clean) === JSON.stringify(getPrefs())) return;
+  prefs = clean;
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
+  } catch {
+    // storage full/blocked — the reconciled value still applies for this session
+  }
+  listeners.forEach((listener) => listener());
+}
+
+if (typeof window !== "undefined") {
+  syncWithServer();
+  pollWhileVisible(syncWithServer);
 }

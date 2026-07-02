@@ -14,9 +14,9 @@ The main view is a living canvas with left and right widget regions, a base stri
 
 ---
 
-## NutBot v2.2
+## NutBot v2.3
 
-NutBot lives in the center terminal slot. The terminal is a single combined header bar — title label, four tabs, and controls all in one row — with a Framer Motion animated pill that slides between active tabs.
+NutBot lives in the center terminal slot. The terminal is a single combined header bar — title label, four tabs, and controls all in one row.
 
 ![NutBot terminal v2.2 — tab bar close-up](<screenshots/nutbot-terminal-v2.2.png>)
 
@@ -58,7 +58,7 @@ The unified model picker in the top-right of the terminal controls which backend
 
 ## Widget Creator
 
-NutBot's `✦ creator` tab scaffolds brand-new widgets from a single prompt. The project list front page has a hero banner for starting new widgets, pipeline stage chips showing each project's progress, and section counts separating in-progress from created widgets.
+NutBot's `✦ creator` tab scaffolds brand-new widgets from a single prompt. The builder uses token-optimized prompt loading and compact skill references so large authoring guidance stays lightweight and fast. The project list front page has a hero banner for starting new widgets, pipeline stage chips showing each project's progress, and section counts separating in-progress from created widgets.
 
 ![Widget Creator project list](<screenshots/widget-creator-project-list.png>)
 
@@ -114,7 +114,7 @@ Once registered, every widget gets framework behavior automatically:
 - Keyboard focus gating via `isFocused` from `useWidget()`
 - Local persistence
 
-NutBot can generate widgets in the `creator` tab, or write them manually with [CREATING_WIDGETS.md](CREATING_WIDGETS.md).
+NutBot can generate widgets in the `creator` tab (see [WIDGET_CREATOR_GUIDE.md](WIDGET_CREATOR_GUIDE.md) for a full walkthrough), or write them manually with [CREATING_WIDGETS.md](CREATING_WIDGETS.md).
 
 ---
 

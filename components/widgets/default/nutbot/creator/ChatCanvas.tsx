@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, PlusCircle, Send, Square } from "lucide-react";
+import { Download, Maximize2, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
@@ -10,17 +10,26 @@ import {
   unplaceWidgetTemporarily,
   restorePlacementSnapshot,
   getPlacementSnapshot,
+  getRegionsThatFitWidget,
   type PlacementSnapshot,
 } from "@/lib/slotLayout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { getManifest } from "@/config/widgets";
 import { isValidSlug } from "@/lib/widget-creator/slug";
 import {
   updateProject,
   setWorkingProjectId,
+  CREATOR_RESTORE_PROJECT_KEY,
   projectMessagesKey,
-  projectBuildSidKey,
-  projectDoneKey,
+  loadProjectBlob,
+  saveProjectBlob,
+  removeProjectBlob,
+  pullProjectBlob,
+  type WidgetBrief,
+  type ProjectMode,
 } from "@/lib/widget-creator/projectStore";
+import { MockupLightbox } from "./MockupLightbox";
+import { renderMessageText } from "./ToolChipLine";
 
 type Phase =
   | { id: "idle" }
@@ -35,8 +44,12 @@ type Message =
   | { role: "assistant"; text: string; streaming?: boolean }
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
+  | { role: "audit"; files: string[] }
   | { role: "ok"; text: string }
-  | { role: "error"; text: string };
+  | { role: "error"; text: string }
+  | { role: "action"; text: string; action: "reload" | "open-widget-manager" | "sync-skills" };
+
+type DoneRecord = { slug: string; registered: boolean };
 
 type Props = {
   projectId: string;
@@ -45,6 +58,16 @@ type Props = {
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
   initialPrompt?: string;
+  /** the project's Plan-mode brief, if any — shown as a "carried over from
+      plan" indicator, and folded into the widget's SPEC.md on generate */
+  brief?: WidgetBrief;
+  /** which pipeline stage this project started from — recorded in SPEC.md */
+  entryMode?: ProjectMode;
+  /** Build-mode CLI session from the synced project record, tagged with the
+      target slug it belongs to so remounts can resume safely. */
+  buildSession?: { id: string; forSlug: string | null };
+  /** Finished-but-not-fully-installed build state from the project record. */
+  pendingInstall?: DoneRecord;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -61,14 +84,15 @@ const PHASE_LABEL: Record<Phase["id"], string> = {
 // only fires for the matching project.
 const PENDING_ADD_KEY = "nutmag-creator-pending-add";
 
-function StatusBar({ phase }: { phase: Phase }) {
+function StatusBar({ phase, modeLabel }: { phase: Phase; modeLabel: string }) {
   const isActive = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
   const harness = (phase as { harness?: HarnessId }).harness;
+  const label = phase.id === "idle" || phase.id === "done" ? `${modeLabel} mode · ${PHASE_LABEL[phase.id]}` : PHASE_LABEL[phase.id];
   return (
     <div className={`wc-status-bar${phase.id === "error" ? " error" : phase.id === "done" ? " done" : isActive ? " active" : ""}`}>
       {isActive && <span className="wc-status-dot" />}
       <span className="wc-status-label">
-        {PHASE_LABEL[phase.id]}
+        {label}
         {harness && ` · ${harness}`}
         {phase.id === "error" && ` · ${(phase as { message: string }).message}`}
       </span>
@@ -84,69 +108,95 @@ function validateSettings(settings: GenerateSettings): string | null {
   return null;
 }
 
-type DoneRecord = { slug: string; registered: boolean };
-
-export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarness, harnessChain, initialPrompt }: Props) {
+export function ChatCanvas({
+  projectId,
+  settings,
+  onSettingsChange,
+  activeHarness,
+  harnessChain,
+  initialPrompt,
+  brief,
+  entryMode,
+  buildSession,
+  pendingInstall,
+}: Props) {
+  const [showMockupPreview, setShowMockupPreview] = useState(false);
+  const [lightboxHtml, setLightboxHtml] = useState<string | null>(null);
   const MESSAGES_KEY  = projectMessagesKey(projectId);
-  const SESSION_KEY   = projectBuildSidKey(projectId);
-  const DONE_KEY_PROJ = projectDoneKey(projectId);
+  const pendingInstallSlug = pendingInstall?.slug ?? null;
+  const pendingInstallRegistered = pendingInstall?.registered ?? false;
 
-  function readDoneRecord(): DoneRecord | null {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = sessionStorage.getItem(DONE_KEY_PROJ);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Partial<DoneRecord>;
-      return typeof parsed.slug === "string" ? { slug: parsed.slug, registered: Boolean(parsed.registered) } : null;
-    } catch { return null; }
-  }
-
-  function writeDoneRecord(record: DoneRecord | null) {
-    try {
-      if (record) sessionStorage.setItem(DONE_KEY_PROJ, JSON.stringify(record));
-      else sessionStorage.removeItem(DONE_KEY_PROJ);
-    } catch {}
-  }
-
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem(MESSAGES_KEY);
-        return saved ? (JSON.parse(saved) as Message[]) : [];
-      } catch {}
-    }
-    return [];
-  });
-
-  const [creatorSessionId, setCreatorSessionId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      try { return sessionStorage.getItem(SESSION_KEY); } catch {}
-    }
-    return null;
-  });
-
-  const sessionForSlugRef = useRef<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(MESSAGES_KEY) ?? []);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
-  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => readDoneRecord()?.slug ?? null);
-  const [pendingRegistration, setPendingRegistration] = useState(() => {
-    const done = readDoneRecord();
-    return done ? !done.registered : false;
-  });
-  const [phase, setPhase] = useState<Phase>(() => (readDoneRecord() ? { id: "done" } : { id: "idle" }));
+  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => pendingInstallSlug);
+  const [pendingRegistration, setPendingRegistration] = useState(() => Boolean(pendingInstallSlug && !pendingInstallRegistered));
+  const [phase, setPhase] = useState<Phase>(() => (pendingInstallSlug ? { id: "done" } : { id: "idle" }));
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editHidden, setEditHidden] = useState(false);
   const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
-  const { setInstalling } = useLayout();
+  const { setInstalling, setHubCoreTab } = useLayout();
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
+  const hasDesignReference = Boolean(settings.designReferenceHtml);
+  const isEditMode = Boolean(settings.editSlug);
+  const modeLabel = isEditMode ? "edit" : "build";
 
   function fail(message: string) {
     clearSignal();
     setWorkingProjectId(null);
     setPhase({ id: "error", message });
     setMessages((prev) => [...prev, { role: "error", text: message }]);
+  }
+
+  function placementFailureMessage(slug: string): Message {
+    const manifest = getManifest(slug);
+    if (!manifest) {
+      return {
+        role: "action",
+        action: "reload",
+        text: `"${slug}" was installed, but it is not in the loaded registry yet.`,
+      };
+    }
+
+    if (getRegionsThatFitWidget(slug).length === 0) {
+      return {
+        role: "action",
+        action: "open-widget-manager",
+        text: `"${manifest.title}" is installed, but no canvas region has room for it.`,
+      };
+    }
+
+    return {
+      role: "error",
+      text: `couldn't place "${slug}" automatically. Try add to layout again, or reload the page if the registry just changed.`,
+    };
+  }
+
+  function reportPlacementFailure(slug: string) {
+    setMessages((prev) => [...prev, placementFailureMessage(slug)]);
+  }
+
+  async function runMessageAction(action: "reload" | "open-widget-manager" | "sync-skills") {
+    if (action === "reload") {
+      window.location.reload();
+    } else if (action === "open-widget-manager") {
+      setHubCoreTab("widgets");
+    } else if (action === "sync-skills") {
+      try {
+        const res = await fetch("/api/widget-creator/sync-skills", { method: "POST" });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        setMessages((prev) => [
+          ...prev,
+          body.ok
+            ? { role: "ok", text: "[ok] skills regenerated. resubmit your prompt." }
+            : { role: "error", text: body.error ?? `skill regeneration failed (${res.status})` },
+        ]);
+      } catch (error) {
+        setMessages((prev) => [...prev, { role: "error", text: `skill regeneration failed: ${(error as Error).message}` }]);
+      }
+    }
   }
 
   // if this canvas is unmounted mid-generation (e.g. canvas switch), abort and clear the lock
@@ -165,12 +215,37 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
   }, [messages, phase]);
 
   useEffect(() => {
-    try { localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages)); } catch {}
+    saveProjectBlob(MESSAGES_KEY, messages);
   }, [messages, MESSAGES_KEY]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await pullProjectBlob<Message[]>(MESSAGES_KEY);
+      if (cancelled || !remote || !Array.isArray(remote)) return;
+      setMessages((current) => {
+        if (current.length > remote.length) return current;
+        if (JSON.stringify(current) === JSON.stringify(remote)) return current;
+        return remote;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [MESSAGES_KEY]);
+
+  useEffect(() => {
+    setDoneWidgetId(pendingInstallSlug);
+    setPendingRegistration(Boolean(pendingInstallSlug && !pendingInstallRegistered));
+    setPhase((current) => {
+      if (pendingInstallSlug && current.id === "idle") return { id: "done" };
+      if (!pendingInstallSlug && current.id === "done") return { id: "idle" };
+      return current;
+    });
+  }, [pendingInstallSlug, pendingInstallRegistered]);
 
   async function generate() {
     const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
-    if (!prompt.trim() || inFlight) return;
+    const promptText = prompt.trim();
+    if ((!promptText && !hasDesignReference) || inFlight) return;
 
     const validationError = validateSettings(settings);
     if (validationError) {
@@ -178,7 +253,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
       return;
     }
 
-    const userText = prompt.trim();
+    const userText = promptText || "(build from the finalized design reference)";
     setPrompt("");
 
     const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
@@ -187,12 +262,12 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     setDoneWidgetId(null);
     setAdded(false);
     setPendingRegistration(false);
-    writeDoneRecord(null);
+    updateProject(projectId, { pendingInstall: undefined });
 
     const currentTarget = (settings.editSlug || settings.slug || "").trim() || null;
-    if (creatorSessionId && sessionForSlugRef.current !== currentTarget) {
-      setCreatorSessionId(null);
-      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    const sessionForRequest = buildSession && buildSession.forSlug === currentTarget ? buildSession.id : null;
+    if (buildSession && buildSession.forSlug !== currentTarget) {
+      updateProject(projectId, { buildSession: undefined });
     }
 
     assistantIdxRef.current = -1;
@@ -219,10 +294,11 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings,
-          prompt: userText,
+          prompt: promptText,
           harness: activeHarness,
           harnessChain,
-          sessionId: creatorSessionId ?? undefined,
+          sessionId: sessionForRequest ?? undefined,
+          projectMeta: { concept: brief?.concept, entryMode },
         }),
         signal: abort.signal,
       });
@@ -263,9 +339,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
               const registered = Boolean(payload.registered);
               const newSessionId = (payload.sessionId as string | null) ?? null;
               if (newSessionId) {
-                setCreatorSessionId(newSessionId);
-                sessionForSlugRef.current = slug;
-                try { sessionStorage.setItem(SESSION_KEY, newSessionId); } catch {}
+                updateProject(projectId, { buildSession: { id: newSessionId, forSlug: slug } });
               }
               setPhase({ id: "done" });
               setMessages((prev) => {
@@ -298,12 +372,14 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
                 setAdded(restoredOk);
                 setPendingRegistration(!registered);
                 emitWidgetCreated(slug);
-                writeDoneRecord({ slug, registered });
+                updateProject(projectId, { pendingInstall: { slug, registered } });
                 // promote project to Created in the store
                 updateProject(projectId, {
                   hasBuildOutput: true,
                   slug,
                   displayName: settings.name ?? slug,
+                  activeMode: "build",
+                  workflowMode: "build",
                 });
                 onSettingsChange({ editSlug: slug });
               }
@@ -330,10 +406,18 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           } else if (event === "tsc_errors") {
             hadTscErrors = true;
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
+          } else if (event === "audit") {
+            setMessages((prev) => [...prev, { role: "audit", files: payload.unexpectedFiles as string[] }]);
           } else if (event === "error") {
             clearSignal();
             setWorkingProjectId(null);
-            fail(payload.message as string);
+            if (payload.code === "skill-missing") {
+              const message = payload.message as string;
+              setPhase({ id: "error", message });
+              setMessages((prev) => [...prev, { role: "action", action: "sync-skills", text: message }]);
+            } else {
+              fail(payload.message as string);
+            }
             if (hadTscErrors && attemptedSlug) {
               onSettingsChange({ editSlug: attemptedSlug });
               setMessages((prev) => [
@@ -382,18 +466,19 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
 
   function clearChat() {
     if (phase.id !== "idle" && phase.id !== "done" && phase.id !== "error") return;
+    const keepInstall = doneWidgetId
+      ? { slug: doneWidgetId, registered: !pendingRegistration }
+      : pendingInstall;
     setMessages([]);
-    setPhase({ id: "idle" });
-    setDoneWidgetId(null);
-    setAdded(false);
-    setPendingRegistration(false);
-    onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
-    writeDoneRecord(null);
-    setCreatorSessionId(null);
-    sessionForSlugRef.current = null;
-    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
-    try { localStorage.removeItem(MESSAGES_KEY); } catch {}
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    setPhase(keepInstall ? { id: "done" } : { id: "idle" });
+    setDoneWidgetId(keepInstall?.slug ?? null);
+    setAdded((current) => keepInstall ? current : false);
+    setPendingRegistration(Boolean(keepInstall && !keepInstall.registered));
+    updateProject(projectId, keepInstall ? { pendingInstall: keepInstall, buildSession: undefined } : { pendingInstall: undefined, buildSession: undefined });
+    if (!keepInstall) {
+      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    }
+    removeProjectBlob(MESSAGES_KEY);
   }
 
   async function placeWithRetry(slug: string, attempts: number, delayMs: number): Promise<boolean> {
@@ -422,8 +507,9 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
       if (cancelled) return;
       try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
       if (ok) {
-        const done = readDoneRecord();
-        if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+        if (pendingInstall?.slug === slug || doneWidgetId === slug) {
+          updateProject(projectId, { pendingInstall: { slug, registered: true } });
+        }
         if (doneWidgetId === slug) {
           setAdded(true);
           setPendingRegistration(false);
@@ -431,13 +517,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
         }
       } else {
         setAdding(false);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "error",
-            text: `"${slug}" was installed but couldn't be auto-placed — every region may be full. Try the Widget Manager.`,
-          },
-        ]);
+        reportPlacementFailure(slug);
       }
     })();
     return () => { cancelled = true; };
@@ -449,7 +529,10 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     const slug = doneWidgetId;
     setAdding(true);
     setInstalling(true);
-    try { sessionStorage.setItem(PENDING_ADD_KEY, JSON.stringify({ slug, projectId })); } catch {}
+    try {
+      sessionStorage.setItem(PENDING_ADD_KEY, JSON.stringify({ slug, projectId }));
+      sessionStorage.setItem(CREATOR_RESTORE_PROJECT_KEY, JSON.stringify({ projectId }));
+    } catch {}
     setMessages((prev) => [
       ...prev,
       { role: "ok", text: `[info] installing "${slug}" — the page will refresh once to pick up the new widget.` },
@@ -468,7 +551,10 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
       });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+        try {
+          sessionStorage.removeItem(PENDING_ADD_KEY);
+          sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+        } catch {}
         setInstalling(false);
         setAdding(false);
         setMessages((prev) => [
@@ -478,20 +564,28 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
         return;
       }
     } catch (err) {
-      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+      try {
+        sessionStorage.removeItem(PENDING_ADD_KEY);
+        sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+      } catch {}
       setInstalling(false);
       setAdding(false);
       setMessages((prev) => [...prev, { role: "error", text: `couldn't install "${slug}": ${(err as Error).message}` }]);
       return;
     }
     setPendingRegistration(false);
-    const done = readDoneRecord();
-    if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+    if (pendingInstall?.slug === slug || doneWidgetId === slug) {
+      updateProject(projectId, { pendingInstall: { slug, registered: true } });
+    }
     const ok = await placeWithRetry(slug, 8, 250);
-    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    try {
+      sessionStorage.removeItem(PENDING_ADD_KEY);
+      sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+    } catch {}
     setInstalling(false);
     setAdding(false);
     if (ok) setAdded(true);
+    else reportPlacementFailure(slug);
   }
 
   async function handleAddToLayout() {
@@ -503,13 +597,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     if (ok) {
       setAdded(true);
     } else {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "error",
-          text: `couldn't place "${slug}" on the canvas — every region may be full. Try the Widget Manager, or reload the page.`,
-        },
-      ]);
+      reportPlacementFailure(slug);
     }
   }
 
@@ -527,12 +615,63 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
 
   return (
     <div className="wc-chat">
-      <StatusBar phase={phase} />
+      <StatusBar phase={phase} modeLabel={modeLabel} />
+
+      {(brief || settings.designReferenceHtml) && (
+        <div className="wc-handoff-strip">
+          {brief && (
+            <span className="wc-handoff-chip" title={brief.concept}>
+              <Map size={9} strokeWidth={2} />
+              <span className="wc-handoff-chip-label">carried over from plan: {brief.title}</span>
+            </span>
+          )}
+          {settings.designReferenceHtml && (
+            <button
+              type="button"
+              className="wc-handoff-chip interactive"
+              onClick={() => setShowMockupPreview((v) => !v)}
+              title="the finalized Ideate-mode mockup being sent as the build reference"
+            >
+              <Wand2 size={9} strokeWidth={2} />
+              <span className="wc-handoff-chip-label">mockup reference attached</span>
+              {showMockupPreview ? <ChevronUp size={9} strokeWidth={2} /> : <ChevronDown size={9} strokeWidth={2} />}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showMockupPreview && settings.designReferenceHtml && (
+        <div className="wc-handoff-preview">
+          <button
+            type="button"
+            className="wc-preview-expand"
+            onClick={() => setLightboxHtml(settings.designReferenceHtml ?? null)}
+            title="expand mockup preview"
+          >
+            <Maximize2 size={11} strokeWidth={2} />
+          </button>
+          <iframe
+            className="wc-handoff-preview-frame"
+            sandbox="allow-scripts"
+            srcDoc={settings.designReferenceHtml}
+            title="finalized mockup reference"
+          />
+        </div>
+      )}
 
       <div className="wc-chat-body" ref={bodyRef}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
-            fill in the settings on the left, then describe your widget here
+            {isEditMode
+              ? "describe changes to this widget here"
+              : "fill in the settings on the left, then describe your widget here"}
+          </div>
+        )}
+
+        {messages.length === 0 && isGenerating && (
+          <div className="wc-chat-empty wc-status-bar active">
+            <span className="wc-status-dot" />
+            <span className="wc-status-label">writing the widget...</span>
           </div>
         )}
 
@@ -543,7 +682,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           if (msg.role === "assistant") {
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <pre className="wc-code">{msg.text}</pre>
+                <div className="wc-code">{renderMessageText(msg.text)}</div>
                 {msg.streaming && <span className="wc-cursor">▍</span>}
               </div>
             );
@@ -565,6 +704,16 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
               </div>
             );
           }
+          if (msg.role === "audit") {
+            return (
+              <div key={i} className="wc-msg wc-msg-audit">
+                <div className="wc-msg-audit-head">[write audit] the run touched files outside the widget&apos;s own folders — review before trusting this build:</div>
+                {msg.files.map((f, j) => (
+                  <div key={j} className="wc-audit-line">{f}</div>
+                ))}
+              </div>
+            );
+          }
           if (msg.role === "ok") {
             return <div key={i} className="wc-msg wc-msg-ok">{msg.text}</div>;
           }
@@ -572,6 +721,21 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
             return (
               <div key={i} className="wc-msg wc-msg-error">
                 <span className="wc-msg-error-tag">[error]</span> {msg.text}
+              </div>
+            );
+          }
+          if (msg.role === "action") {
+            const label = msg.action === "reload"
+              ? "reload"
+              : msg.action === "open-widget-manager"
+                ? "open widget manager"
+                : "regenerate skills";
+            return (
+              <div key={i} className="wc-msg wc-msg-action">
+                <span>{msg.text}</span>
+                <button type="button" className="wc-msg-action-btn" onClick={() => void runMessageAction(msg.action)}>
+                  {label}
+                </button>
               </div>
             );
           }
@@ -591,7 +755,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
         {isDoneOrError && (
           <>
             <button type="button" className="wc-clear-btn" onClick={clearChat}>
-              new
+              clear chat
             </button>
             {doneWidgetId && !added && pendingRegistration && (
               <button
@@ -627,7 +791,15 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
         )}
         <textarea
           className="wc-chat-input"
-          placeholder={isGenerating ? "generating..." : "describe your widget... (shift+enter for newline)"}
+          placeholder={
+            isGenerating
+              ? "generating..."
+              : hasDesignReference
+                ? "optional notes — or just hit send to build the finalized mockup"
+                : isEditMode
+                  ? "describe the edit... (shift+enter for newline)"
+                  : "describe your widget... (shift+enter for newline)"
+          }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -644,11 +816,14 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
           onClick={isGenerating ? stop : generate}
           aria-label={isGenerating ? "stop" : "generate"}
-          disabled={!isGenerating && !prompt.trim()}
+          disabled={!isGenerating && !prompt.trim() && !hasDesignReference}
         >
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>
       </div>
+      {lightboxHtml && (
+        <MockupLightbox html={lightboxHtml} title="finalized mockup reference" onClose={() => setLightboxHtml(null)} />
+      )}
     </div>
   );
 }

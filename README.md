@@ -1,12 +1,12 @@
 # AVN Hub
 
-> A personal widget canvas. Start from the alpha layout, then make it yours.
+> A blank canvas. Fill it with whatever you want.
 
-AVN Hub starts with a compact alpha layout: identity, clock, NutBot, GitHub, Spotify, system stats, notes, dictionary, dot matrix, and a few visual toys. Rearrange it, resize it, strip it back, or use NutBot's creator tab to generate entirely new widgets from a prompt.
+AVN Hub starts empty. There are no fixed widgets, no preset layouts, nothing telling you what your dashboard should be. You fill it — and the AI widget creator is how you do it.
 
 Open NutBot's creator tab, describe what you want — a cube timer, a Wordle clone, a live price feed, a rope physics toy, a notes board, a visualizer — and it generates a real, running component. Not a template. Not a config file. An actual `.tsx` widget that drops straight into the canvas. Then arrange it, resize it, and put it in whichever named canvas makes sense: one for work, one for your homelab, one just because you like the way it looks.
 
-The bundled widgets are examples of what the framework can hold — not the limit. The point is the canvas, and the tool to make it yours.
+The bundled widgets (Spotify, homelab stats, GitHub activity, system stats, notes, dictionary, and dot matrix) are examples of what the framework can hold — not the point of it. The point is the empty canvas, and the tool to make it yours.
 
 ![AVN Hub dark mode canvas](<docs/screenshots/display dark mode.png>)
 

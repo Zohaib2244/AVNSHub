@@ -6,24 +6,42 @@ import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
 import { isValidIdeateSessionId, sessionDirFor, variationFile } from "@/lib/widget-creator/ideateStore";
+import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
+
+const REPO_ROOT = process.cwd();
+
+// Pull the default (dark "ember") token values straight out of the real
+// stylesheet instead of hand-copying hex values here — this used to be a
+// separate hardcoded :root block that could silently drift from
+// styles/globals.css whenever the palette was retuned. Falls back to the
+// last-known-good block only if globals.css can't be read at all.
+const FALLBACK_ROOT_TOKENS = `--bg-page: #13100c;
+  --bg-card: #1e1a14;
+  --bg-nested: #1a1610;
+  --border: #3d3220;
+  --shadow: #070604;
+  --text-primary: #e8dfc8;
+  --text-muted: #9f9887;
+  --text-muted-dim: #8b8475;
+  --accent-orange: #ff6b2b;
+  --accent-cyan: #00b4c8;`;
+
+function readDefaultRootTokens(): string {
+  try {
+    const css = readFileSync(join(REPO_ROOT, "styles/globals.css"), "utf-8");
+    const match = css.match(/:root\s*\{([^}]*)\}/);
+    return match ? match[1].trim() : FALLBACK_ROOT_TOKENS;
+  } catch {
+    return FALLBACK_ROOT_TOKENS;
+  }
+}
 
 // Few-shot structural/style reference trimmed from the user's own hand-built
 // Ideate mockups use the same dark "ember" palette tokens and chunky
-// sticker-card chrome the real widget framework uses, kept here as raw text
-// rather than read from disk so the prompt doesn't depend on that file
-// staying on disk or unedited.
+// sticker-card chrome the real widget framework uses.
 const STYLE_REFERENCE = `<style>
   :root {
-    --bg-page: #13100c;
-    --bg-card: #1e1a14;
-    --bg-nested: #1a1610;
-    --border: #3d3220;
-    --shadow: #070604;
-    --text-primary: #e8dfc8;
-    --text-muted: #9f9887;
-    --text-muted-dim: #8b8475;
-    --accent-orange: #ff6b2b;
-    --accent-cyan: #00b4c8;
+    ${readDefaultRootTokens()}
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg-page); color: var(--text-primary); font-family: 'JetBrains Mono', monospace; padding: 32px; }
@@ -145,6 +163,16 @@ export async function POST(req: Request) {
   const requestedHarness: HarnessId = bodyHarness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? HARNESS_CHAIN_DEFAULT;
 
+  // Same single-generation mutex as the generate route — a mockup run and a
+  // build run (or two mockup runs from different tabs) still race on the repo.
+  const lock = acquireGenerationLock("ideate");
+  if (!lock.ok) {
+    return new Response(
+      `event: error\ndata: ${JSON.stringify({ message: describeBusyError(lock.holder, lock.ageMs) })}\n\n`,
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+  }
+
   const encoder = new TextEncoder();
   const abortController = new AbortController();
 
@@ -157,6 +185,8 @@ export async function POST(req: Request) {
           // client disconnected
         }
       };
+
+      try {
 
       // On a mid-run harness switch, hand the fallback whatever variation
       // files already exist so it resumes from them instead of re-reading.
@@ -171,6 +201,8 @@ export async function POST(req: Request) {
 
       const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
 
+      // "aborted" (user stop) deliberately skips the done-verification below —
+      // a stopped run reporting "no variation files found" would be noise.
       if (outcome === "done") {
         // Verify what was actually written rather than trusting the harness's
         // claim — same discipline as the real generate route's
@@ -190,6 +222,10 @@ export async function POST(req: Request) {
           }
           sendEvent(write, "status", { type: "done", variations: written });
         }
+      }
+
+      } finally {
+        releaseGenerationLock();
       }
 
       controller.close();

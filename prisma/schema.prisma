@@ -1,0 +1,33 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// Generic key/value store — mirrors the existing localStorage key model
+// (nutmag-canvases, nutmag-theme::<canvasId>, etc.) 1:1, just moved
+// server-side so multiple browsers/devices can share the same values.
+model KV {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+// File bytes live on disk at data/uploads/<sanitized key> (see
+// app/api/hub-files/route.ts); this row just tracks the metadata needed to
+// serve them back with the right Content-Type. Used by wallpaper images/
+// videos today (key = "wallpaper:<canvasId>").
+model FileBlob {
+  key       String   @id
+  mimeType  String
+  size      Int
+  updatedAt DateTime @updatedAt
+}
