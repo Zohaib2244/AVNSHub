@@ -106,6 +106,36 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   const [ideateInitialPrompt, setIdeateInitialPrompt] = useState<string | undefined>(undefined);
   const [ideateNonce, setIdeateNonce] = useState(0);
 
+  function buildSettingsFromBrief(brief: WidgetBrief): Partial<GenerateSettings> {
+    return {
+      name: brief.title,
+      slug: brief.slug,
+      icon: brief.icon ?? project.buildSettings?.icon,
+      sizes: brief.sizes ?? ["S", "M"],
+      orientations: ["h"],
+      sDescription: brief.sContent,
+      mDescription: brief.mContent,
+      lDescription: brief.lContent,
+      dataShape: brief.dataShape,
+    };
+  }
+
+  function handlePlanBuild(brief: WidgetBrief) {
+    updateProject(project.id, {
+      hasBrief: true,
+      brief,
+      displayName: brief.title,
+      activeMode: "build",
+      workflowMode: "build",
+      buildSettings: {
+        ...(project.buildSettings ?? EMPTY_SETTINGS),
+        ...buildSettingsFromBrief(brief),
+        editSlug: undefined,
+        designReferenceHtml: undefined,
+      },
+    });
+  }
+
   function handlePlanVisualize(brief: WidgetBrief) {
     updateProject(project.id, { hasBrief: true, brief, displayName: brief.title, activeMode: "ideate", workflowMode: "ideate" });
     setIdeateInitialPrompt(brief.concept || brief.title);
@@ -113,19 +143,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   }
 
   function handleFinalize(html: string) {
-    const briefPatch: Partial<GenerateSettings> = project.brief
-      ? {
-          name: project.brief.title,
-          slug: project.brief.slug,
-          icon: project.brief.icon ?? project.buildSettings?.icon,
-          sizes: project.brief.sizes ?? ["S", "M"],
-          orientations: ["h"],
-          sDescription: project.brief.sContent,
-          mDescription: project.brief.mContent,
-          lDescription: project.brief.lContent,
-          dataShape: project.brief.dataShape,
-        }
-      : {};
+    const briefPatch = project.brief ? buildSettingsFromBrief(project.brief) : {};
     updateProject(project.id, {
       designReferenceHtml: html,
       hasIdeateRounds: true,
@@ -297,7 +315,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                         idea — get concept suggestions, then a structured brief.
                       </p>
                       <p className="wc-stage-lock-note">
-                        Moving to Ideate locks Plan for edits. You can still come back to review this chat.
+                        Moving to Ideate or Build locks Plan for edits. You can still come back to review this chat.
                       </p>
                     </div>
                   </div>
@@ -355,6 +373,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                 <PlanCanvas
                   projectId={project.id}
                   activeHarness={activeHarness}
+                  onBuild={handlePlanBuild}
                   onVisualize={handlePlanVisualize}
                   planSessionId={project.planSessionId}
                   readOnly={isReviewMode}

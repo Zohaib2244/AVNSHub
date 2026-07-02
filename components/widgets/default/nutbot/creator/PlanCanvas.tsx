@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Send, Square, Wand2 } from "lucide-react";
+import { Hammer, Send, Square, Wand2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import { useEffect } from "react";
@@ -77,11 +77,13 @@ function draftFromBrief(brief: WidgetBrief) {
 
 function BriefCard({
   brief,
+  onBuild,
   onVisualize,
   onSave,
   readOnly = false,
 }: {
   brief: WidgetBrief;
+  onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
   onSave: (brief: WidgetBrief) => void;
   readOnly?: boolean;
@@ -160,6 +162,15 @@ function BriefCard({
         <div className="wc-brief-actions">
           <button
             type="button"
+            className="wc-brief-action-btn wc-brief-build-btn"
+            onClick={() => onBuild(brief)}
+            title="locks Plan for edits and switches directly to Build"
+          >
+            <Hammer size={10} strokeWidth={2} />
+            direct build
+          </button>
+          <button
+            type="button"
             className="wc-brief-action-btn wc-brief-viz-btn"
             onClick={() => onVisualize(brief)}
             title="locks Plan for edits and continues to Ideate"
@@ -186,6 +197,7 @@ function BriefCard({
 type Props = {
   projectId: string;
   activeHarness: HarnessId;
+  onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
   /** CLI conversation id from the synced project record — server-machine
       scoped, so it survives remounts, tab closes, and device switches */
@@ -193,7 +205,7 @@ type Props = {
   readOnly?: boolean;
 };
 
-export function PlanCanvas({ projectId, activeHarness, onVisualize, planSessionId, readOnly = false }: Props) {
+export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, planSessionId, readOnly = false }: Props) {
   const msgsKey = projectPlanMessagesKey(projectId);
 
   const sessionId = planSessionId ?? null;
@@ -384,7 +396,7 @@ export function PlanCanvas({ projectId, activeHarness, onVisualize, planSessionI
       <div className="wc-chat-body wc-plan-body" ref={bodyRef}>
         {messages.length === 0 && !isLoading && (
           <div className="wc-chat-empty">
-            describe an idea (&ldquo;I want a widget that shows...&rdquo;) — get concept suggestions, then continue to ideate from a brief
+            describe an idea (&ldquo;I want a widget that shows...&rdquo;) — get concept suggestions, then continue to ideate or build from a brief
           </div>
         )}
 
@@ -415,6 +427,10 @@ export function PlanCanvas({ projectId, activeHarness, onVisualize, planSessionI
               <BriefCard
                 key={i}
                 brief={msg.brief}
+                onBuild={(brief) => {
+                  updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
+                  onBuild(brief);
+                }}
                 onVisualize={(brief) => {
                   updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
                   onVisualize(brief);
