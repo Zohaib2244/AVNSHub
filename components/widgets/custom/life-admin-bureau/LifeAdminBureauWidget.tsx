@@ -179,7 +179,7 @@ function CompactView({ miniStatus }: { miniStatus: string }) {
   );
 }
 
-function FolderView({ deadlineText }: { deadlineText: string }) {
+function CaseFolder({ deadlineText, label }: { deadlineText: string; label: string }) {
   return (
     <div
       style={{
@@ -192,7 +192,7 @@ function FolderView({ deadlineText }: { deadlineText: string }) {
         overflow: "auto",
       }}
     >
-      <SectionLabel>M / active folder</SectionLabel>
+      <SectionLabel>{label}</SectionLabel>
       <div style={{ display: "grid", gap: 10, minHeight: 0 }}>
         <div
           style={{
@@ -233,6 +233,10 @@ function FolderView({ deadlineText }: { deadlineText: string }) {
       </div>
     </div>
   );
+}
+
+function FolderView({ deadlineText }: { deadlineText: string }) {
+  return <CaseFolder deadlineText={deadlineText} label="M / active folder" />;
 }
 
 function FolderLine({ children, label }: { children: ReactNode; label: string }) {
@@ -469,7 +473,7 @@ function RichView({
             </div>
           </div>
 
-          <FolderView deadlineText={deadlineText} />
+          <CaseFolder deadlineText={deadlineText} label="today's case file" />
 
           <div style={{ display: "grid", gap: 8, gridTemplateColumns: "repeat(4, minmax(0, 1fr))" }}>
             {history.map((item) => (
