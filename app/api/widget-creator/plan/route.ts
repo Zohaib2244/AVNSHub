@@ -66,7 +66,8 @@ When the concept is specific, produce a structured brief in this exact format �
   "lContent": "what L shows — omit key if L is not useful",
   "dataSource": "URL or API the widget polls (empty string if static)",
   "dataShape": "JSON shape of the response (empty string if static)",
-  "concept": "One or two sentences describing the widget for a visual mockup tool"
+  "concept": "One or two sentences describing the widget for a visual mockup tool",
+  "notes": "Anything else worth carrying forward that doesn't fit the fields above — constraints, inspiration, things to avoid, edge cases. Omit the key entirely if there's nothing extra."
 }
 \`\`\`
 

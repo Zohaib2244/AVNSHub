@@ -188,6 +188,14 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const nextIndex = Math.max(0, ...rounds.flatMap((r) => r.variations.map((v) => v.index))) + 1;
   const isGenerating = phase.id === "connecting" || phase.id === "generating";
 
+  /** Brief is substantive enough to start generation without a prompt — has
+      concept + at least one size description, or explicit notes to work from. */
+  function isBriefSubstantive(): boolean {
+    if (!brief) return false;
+    const hasContent = brief.concept || brief.sContent || brief.mContent || brief.lContent;
+    return Boolean(hasContent || brief.notes);
+  }
+
   async function fetchVariationHtml(file: string, activeSessionId = sessionId): Promise<string> {
     if (!activeSessionId) throw new Error("ideate session is not ready yet");
     const res = await fetch(`/api/widget-creator/ideate/file?session=${activeSessionId}&file=${encodeURIComponent(file)}`);
@@ -223,8 +231,11 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   }
 
   async function generate() {
-    if (!prompt.trim() || isGenerating || readOnly) return;
+    if (isGenerating || readOnly) return;
     if (!sessionId) return;
+    // Allow empty prompt if brief is substantial (from Plan); require it otherwise
+    const hasPrompt = prompt.trim();
+    if (!hasPrompt && !isBriefSubstantive()) return;
     const userPrompt = prompt.trim();
     const expectedFiles = Array.from({ length: count }, (_, i) => `variation-${nextIndex + i}.html`);
     setPrompt("");
@@ -238,7 +249,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
     try {
       const result = await streamIdeate(
-        { sessionId, prompt: userPrompt, count, startIndex: nextIndex, harness: activeHarness, harnessChain },
+        { sessionId, prompt: userPrompt, count, startIndex: nextIndex, harness: activeHarness, harnessChain, brief },
         abort.signal,
         (_from, to) => setPhase({ id: "connecting", harness: to }),
         (harness) => setPhase({ id: "generating", harness }),
@@ -296,7 +307,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
     try {
       const result = await streamIdeate(
-        { sessionId, prompt: instruction, regenerateIndex: index, harness: activeHarness, harnessChain },
+        { sessionId, prompt: instruction, regenerateIndex: index, harness: activeHarness, harnessChain, brief },
         abort.signal,
         (_from, to) => setPhase({ id: "connecting", harness: to }),
         (harness) => setPhase({ id: "generating", harness }),
@@ -563,7 +574,12 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         </div>
         <textarea
           className="wc-chat-input"
-          placeholder={readOnly ? "review only — continue in Build" : isGenerating ? "generating..." : "describe the widget concept... (shift+enter for newline)"}
+          placeholder={
+            readOnly ? "review only — continue in Build"
+            : isGenerating ? "generating..."
+            : brief ? "optional — add details or press send to use the plan... (shift+enter for newline)"
+            : "describe the widget concept... (shift+enter for newline)"
+          }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -580,7 +596,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
           onClick={isGenerating ? stop : generate}
           aria-label={isGenerating ? "stop" : "generate"}
-          disabled={readOnly || (!isGenerating && !prompt.trim())}
+          disabled={readOnly || (!isGenerating && !prompt.trim() && !isBriefSubstantive())}
         >
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>

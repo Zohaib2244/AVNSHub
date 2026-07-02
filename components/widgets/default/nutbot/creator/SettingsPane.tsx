@@ -492,6 +492,18 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
           </div>
         </Section>
       )}
+
+      {isCreateMode && (
+        <Section title="additional notes" defaultOpen={false}>
+          <textarea
+            className="wc-textarea"
+            placeholder="constraints, inspiration, things to avoid — anything else worth carrying into the build"
+            value={settings.notes ?? ""}
+            onChange={(e) => onChange({ notes: e.target.value })}
+            rows={2}
+          />
+        </Section>
+      )}
     </div>
   );
 }

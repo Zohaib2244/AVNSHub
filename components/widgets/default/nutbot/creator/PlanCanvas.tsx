@@ -72,6 +72,7 @@ function draftFromBrief(brief: WidgetBrief) {
     mContent: brief.mContent ?? "",
     lContent: brief.lContent ?? "",
     dataShape: brief.dataShape ?? "",
+    notes: brief.notes ?? "",
   };
 }
 
@@ -81,12 +82,16 @@ function BriefCard({
   onVisualize,
   onSave,
   readOnly = false,
+  isStale = false,
 }: {
   brief: WidgetBrief;
   onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
   onSave: (brief: WidgetBrief) => void;
   readOnly?: boolean;
+  /** if true, this brief card's handoff buttons are disabled (a newer message
+      was sent, so this brief's context is stale) */
+  isStale?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => draftFromBrief(brief));
@@ -103,6 +108,7 @@ function BriefCard({
       mContent: draft.mContent.trim() || undefined,
       lContent: draft.lContent.trim() || undefined,
       dataShape: draft.dataShape.trim() || undefined,
+      notes: draft.notes.trim() || undefined,
     };
     onSave(next);
     setDraft(draftFromBrief(next));
@@ -125,6 +131,7 @@ function BriefCard({
           <textarea className="wc-textarea" value={draft.lContent} onChange={(e) => setDraft((d) => ({ ...d, lContent: e.target.value }))} rows={2} placeholder="L content" />
           <textarea className="wc-textarea" value={draft.dataShape} onChange={(e) => setDraft((d) => ({ ...d, dataShape: e.target.value }))} rows={2} placeholder="data shape" />
         </div>
+        <textarea className="wc-textarea" value={draft.notes} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} rows={2} placeholder="additional notes — constraints, inspiration, anything else to carry forward" />
         <div className="wc-brief-actions">
           <button type="button" className="wc-brief-action-btn wc-brief-build-btn" onClick={save}>save</button>
           <button
@@ -156,6 +163,11 @@ function BriefCard({
       {brief.concept && (
         <p className="wc-brief-concept">{brief.concept}</p>
       )}
+      {brief.notes && (
+        <p className="wc-brief-concept">
+          <span className="wc-field-label">notes</span> {brief.notes}
+        </p>
+      )}
       {readOnly ? (
         <p className="wc-stage-lock-note">Plan is locked for edits. This brief is kept here for review.</p>
       ) : (
@@ -164,7 +176,8 @@ function BriefCard({
             type="button"
             className="wc-brief-action-btn wc-brief-build-btn"
             onClick={() => onBuild(brief)}
-            title="locks Plan for edits and switches directly to Build"
+            disabled={isStale}
+            title={isStale ? "this brief is stale — send a new message to get a fresh one" : "locks Plan for edits and switches directly to Build"}
           >
             <Hammer size={10} strokeWidth={2} />
             direct build
@@ -173,7 +186,8 @@ function BriefCard({
             type="button"
             className="wc-brief-action-btn wc-brief-viz-btn"
             onClick={() => onVisualize(brief)}
-            title="locks Plan for edits and continues to Ideate"
+            disabled={isStale}
+            title={isStale ? "this brief is stale — send a new message to get a fresh one" : "locks Plan for edits and continues to Ideate"}
           >
             <Wand2 size={10} strokeWidth={2} />
             continue to ideate
@@ -212,6 +226,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
   const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(msgsKey) ?? []);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [hasNewUserMsg, setHasNewUserMsg] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -254,6 +269,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
     const userText = prompt.trim();
     setPrompt("");
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
+    setHasNewUserMsg(true);
     setIsLoading(true);
     emitWorking();
     setWorkingProjectId(projectId);
@@ -336,6 +352,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
             const brief = extractBrief(accText);
             if (brief) {
               setMessages((prev) => [...prev, { role: "brief", brief }]);
+              setHasNewUserMsg(false);
               updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
             } else if (hasBriefBlock(accText)) {
               setMessages((prev) => [...prev, { role: "error", text: "couldn't parse the widget brief JSON — the raw block is left above" }]);
@@ -427,6 +444,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
               <BriefCard
                 key={i}
                 brief={msg.brief}
+                isStale={hasNewUserMsg}
                 onBuild={(brief) => {
                   updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
                   onBuild(brief);

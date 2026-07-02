@@ -23,6 +23,10 @@ export type WidgetBrief = {
   dataSource?: string;
   dataShape?: string;
   concept: string;
+  /** freeform extra context that doesn't fit the fixed fields above —
+      constraints, inspiration, things to avoid, edge cases. Carried through
+      to Ideate's prompt and Build's settingsSummary/SPEC.md unchanged. */
+  notes?: string;
 };
 
 export type ProjectMode = "plan" | "ideate" | "build";

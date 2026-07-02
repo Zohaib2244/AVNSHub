@@ -117,6 +117,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
       mDescription: brief.mContent,
       lDescription: brief.lContent,
       dataShape: brief.dataShape,
+      notes: brief.notes,
     };
   }
 

@@ -1,0 +1,8 @@
+{
+  "title": "Life Admin Bureau",
+  "iconName": "Stamp",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": []
+}

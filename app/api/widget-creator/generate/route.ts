@@ -108,6 +108,7 @@ function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string
     settings.lImageRef && `L size visual reference: [image attached]`,
     settings.dataUrl && `Polling endpoint: ${settings.dataUrl}`,
     settings.dataShape && `Data shape: ${settings.dataShape}`,
+    settings.notes && `Additional notes: ${settings.notes}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -217,6 +218,10 @@ export type GenerateSettings = {
   lImageRef?: string | null;
   dataUrl?: string;
   dataShape?: string;
+  /** freeform extra context carried from Plan mode's brief (or typed directly
+      here) — constraints, inspiration, things to avoid. Folded into the build
+      prompt and archived into SPEC.md alongside the per-size descriptions. */
+  notes?: string;
   /** raw HTML/CSS source of a mockup finalized in Ideate mode — when present,
       the harness is asked to recreate it as the real widget (create mode only) */
   designReferenceHtml?: string;

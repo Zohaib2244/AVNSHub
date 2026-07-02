@@ -78,6 +78,10 @@ export function buildProjectSpecMarkdown(
     if (settings.dataShape) lines.push(`- **shape**: \`${settings.dataShape}\``);
   }
 
+  if (settings.notes) {
+    lines.push("", "## Additional notes", "", settings.notes);
+  }
+
   if (settings.designReferenceHtml) {
     lines.push(
       "",

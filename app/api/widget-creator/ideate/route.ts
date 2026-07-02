@@ -7,6 +7,7 @@ import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harn
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
 import { isValidIdeateSessionId, sessionDirFor, variationFile } from "@/lib/widget-creator/ideateStore";
 import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
+import type { WidgetBrief } from "@/lib/widget-creator/projectStore";
 
 const REPO_ROOT = process.cwd();
 
@@ -60,6 +61,24 @@ const STYLE_REFERENCE = `<style>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />`;
 
+/** Fields from the Plan-mode brief that aren't already covered by the free-text
+    `prompt` (which is usually seeded from brief.concept/title) — surfaced here
+    so Ideate's mockups reflect per-size intent and data shape too, not just
+    the one-sentence concept the user sees pre-filled in the textbox. */
+function briefContextSection(brief?: WidgetBrief): string {
+  if (!brief) return "";
+  const lines = [
+    brief.sContent && `- S size shows: ${brief.sContent}`,
+    brief.mContent && `- M size shows: ${brief.mContent}`,
+    brief.lContent && `- L size shows: ${brief.lContent}`,
+    brief.dataSource && `- Data source: ${brief.dataSource}`,
+    brief.dataShape && `- Data shape: ${brief.dataShape}`,
+    brief.notes && `- Additional notes: ${brief.notes}`,
+  ].filter(Boolean);
+  if (lines.length === 0) return "";
+  return `\n## Additional context carried over from Plan\n\n${lines.join("\n")}\n`;
+}
+
 function buildIdeatePrompt(opts: {
   sessionDir: string;
   prompt: string;
@@ -67,8 +86,10 @@ function buildIdeatePrompt(opts: {
   startIndex: number;
   regenerateIndex?: number;
   existingContent?: string;
+  brief?: WidgetBrief;
 }): string {
-  const { sessionDir, prompt, count, startIndex, regenerateIndex, existingContent } = opts;
+  const { sessionDir, prompt, count, startIndex, regenerateIndex, existingContent, brief } = opts;
+  const contextSection = briefContextSection(brief);
 
   const sharedRules = `These are throwaway visual mockups for brainstorming a future AVN Hub dashboard widget — NOT real components. Each file must be a complete, standalone HTML document that opens directly in a browser with no build step, no external JS framework, and no network calls other than the Google Fonts link below.
 
@@ -85,7 +106,7 @@ Rules:
 
   if (regenerateIndex) {
     return `${sharedRules}
-
+${contextSection}
 ## Your task — revising one existing mockup
 
 Overwrite \`${join(sessionDir, variationFile(regenerateIndex))}\` (use this exact absolute path) with a revised version of the mockup below, per this instruction: ${prompt}
@@ -104,7 +125,7 @@ Start writing the file now.`;
   const fileList = Array.from({ length: count }, (_, i) => join(sessionDir, variationFile(startIndex + i))).join("\n");
 
   return `${sharedRules}
-
+${contextSection}
 ## Your task — generating ${count} variation${count > 1 ? "s" : ""}
 
 Concept: ${prompt}
@@ -128,8 +149,11 @@ export async function POST(req: Request) {
     regenerateIndex?: number;
     harness?: HarnessId;
     harnessChain?: HarnessId[];
+    /** the project's Plan-mode brief, if any — folds per-size/data fields
+        into the mockup prompt beyond just the one-line concept text */
+    brief?: WidgetBrief;
   };
-  const { sessionId, prompt, regenerateIndex, harness: bodyHarness, harnessChain: bodyChain } = body;
+  const { sessionId, prompt, regenerateIndex, harness: bodyHarness, harnessChain: bodyChain, brief } = body;
   const count = Math.min(Math.max(Math.trunc(body.count ?? 3), 1), 6);
   const startIndex = Math.min(Math.max(Math.trunc(body.startIndex ?? 1), 1), 1000);
 
@@ -158,7 +182,7 @@ export async function POST(req: Request) {
     }
   }
 
-  const fullPrompt = buildIdeatePrompt({ sessionDir, prompt: prompt.trim(), count, startIndex, regenerateIndex, existingContent });
+  const fullPrompt = buildIdeatePrompt({ sessionDir, prompt: prompt.trim(), count, startIndex, regenerateIndex, existingContent, brief });
 
   const requestedHarness: HarnessId = bodyHarness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? HARNESS_CHAIN_DEFAULT;
