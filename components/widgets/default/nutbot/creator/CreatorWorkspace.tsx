@@ -37,6 +37,7 @@ const FOCUS_HINT_KEY = "nutmag-creator-focus-hint";
 // step progression, distinct from the horizontal drill-in used for
 // list/picker/workspace navigation one level up
 const PIB_ORDER: ProjectMode[] = ["plan", "ideate", "build"];
+const PIB_INDEX: Record<ProjectMode, number> = { plan: 0, ideate: 1, build: 2 };
 
 const PIB_VARIANTS = {
   enter: (dir: number) => ({ opacity: 0, y: dir * 10 }),
@@ -95,6 +96,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
   function handleStage(mode: ProjectMode) {
     if (isLocked) return; // AI is generating — block mode switches
+    if (PIB_INDEX[mode] > PIB_INDEX[project.workflowMode]) return; // future stages unlock only through handoff actions
     if (mode !== project.activeMode) {
       updateProject(project.id, { activeMode: mode });
     }
@@ -104,45 +106,34 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   const [ideateInitialPrompt, setIdeateInitialPrompt] = useState<string | undefined>(undefined);
   const [ideateNonce, setIdeateNonce] = useState(0);
 
-  function handlePlanBuild(brief: WidgetBrief) {
-    const patch: Partial<GenerateSettings> = {
-      name: brief.title,
-      slug: brief.slug,
-      // fall back to whatever identity was decided at project creation —
-      // the brief doesn't always suggest an icon, and an explicit
-      // `icon: undefined` here would otherwise wipe a decided one on spread
-      icon: brief.icon ?? project.buildSettings?.icon,
-      sizes: brief.sizes ?? ["S", "M"],
-      orientations: ["h"],
-      sDescription: brief.sContent,
-      mDescription: brief.mContent,
-      lDescription: brief.lContent,
-      dataShape: brief.dataShape,
-      editSlug: undefined,
-      designReferenceHtml: undefined,
-    };
-    updateProject(project.id, {
-      hasBrief: true,
-      brief,
-      displayName: brief.title,
-      activeMode: "build",
-      buildSettings: { ...(project.buildSettings ?? EMPTY_SETTINGS), ...patch },
-    });
-  }
-
   function handlePlanVisualize(brief: WidgetBrief) {
-    updateProject(project.id, { hasBrief: true, brief, displayName: brief.title, activeMode: "ideate" });
+    updateProject(project.id, { hasBrief: true, brief, displayName: brief.title, activeMode: "ideate", workflowMode: "ideate" });
     setIdeateInitialPrompt(brief.concept || brief.title);
     setIdeateNonce((n) => n + 1);
   }
 
   function handleFinalize(html: string) {
+    const briefPatch: Partial<GenerateSettings> = project.brief
+      ? {
+          name: project.brief.title,
+          slug: project.brief.slug,
+          icon: project.brief.icon ?? project.buildSettings?.icon,
+          sizes: project.brief.sizes ?? ["S", "M"],
+          orientations: ["h"],
+          sDescription: project.brief.sContent,
+          mDescription: project.brief.mContent,
+          lDescription: project.brief.lContent,
+          dataShape: project.brief.dataShape,
+        }
+      : {};
     updateProject(project.id, {
       designReferenceHtml: html,
       hasIdeateRounds: true,
       activeMode: "build",
+      workflowMode: "build",
       buildSettings: {
         ...(project.buildSettings ?? EMPTY_SETTINGS),
+        ...briefPatch,
         designReferenceHtml: html,
         editSlug: undefined,
       },
@@ -156,6 +147,8 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   }
 
   const mode = project.activeMode;
+  const workflowMode = project.workflowMode;
+  const isReviewMode = PIB_INDEX[mode] < PIB_INDEX[workflowMode];
   const legacyBuildTarget = (project.buildSettings?.editSlug || project.buildSettings?.slug || project.slug || "").trim() || null;
 
   useEffect(() => {
@@ -208,6 +201,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
   const isEditBuild = mode === "build" && project.hasBuildOutput && !!project.slug;
   const settingsPaneMode: "create" | "edit" = isEditBuild ? "edit" : "create";
+  const buildModeLabel = isEditBuild ? "edit" : "build";
 
   // ensure editSlug is set correctly for edit mode
   const effectiveBuildSettings: GenerateSettings = (() => {
@@ -261,6 +255,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
         <CreatorPipelineBar
           entryMode={project.entryMode}
           activeMode={mode}
+          workflowMode={workflowMode}
           hasBrief={project.hasBrief}
           hasIdeateRounds={project.hasIdeateRounds || !!project.designReferenceHtml}
           hasBuildOutput={project.hasBuildOutput}
@@ -299,10 +294,10 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                     <div className="wc-section-body" style={{ padding: "8px 4px" }}>
                       <p className="wc-ideate-help">
                         Chat with AI to figure out what to build. Describe a use case or vague
-                        idea — get concept suggestions, then a structured brief. Click
-                        &ldquo;Build this&rdquo; to jump into build mode with the settings
-                        pre-filled, or &ldquo;Visualize first&rdquo; to generate mockups in
-                        ideate mode before committing.
+                        idea — get concept suggestions, then a structured brief.
+                      </p>
+                      <p className="wc-stage-lock-note">
+                        Moving to Ideate locks Plan for edits. You can still come back to review this chat.
                       </p>
                     </div>
                   </div>
@@ -317,7 +312,10 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                         Describe a widget concept and how many variations to brainstorm. Each
                         variation renders live as an HTML/CSS mockup — no real component yet.
                         Regenerate a variation in place, or finalize a design to switch into
-                        build mode with it as the reference.
+                        {` ${buildModeLabel}`} mode with it as the reference.
+                      </p>
+                      <p className="wc-stage-lock-note">
+                        Moving to {buildModeLabel} locks Ideate for edits. You can still come back to review the mockups.
                       </p>
                     </div>
                   </div>
@@ -357,9 +355,9 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                 <PlanCanvas
                   projectId={project.id}
                   activeHarness={activeHarness}
-                  onBuild={handlePlanBuild}
                   onVisualize={handlePlanVisualize}
                   planSessionId={project.planSessionId}
+                  readOnly={isReviewMode}
                 />
               )}
 
@@ -373,6 +371,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   initialPrompt={ideateNonce > 0 ? ideateInitialPrompt : undefined}
                   brief={project.brief}
                   ideateSessionId={project.ideateSessionId}
+                  readOnly={isReviewMode}
                 />
               )}
 

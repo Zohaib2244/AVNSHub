@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { getPrefs, getServerPrefs, subscribePrefs } from "@/lib/prefs";
@@ -10,7 +10,9 @@ import {
   subscribeProjects,
   createProject,
   ensureProject,
+  updateProject,
   buildProjectView,
+  CREATOR_RESTORE_PROJECT_KEY,
   type WidgetProject,
   type ProjectMode,
   type ProjectIdentity,
@@ -24,6 +26,7 @@ import { CreatorWorkspace } from "./CreatorWorkspace";
 export type PanelMode = "create" | "edit" | "ideate" | "plan";
 
 type View = "list" | "picker" | "workspace";
+type RestoreProjectRequest = { projectId: string };
 
 // drill-in/out navigation — deeper views (picker, workspace) slide in from
 // the right over the outgoing view; returning to the list reverses it
@@ -35,10 +38,24 @@ const VIEW_VARIANTS = {
   exit: (dir: number) => ({ opacity: 0, x: dir * -28, scale: dir === 0 ? 1 : 0.98 }),
 };
 
+function readRestoreProjectRequest(): RestoreProjectRequest | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(CREATOR_RESTORE_PROJECT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<RestoreProjectRequest>;
+    return typeof parsed.projectId === "string" ? { projectId: parsed.projectId } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function WidgetCreatorPanel() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
-  const [view, setView] = useState<View>("list");
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+  const [restoreProjectId] = useState(() => readRestoreProjectRequest()?.projectId ?? null);
+  const restoreAppliedRef = useRef(false);
+  const [view, setView] = useState<View>(() => restoreProjectId ? "workspace" : "list");
+  const [activeProjectId, setActiveProjectId] = useState<string | null>(() => restoreProjectId);
 
   // getStoredProjects() returns the stable module-level reference — never a
   // new array unless a mutation ran. This satisfies useSyncExternalStore's
@@ -55,6 +72,16 @@ export function WidgetCreatorPanel() {
   // and appends virtual entries for pre-existing widgets.
   const allProjects = buildProjectView(storedProjects, customRegistryRaw as RegistryLike);
   const activeProject = allProjects.find((p) => p.id === activeProjectId) ?? null;
+
+  useEffect(() => {
+    if (!restoreProjectId || restoreAppliedRef.current) return;
+    const project = allProjects.find((p) => p.id === restoreProjectId);
+    if (!project) return;
+    restoreAppliedRef.current = true;
+    try { sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY); } catch {}
+    ensureProject(project);
+    updateProject(project.id, { activeMode: "build", workflowMode: "build" });
+  }, [allProjects, restoreProjectId]);
 
   // track drill direction for the transition — adjusted directly during
   // render (React-blessed pattern for deriving state from a state change)
@@ -80,6 +107,10 @@ export function WidgetCreatorPanel() {
   function handleOpenProject(project: WidgetProject) {
     // promote virtual entry to a real stored entry on first open
     ensureProject(project);
+    const targetMode = project.workflowMode;
+    if (project.activeMode !== targetMode) {
+      updateProject(project.id, { activeMode: targetMode });
+    }
     setActiveProjectId(project.id);
     setView("workspace");
   }

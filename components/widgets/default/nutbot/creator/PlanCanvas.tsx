@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Hammer, Send, Square, Wand2 } from "lucide-react";
+import { Send, Square, Wand2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import { useEffect } from "react";
@@ -77,14 +77,14 @@ function draftFromBrief(brief: WidgetBrief) {
 
 function BriefCard({
   brief,
-  onBuild,
   onVisualize,
   onSave,
+  readOnly = false,
 }: {
   brief: WidgetBrief;
-  onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
   onSave: (brief: WidgetBrief) => void;
+  readOnly?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => draftFromBrief(brief));
@@ -154,36 +154,31 @@ function BriefCard({
       {brief.concept && (
         <p className="wc-brief-concept">{brief.concept}</p>
       )}
-      <div className="wc-brief-actions">
-        <button
-          type="button"
-          className="wc-brief-action-btn wc-brief-build-btn"
-          onClick={() => onBuild(brief)}
-          title="pre-fill build settings and switch to build mode"
-        >
-          <Hammer size={10} strokeWidth={2} />
-          build this
-        </button>
-        <button
-          type="button"
-          className="wc-brief-action-btn wc-brief-viz-btn"
-          onClick={() => onVisualize(brief)}
-          title="generate HTML/CSS mockups from this concept"
-        >
-          <Wand2 size={10} strokeWidth={2} />
-          visualize first
-        </button>
-        <button
-          type="button"
-          className="wc-brief-action-btn"
-          onClick={() => {
-            setDraft(draftFromBrief(brief));
-            setEditing(true);
-          }}
-        >
-          edit
-        </button>
-      </div>
+      {readOnly ? (
+        <p className="wc-stage-lock-note">Plan is locked for edits. This brief is kept here for review.</p>
+      ) : (
+        <div className="wc-brief-actions">
+          <button
+            type="button"
+            className="wc-brief-action-btn wc-brief-viz-btn"
+            onClick={() => onVisualize(brief)}
+            title="locks Plan for edits and continues to Ideate"
+          >
+            <Wand2 size={10} strokeWidth={2} />
+            continue to ideate
+          </button>
+          <button
+            type="button"
+            className="wc-brief-action-btn"
+            onClick={() => {
+              setDraft(draftFromBrief(brief));
+              setEditing(true);
+            }}
+          >
+            edit
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -191,14 +186,14 @@ function BriefCard({
 type Props = {
   projectId: string;
   activeHarness: HarnessId;
-  onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
   /** CLI conversation id from the synced project record — server-machine
       scoped, so it survives remounts, tab closes, and device switches */
   planSessionId?: string;
+  readOnly?: boolean;
 };
 
-export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, planSessionId }: Props) {
+export function PlanCanvas({ projectId, activeHarness, onVisualize, planSessionId, readOnly = false }: Props) {
   const msgsKey = projectPlanMessagesKey(projectId);
 
   const sessionId = planSessionId ?? null;
@@ -236,14 +231,14 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
   }
 
   function clearChat() {
-    if (isLoading) return;
+    if (isLoading || readOnly) return;
     setMessages([]);
     updateProject(projectId, { planSessionId: undefined });
     removeProjectBlob(msgsKey);
   }
 
   async function send() {
-    if (!prompt.trim() || isLoading) return;
+    if (!prompt.trim() || isLoading || readOnly) return;
     const userText = prompt.trim();
     setPrompt("");
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
@@ -372,14 +367,24 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
       <div className={`wc-status-bar${isLoading ? " active" : ""}`}>
         {isLoading && <span className="wc-status-dot" />}
         <span className="wc-status-label">
-          {isLoading ? `planning · ${activeHarness}` : "plan mode — describe a widget idea to get started"}
+          {isLoading
+            ? `planning · ${activeHarness}`
+            : readOnly
+              ? "plan mode — review only"
+              : "plan mode — describe a widget idea to get started"}
         </span>
       </div>
+
+      {readOnly && (
+        <div className="wc-readonly-banner">
+          Plan has been locked. You can review this transcript, but edits now happen in the current stage.
+        </div>
+      )}
 
       <div className="wc-chat-body wc-plan-body" ref={bodyRef}>
         {messages.length === 0 && !isLoading && (
           <div className="wc-chat-empty">
-            describe an idea (&ldquo;I want a widget that shows...&rdquo;) — get concept suggestions, then build or visualize from a brief
+            describe an idea (&ldquo;I want a widget that shows...&rdquo;) — get concept suggestions, then continue to ideate from a brief
           </div>
         )}
 
@@ -410,10 +415,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
               <BriefCard
                 key={i}
                 brief={msg.brief}
-                onBuild={(brief) => {
-                  updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
-                  onBuild(brief);
-                }}
                 onVisualize={(brief) => {
                   updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
                   onVisualize(brief);
@@ -424,6 +425,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
                   )));
                   updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
                 }}
+                readOnly={readOnly}
               />
             );
           }
@@ -449,14 +451,14 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
       </div>
 
       <div className="wc-chat-footer">
-        {messages.length > 0 && !isLoading && (
+        {messages.length > 0 && !isLoading && !readOnly && (
           <button type="button" className="wc-clear-btn" onClick={clearChat}>
-            new
+            reset
           </button>
         )}
         <textarea
           className="wc-chat-input"
-          placeholder={isLoading ? "thinking..." : "describe a widget idea... (shift+enter for newline)"}
+          placeholder={readOnly ? "review only — continue in the current stage" : isLoading ? "thinking..." : "describe a widget idea... (shift+enter for newline)"}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -466,14 +468,14 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
             }
           }}
           rows={2}
-          disabled={isLoading}
+          disabled={isLoading || readOnly}
         />
         <button
           type="button"
           className={`wc-send-btn${isLoading ? " stop" : ""}`}
           onClick={isLoading ? stop : send}
           aria-label={isLoading ? "stop" : "send"}
-          disabled={!isLoading && !prompt.trim()}
+          disabled={readOnly || (!isLoading && !prompt.trim())}
         >
           {isLoading
             ? <Square size={10} strokeWidth={2} fill="currentColor" />

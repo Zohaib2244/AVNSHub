@@ -47,13 +47,14 @@ function PipelineChips({ project }: { project: WidgetProject }) {
   return (
     <div className="cr-proj-pipe">
       {stages.map((mode, i) => {
-        const isCurrent = mode === project.activeMode;
+        const isCurrent = mode === project.workflowMode;
         const isDone    = hasData(mode);
+        const label = mode === "build" && project.hasBuildOutput ? "edit" : mode;
         return (
           <span key={mode} className="cr-pipe-group">
             <span className={`cr-pipe-chip${isCurrent ? " active" : isDone ? " done" : ""}`}>
               {isCurrent && <span className="cr-pipe-dot" />}
-              {mode}
+              {label}
             </span>
             {i < stages.length - 1 && <span className="cr-pipe-sep">›</span>}
           </span>

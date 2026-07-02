@@ -1877,7 +1877,7 @@
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
-.cr-stage:hover {
+.cr-stage:hover:not(:disabled) {
   color: var(--text-primary);
   border-color: var(--nb-muted, var(--text-muted));
 }
@@ -1891,6 +1891,17 @@
 .cr-stage.has-data {
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
+}
+
+.cr-stage.review:not(.current) {
+  border-style: dashed;
+  background: color-mix(in srgb, var(--accent-cyan) 6%, transparent);
+}
+
+.cr-stage.future {
+  border-color: var(--border);
+  color: var(--nb-muted, var(--text-muted));
+  opacity: 0.34;
 }
 
 .cr-stage-dot {
@@ -1920,6 +1931,29 @@
 
 .cr-stage:disabled {
   cursor: not-allowed;
+}
+
+.wc-readonly-banner,
+.wc-stage-lock-note {
+  border: 1px dashed color-mix(in srgb, var(--accent-orange) 52%, var(--border));
+  background: color-mix(in srgb, var(--accent-orange) 7%, transparent);
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.66rem * var(--nb-scale, 1));
+  line-height: 1.45;
+}
+
+.wc-readonly-banner {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+  padding: 7px 9px;
+  border-radius: 7px;
+}
+
+.wc-stage-lock-note {
+  margin: 7px 0 0;
+  padding: 6px 8px;
+  border-radius: 6px;
 }
 
 /* ── pipeline handoff indicators (what carried over from the previous stage) ── */

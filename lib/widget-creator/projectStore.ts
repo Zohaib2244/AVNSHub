@@ -34,7 +34,10 @@ export type WidgetProject = {
   displayName: string;
   /** Set when the widget has been successfully built (= its id in the registry). */
   slug?: string;
+  /** Visible panel. Earlier stages can be opened for read-only review. */
   activeMode: ProjectMode;
+  /** Furthest/current editable stage in the one-way Plan -> Ideate -> Build flow. */
+  workflowMode: ProjectMode;
   entryMode: ProjectMode;
   createdAt: number;
   updatedAt: number;
@@ -75,6 +78,7 @@ export const legacyDoneKey      = (id: string) => `nutmag-creator-done-${id}`;
 // ── internal state ────────────────────────────────────────────────────────────
 
 const PROJECTS_KEY = "nutmag-creator-projects";
+export const CREATOR_RESTORE_PROJECT_KEY = "nutmag-creator-restore-project";
 
 let projects: WidgetProject[] = [];
 let workingProjectId: string | null = null;
@@ -88,9 +92,14 @@ function notifyWorking()  { workingListeners.forEach((l) => l()); }
 // ── sanitize ──────────────────────────────────────────────────────────────────
 
 const MODES: ProjectMode[] = ["plan", "ideate", "build"];
+const MODE_INDEX: Record<ProjectMode, number> = { plan: 0, ideate: 1, build: 2 };
 
 function isMode(v: unknown): v is ProjectMode {
   return typeof v === "string" && (MODES as string[]).includes(v);
+}
+
+function maxMode(...modes: ProjectMode[]): ProjectMode {
+  return modes.reduce((max, mode) => (MODE_INDEX[mode] > MODE_INDEX[max] ? mode : max));
 }
 
 export function sanitizeProjects(raw: unknown): WidgetProject[] {
@@ -116,12 +125,21 @@ export function sanitizeProjects(raw: unknown): WidgetProject[] {
           registered: Boolean((p.pendingInstall as Record<string, unknown>).registered),
         }
       : undefined;
+    const activeMode = isMode(p.activeMode) ? p.activeMode : "build";
+    const entryMode = isMode(p.entryMode) ? p.entryMode : "build";
+    const inferredWorkflow = maxMode(
+      entryMode,
+      activeMode,
+      Boolean(p.hasIdeateRounds) || typeof p.designReferenceHtml === "string" ? "ideate" : entryMode,
+      Boolean(p.hasBuildOutput) || pendingInstall ? "build" : entryMode,
+    );
     out.push({
       id: p.id,
       displayName: typeof p.displayName === "string" && p.displayName ? p.displayName : "Untitled",
       slug: typeof p.slug === "string" ? p.slug : undefined,
-      activeMode: isMode(p.activeMode) ? p.activeMode : "build",
-      entryMode: isMode(p.entryMode) ? p.entryMode : "build",
+      activeMode,
+      workflowMode: isMode(p.workflowMode) ? p.workflowMode : inferredWorkflow,
+      entryMode,
       createdAt: typeof p.createdAt === "number" ? p.createdAt : 0,
       updatedAt: typeof p.updatedAt === "number" ? p.updatedAt : 0,
       hasBrief: Boolean(p.hasBrief),
@@ -276,6 +294,7 @@ export function createProject(
     id: crypto.randomUUID(),
     displayName: name || displayName,
     activeMode: entryMode,
+    workflowMode: entryMode,
     entryMode,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -388,6 +407,7 @@ export function buildProjectView(stored: WidgetProject[], registry: RegistryLike
       displayName: registry[slug]?.title ?? slug,
       slug,
       activeMode: "build" as ProjectMode,
+      workflowMode: "build" as ProjectMode,
       entryMode: "build" as ProjectMode,
       createdAt: 0,
       updatedAt: 0,

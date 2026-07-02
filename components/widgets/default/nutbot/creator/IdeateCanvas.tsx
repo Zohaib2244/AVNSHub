@@ -39,6 +39,7 @@ type Props = {
   /** Ideate session id from the synced project record; also names the
       scratch directory holding generated mockups. */
   ideateSessionId?: string;
+  readOnly?: boolean;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -120,7 +121,7 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief, ideateSessionId }: Props) {
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief, ideateSessionId, readOnly = false }: Props) {
   const roundsKey = projectIdeateKey(projectId);
 
   const sessionId = ideateSessionId ?? null;
@@ -222,7 +223,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   }
 
   async function generate() {
-    if (!prompt.trim() || isGenerating) return;
+    if (!prompt.trim() || isGenerating || readOnly) return;
     if (!sessionId) return;
     const userPrompt = prompt.trim();
     const expectedFiles = Array.from({ length: count }, (_, i) => `variation-${nextIndex + i}.html`);
@@ -281,7 +282,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   }
 
   async function regenerate(file: string, index: number) {
-    if (!regenPrompt.trim() || isGenerating) return;
+    if (!regenPrompt.trim() || isGenerating || readOnly) return;
     if (!sessionId) return;
     const instruction = regenPrompt.trim();
     setRegenPrompt("");
@@ -343,7 +344,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   }
 
   function newSession() {
-    if (isGenerating) return;
+    if (isGenerating || readOnly) return;
     const oldSessionId = sessionId;
     if (oldSessionId) fetch(`/api/widget-creator/ideate/file?session=${oldSessionId}`, { method: "DELETE" }).catch(() => {});
     const id = crypto.randomUUID();
@@ -358,6 +359,12 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   return (
     <div className="wc-chat">
       <StatusBar phase={phase} />
+
+      {readOnly && (
+        <div className="wc-readonly-banner">
+          Ideate has been locked. You can review and expand mockups, but edits now happen in Build.
+        </div>
+      )}
 
       {brief && (
         <div className="wc-handoff-strip">
@@ -396,7 +403,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                     title={`variation ${v.index}`}
                   />
                   <div className="wc-ideate-card-actions">
-                    {regeneratingFile === v.file ? (
+                    {regeneratingFile === v.file && !readOnly ? (
                       <div className="wc-ideate-regen-row">
                         <input
                           className="wc-input"
@@ -435,7 +442,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                           type="button"
                           className="wc-ideate-action-btn"
                           onClick={() => { setRegeneratingFile(v.file); setRegenPrompt(""); }}
-                          disabled={isGenerating}
+                          disabled={isGenerating || readOnly}
                           title="regenerate this variation"
                         >
                           <RefreshCw size={11} strokeWidth={2} />
@@ -445,8 +452,8 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                           type="button"
                           className="wc-ideate-action-btn wc-ideate-finalize-btn"
                           onClick={() => onFinalize(v.html)}
-                          disabled={isGenerating}
-                          title="finalize this design and build the real widget"
+                          disabled={isGenerating || readOnly}
+                          title="locks Ideate for edits and builds the real widget"
                         >
                           <Hammer size={11} strokeWidth={2} />
                           finalize → build
@@ -499,6 +506,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                             type="button"
                             className="wc-ideate-action-btn wc-ideate-finalize-btn"
                             onClick={() => onFinalize(variation.html)}
+                            disabled={readOnly}
                             title="finalize this design and build the real widget"
                           >
                             <Hammer size={11} strokeWidth={2} />
@@ -529,9 +537,9 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
       )}
 
       <div className="wc-chat-footer wc-ideate-footer">
-        {rounds.length > 0 && !isGenerating && (
+        {rounds.length > 0 && !isGenerating && !readOnly && (
           <button type="button" className="wc-clear-btn" onClick={newSession}>
-            new
+            reset
           </button>
         )}
         <div className="wc-ideate-count">
@@ -539,7 +547,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
             type="button"
             className="wc-ideate-count-btn"
             onClick={() => setCount((c) => Math.max(1, c - 1))}
-            disabled={isGenerating || count <= 1}
+            disabled={isGenerating || readOnly || count <= 1}
           >
             <Minus size={10} strokeWidth={2} />
           </button>
@@ -548,14 +556,14 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
             type="button"
             className="wc-ideate-count-btn"
             onClick={() => setCount((c) => Math.min(6, c + 1))}
-            disabled={isGenerating || count >= 6}
+            disabled={isGenerating || readOnly || count >= 6}
           >
             <Plus size={10} strokeWidth={2} />
           </button>
         </div>
         <textarea
           className="wc-chat-input"
-          placeholder={isGenerating ? "generating..." : "describe the widget concept... (shift+enter for newline)"}
+          placeholder={readOnly ? "review only — continue in Build" : isGenerating ? "generating..." : "describe the widget concept... (shift+enter for newline)"}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -565,14 +573,14 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
             }
           }}
           rows={2}
-          disabled={isGenerating}
+          disabled={isGenerating || readOnly}
         />
         <button
           type="button"
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
           onClick={isGenerating ? stop : generate}
           aria-label={isGenerating ? "stop" : "generate"}
-          disabled={!isGenerating && !prompt.trim()}
+          disabled={readOnly || (!isGenerating && !prompt.trim())}
         >
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>

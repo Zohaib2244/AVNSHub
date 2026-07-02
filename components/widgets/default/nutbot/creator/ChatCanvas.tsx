@@ -19,6 +19,7 @@ import { isValidSlug } from "@/lib/widget-creator/slug";
 import {
   updateProject,
   setWorkingProjectId,
+  CREATOR_RESTORE_PROJECT_KEY,
   projectMessagesKey,
   loadProjectBlob,
   saveProjectBlob,
@@ -83,14 +84,15 @@ const PHASE_LABEL: Record<Phase["id"], string> = {
 // only fires for the matching project.
 const PENDING_ADD_KEY = "nutmag-creator-pending-add";
 
-function StatusBar({ phase }: { phase: Phase }) {
+function StatusBar({ phase, modeLabel }: { phase: Phase; modeLabel: string }) {
   const isActive = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
   const harness = (phase as { harness?: HarnessId }).harness;
+  const label = phase.id === "idle" || phase.id === "done" ? `${modeLabel} mode · ${PHASE_LABEL[phase.id]}` : PHASE_LABEL[phase.id];
   return (
     <div className={`wc-status-bar${phase.id === "error" ? " error" : phase.id === "done" ? " done" : isActive ? " active" : ""}`}>
       {isActive && <span className="wc-status-dot" />}
       <span className="wc-status-label">
-        {PHASE_LABEL[phase.id]}
+        {label}
         {harness && ` · ${harness}`}
         {phase.id === "error" && ` · ${(phase as { message: string }).message}`}
       </span>
@@ -138,6 +140,8 @@ export function ChatCanvas({
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
   const hasDesignReference = Boolean(settings.designReferenceHtml);
+  const isEditMode = Boolean(settings.editSlug);
+  const modeLabel = isEditMode ? "edit" : "build";
 
   function fail(message: string) {
     clearSignal();
@@ -374,6 +378,8 @@ export function ChatCanvas({
                   hasBuildOutput: true,
                   slug,
                   displayName: settings.name ?? slug,
+                  activeMode: "build",
+                  workflowMode: "build",
                 });
                 onSettingsChange({ editSlug: slug });
               }
@@ -460,13 +466,18 @@ export function ChatCanvas({
 
   function clearChat() {
     if (phase.id !== "idle" && phase.id !== "done" && phase.id !== "error") return;
+    const keepInstall = doneWidgetId
+      ? { slug: doneWidgetId, registered: !pendingRegistration }
+      : pendingInstall;
     setMessages([]);
-    setPhase({ id: "idle" });
-    setDoneWidgetId(null);
-    setAdded(false);
-    setPendingRegistration(false);
-    updateProject(projectId, { pendingInstall: undefined, buildSession: undefined });
-    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    setPhase(keepInstall ? { id: "done" } : { id: "idle" });
+    setDoneWidgetId(keepInstall?.slug ?? null);
+    setAdded((current) => keepInstall ? current : false);
+    setPendingRegistration(Boolean(keepInstall && !keepInstall.registered));
+    updateProject(projectId, keepInstall ? { pendingInstall: keepInstall, buildSession: undefined } : { pendingInstall: undefined, buildSession: undefined });
+    if (!keepInstall) {
+      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    }
     removeProjectBlob(MESSAGES_KEY);
   }
 
@@ -518,7 +529,10 @@ export function ChatCanvas({
     const slug = doneWidgetId;
     setAdding(true);
     setInstalling(true);
-    try { sessionStorage.setItem(PENDING_ADD_KEY, JSON.stringify({ slug, projectId })); } catch {}
+    try {
+      sessionStorage.setItem(PENDING_ADD_KEY, JSON.stringify({ slug, projectId }));
+      sessionStorage.setItem(CREATOR_RESTORE_PROJECT_KEY, JSON.stringify({ projectId }));
+    } catch {}
     setMessages((prev) => [
       ...prev,
       { role: "ok", text: `[info] installing "${slug}" — the page will refresh once to pick up the new widget.` },
@@ -537,7 +551,10 @@ export function ChatCanvas({
       });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
       if (!res.ok || !body.ok) {
-        try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+        try {
+          sessionStorage.removeItem(PENDING_ADD_KEY);
+          sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+        } catch {}
         setInstalling(false);
         setAdding(false);
         setMessages((prev) => [
@@ -547,7 +564,10 @@ export function ChatCanvas({
         return;
       }
     } catch (err) {
-      try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+      try {
+        sessionStorage.removeItem(PENDING_ADD_KEY);
+        sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+      } catch {}
       setInstalling(false);
       setAdding(false);
       setMessages((prev) => [...prev, { role: "error", text: `couldn't install "${slug}": ${(err as Error).message}` }]);
@@ -558,7 +578,10 @@ export function ChatCanvas({
       updateProject(projectId, { pendingInstall: { slug, registered: true } });
     }
     const ok = await placeWithRetry(slug, 8, 250);
-    try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
+    try {
+      sessionStorage.removeItem(PENDING_ADD_KEY);
+      sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
+    } catch {}
     setInstalling(false);
     setAdding(false);
     if (ok) setAdded(true);
@@ -592,7 +615,7 @@ export function ChatCanvas({
 
   return (
     <div className="wc-chat">
-      <StatusBar phase={phase} />
+      <StatusBar phase={phase} modeLabel={modeLabel} />
 
       {(brief || settings.designReferenceHtml) && (
         <div className="wc-handoff-strip">
@@ -639,7 +662,9 @@ export function ChatCanvas({
       <div className="wc-chat-body" ref={bodyRef}>
         {messages.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
-            fill in the settings on the left, then describe your widget here
+            {isEditMode
+              ? "describe changes to this widget here"
+              : "fill in the settings on the left, then describe your widget here"}
           </div>
         )}
 
@@ -730,7 +755,7 @@ export function ChatCanvas({
         {isDoneOrError && (
           <>
             <button type="button" className="wc-clear-btn" onClick={clearChat}>
-              new
+              clear chat
             </button>
             {doneWidgetId && !added && pendingRegistration && (
               <button
@@ -771,7 +796,9 @@ export function ChatCanvas({
               ? "generating..."
               : hasDesignReference
                 ? "optional notes — or just hit send to build the finalized mockup"
-                : "describe your widget... (shift+enter for newline)"
+                : isEditMode
+                  ? "describe the edit... (shift+enter for newline)"
+                  : "describe your widget... (shift+enter for newline)"
           }
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
