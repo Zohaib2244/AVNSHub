@@ -1,0 +1,12 @@
+{
+  "title": "spotify visualizer",
+  "iconName": "Music",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": [
+    { "key": "spotifyClientId", "label": "spotify client id", "type": "text", "default": "", "placeholder": "optional, falls back to env" },
+    { "key": "spotifyClientSecret", "label": "spotify client secret", "type": "text", "default": "", "placeholder": "optional, falls back to env" },
+    { "key": "spotifyRefreshToken", "label": "spotify refresh token", "type": "text", "default": "", "placeholder": "optional, falls back to env" }
+  ]
+}
