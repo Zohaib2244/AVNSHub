@@ -246,8 +246,8 @@ export async function POST(req: Request) {
   };
   const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain, sessionId: incomingSessionId, projectMeta } = body;
 
-  const sseError = (message: string) =>
-    new Response(`event: error\ndata: ${JSON.stringify({ message })}\n\n`, {
+  const sseError = (message: string, code?: string) =>
+    new Response(`event: error\ndata: ${JSON.stringify(code ? { message, code } : { message })}\n\n`, {
       headers: { "Content-Type": "text/event-stream" },
     });
 
@@ -298,7 +298,7 @@ export async function POST(req: Request) {
   // has no idea what the framework rules are.
   const skillError = checkSkillOrError("avn-widget-build", requestedHarness);
   if (skillError) {
-    return sseError(skillError);
+    return sseError(skillError, "skill-missing");
   }
 
   // One generation at a time, enforced where it actually matters — two

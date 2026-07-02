@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Maximize2, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
@@ -27,6 +27,8 @@ import {
   type WidgetBrief,
   type ProjectMode,
 } from "@/lib/widget-creator/projectStore";
+import { MockupLightbox } from "./MockupLightbox";
+import { renderMessageText } from "./ToolChipLine";
 
 type Phase =
   | { id: "idle" }
@@ -117,6 +119,7 @@ export function ChatCanvas({
   pendingInstall,
 }: Props) {
   const [showMockupPreview, setShowMockupPreview] = useState(false);
+  const [lightboxHtml, setLightboxHtml] = useState<string | null>(null);
   const MESSAGES_KEY  = projectMessagesKey(projectId);
   const pendingInstallSlug = pendingInstall?.slug ?? null;
   const pendingInstallRegistered = pendingInstall?.registered ?? false;
@@ -171,11 +174,24 @@ export function ChatCanvas({
     setMessages((prev) => [...prev, placementFailureMessage(slug)]);
   }
 
-  function runMessageAction(action: "reload" | "open-widget-manager" | "sync-skills") {
+  async function runMessageAction(action: "reload" | "open-widget-manager" | "sync-skills") {
     if (action === "reload") {
       window.location.reload();
     } else if (action === "open-widget-manager") {
       setHubCoreTab("widgets");
+    } else if (action === "sync-skills") {
+      try {
+        const res = await fetch("/api/widget-creator/sync-skills", { method: "POST" });
+        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+        setMessages((prev) => [
+          ...prev,
+          body.ok
+            ? { role: "ok", text: "[ok] skills regenerated. resubmit your prompt." }
+            : { role: "error", text: body.error ?? `skill regeneration failed (${res.status})` },
+        ]);
+      } catch (error) {
+        setMessages((prev) => [...prev, { role: "error", text: `skill regeneration failed: ${(error as Error).message}` }]);
+      }
     }
   }
 
@@ -389,7 +405,13 @@ export function ChatCanvas({
           } else if (event === "error") {
             clearSignal();
             setWorkingProjectId(null);
-            fail(payload.message as string);
+            if (payload.code === "skill-missing") {
+              const message = payload.message as string;
+              setPhase({ id: "error", message });
+              setMessages((prev) => [...prev, { role: "action", action: "sync-skills", text: message }]);
+            } else {
+              fail(payload.message as string);
+            }
             if (hadTscErrors && attemptedSlug) {
               onSettingsChange({ editSlug: attemptedSlug });
               setMessages((prev) => [
@@ -597,6 +619,14 @@ export function ChatCanvas({
 
       {showMockupPreview && settings.designReferenceHtml && (
         <div className="wc-handoff-preview">
+          <button
+            type="button"
+            className="wc-preview-expand"
+            onClick={() => setLightboxHtml(settings.designReferenceHtml ?? null)}
+            title="expand mockup preview"
+          >
+            <Maximize2 size={11} strokeWidth={2} />
+          </button>
           <iframe
             className="wc-handoff-preview-frame"
             sandbox="allow-scripts"
@@ -627,7 +657,7 @@ export function ChatCanvas({
           if (msg.role === "assistant") {
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <pre className="wc-code">{msg.text}</pre>
+                <div className="wc-code">{renderMessageText(msg.text)}</div>
                 {msg.streaming && <span className="wc-cursor">▍</span>}
               </div>
             );
@@ -678,7 +708,7 @@ export function ChatCanvas({
             return (
               <div key={i} className="wc-msg wc-msg-action">
                 <span>{msg.text}</span>
-                <button type="button" className="wc-msg-action-btn" onClick={() => runMessageAction(msg.action)}>
+                <button type="button" className="wc-msg-action-btn" onClick={() => void runMessageAction(msg.action)}>
                   {label}
                 </button>
               </div>
@@ -764,6 +794,9 @@ export function ChatCanvas({
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>
       </div>
+      {lightboxHtml && (
+        <MockupLightbox html={lightboxHtml} title="finalized mockup reference" onClose={() => setLightboxHtml(null)} />
+      )}
     </div>
   );
 }

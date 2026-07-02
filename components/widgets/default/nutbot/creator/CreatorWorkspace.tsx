@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, X } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import {
@@ -23,12 +23,15 @@ import { SettingsPane } from "./SettingsPane";
 import { PlanCanvas } from "./PlanCanvas";
 import { IdeateCanvas } from "./IdeateCanvas";
 import { ChatCanvas } from "./ChatCanvas";
+import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 const EMPTY_SETTINGS: GenerateSettings = {
   sizes: ["S", "M", "L"],
   orientations: ["h"],
   hoe: false,
 };
+
+const FOCUS_HINT_KEY = "nutmag-creator-focus-hint";
 
 // pipeline-stage transition — plan → ideate → build reads as a vertical
 // step progression, distinct from the horizontal drill-in used for
@@ -49,12 +52,23 @@ type Props = {
 };
 
 export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain }: Props) {
+  const { focusWidgetId } = useLayout();
   const workingId = useSyncExternalStore(
     subscribeWorkingProjectId,
     getWorkingProjectId,
     getServerWorkingProjectId,
   );
   const isLocked = workingId === project.id;
+  const isFocusMode = focusWidgetId === "nutbot";
+  const [focusHintDismissed, setFocusHintDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    try { return localStorage.getItem(FOCUS_HINT_KEY) === "dismissed"; } catch { return true; }
+  });
+
+  function dismissFocusHint() {
+    setFocusHintDismissed(true);
+    try { localStorage.setItem(FOCUS_HINT_KEY, "dismissed"); } catch {}
+  }
 
   // editable project name
   const [editingName, setEditingName] = useState(false);
@@ -253,6 +267,15 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
           onStage={handleStage}
           locked={isLocked}
         />
+
+        {!isFocusMode && !focusHintDismissed && (
+          <div className="cr-focus-hint">
+            <span>tip: the ⤢ button gives the creator the whole frame</span>
+            <button type="button" className="cr-focus-hint-close" onClick={dismissFocusHint} aria-label="dismiss focus hint">
+              <X size={10} strokeWidth={2} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* workspace body */}

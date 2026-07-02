@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Square, RefreshCw, Hammer, Plus, Minus, Map } from "lucide-react";
+import { Send, Square, RefreshCw, Hammer, Plus, Minus, Map, Maximize2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import {
@@ -14,9 +14,11 @@ import {
   pullProjectBlob,
   type WidgetBrief,
 } from "@/lib/widget-creator/projectStore";
+import { MockupLightbox } from "./MockupLightbox";
 
 type Variation = { index: number; file: string; html: string };
 type Round = { prompt: string; variations: Variation[] };
+type PendingRound = { prompt: string; files: string[]; variations: Array<Variation | null> };
 
 type Phase =
   | { id: "idle" }
@@ -128,13 +130,24 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const [phase, setPhase] = useState<Phase>({ id: "idle" });
   const [regeneratingFile, setRegeneratingFile] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState("");
+  const [pendingRound, setPendingRound] = useState<PendingRound | null>(null);
+  const [lightboxHtml, setLightboxHtml] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
+
+  function clearPendingPoll() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
 
   // if this canvas is unmounted mid-generation (e.g. stage/canvas switch),
   // abort the request and clear this tab's working indicator
   useEffect(() => {
     return () => {
+      clearPendingPoll();
       if (abortRef.current) {
         abortRef.current.abort();
         clearSignal();
@@ -169,7 +182,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [rounds.length, phase]);
+  }, [rounds.length, pendingRound, phase]);
 
   const nextIndex = Math.max(0, ...rounds.flatMap((r) => r.variations.map((v) => v.index))) + 1;
   const isGenerating = phase.id === "connecting" || phase.id === "generating";
@@ -181,10 +194,38 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     return res.text();
   }
 
+  async function fetchCompletedVariation(file: string, activeSessionId: string): Promise<Variation | null> {
+    const res = await fetch(`/api/widget-creator/ideate/file?session=${activeSessionId}&file=${encodeURIComponent(file)}`);
+    if (!res.ok) return null;
+    const html = await res.text();
+    if (!html.trim().endsWith("</html>")) return null;
+    const m = file.match(/variation-(\d+)\.html/);
+    return { index: m ? Number(m[1]) : 0, file, html };
+  }
+
+  function startProgressPolling(promptText: string, files: string[], activeSessionId: string) {
+    clearPendingPoll();
+    setPendingRound({ prompt: promptText, files, variations: files.map(() => null) });
+
+    const poll = async () => {
+      const variations = await Promise.all(files.map((file) => fetchCompletedVariation(file, activeSessionId)));
+      setPendingRound((current) => {
+        if (!current || current.prompt !== promptText) return current;
+        return {
+          ...current,
+          variations: current.variations.map((existing, index) => existing ?? variations[index]),
+        };
+      });
+    };
+    void poll();
+    pollRef.current = setInterval(() => { void poll(); }, 2000);
+  }
+
   async function generate() {
     if (!prompt.trim() || isGenerating) return;
     if (!sessionId) return;
     const userPrompt = prompt.trim();
+    const expectedFiles = Array.from({ length: count }, (_, i) => `variation-${nextIndex + i}.html`);
     setPrompt("");
     setPhase({ id: "connecting", harness: activeHarness });
     emitWorking();
@@ -192,6 +233,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
     const abort = new AbortController();
     abortRef.current = abort;
+    startProgressPolling(userPrompt, expectedFiles, sessionId);
 
     try {
       const result = await streamIdeate(
@@ -202,6 +244,8 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
       );
 
       if (!result.ok) {
+        clearPendingPoll();
+        setPendingRound(null);
         clearSignal();
         setWorkingProjectId(null);
         setPhase({ id: "error", message: result.message });
@@ -217,6 +261,8 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
       setRounds((prev) => [...prev, { prompt: userPrompt, variations }]);
       updateProject(projectId, { hasIdeateRounds: true });
+      clearPendingPoll();
+      setPendingRound(null);
       setPhase({ id: "done" });
       clearSignal();
       setWorkingProjectId(null);
@@ -229,6 +275,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         setPhase({ id: "error", message: (err as Error).message ?? "request failed" });
       }
     } finally {
+      clearPendingPoll();
       abortRef.current = null;
     }
   }
@@ -255,6 +302,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
       );
 
       if (!result.ok) {
+        clearPendingPoll();
         clearSignal();
         setWorkingProjectId(null);
         setPhase({ id: "error", message: result.message });
@@ -280,12 +328,15 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         setPhase({ id: "error", message: (err as Error).message ?? "request failed" });
       }
     } finally {
+      clearPendingPoll();
       abortRef.current = null;
     }
   }
 
   function stop() {
     abortRef.current?.abort();
+    clearPendingPoll();
+    setPendingRound(null);
     clearSignal();
     setWorkingProjectId(null);
     setPhase({ id: "idle" });
@@ -299,6 +350,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     updateProject(projectId, { ideateSessionId: id });
     removeProjectBlob(roundsKey);
     setRounds([]);
+    setPendingRound(null);
     setPhase({ id: "idle" });
     setRegeneratingFile(null);
   }
@@ -372,6 +424,16 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                         <button
                           type="button"
                           className="wc-ideate-action-btn"
+                          onClick={() => setLightboxHtml(v.html)}
+                          disabled={isGenerating}
+                          title="expand this mockup"
+                        >
+                          <Maximize2 size={11} strokeWidth={2} />
+                          expand
+                        </button>
+                        <button
+                          type="button"
+                          className="wc-ideate-action-btn"
                           onClick={() => { setRegeneratingFile(v.file); setRegenPrompt(""); }}
                           disabled={isGenerating}
                           title="regenerate this variation"
@@ -398,6 +460,62 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
           </div>
         ))}
 
+        {pendingRound && (
+          <div className="wc-ideate-round">
+            <div className="wc-msg wc-msg-user">{pendingRound.prompt}</div>
+            <div className="wc-ideate-gallery">
+              {pendingRound.files.map((file, index) => {
+                const variation = pendingRound.variations[index];
+                return (
+                  <div key={file} className={`wc-ideate-card${variation ? "" : " pending"}`}>
+                    <div className="wc-ideate-card-head">variation {variation?.index ?? index + nextIndex}</div>
+                    {variation ? (
+                      <iframe
+                        className="wc-ideate-frame"
+                        sandbox="allow-scripts"
+                        srcDoc={variation.html}
+                        title={`variation ${variation.index}`}
+                      />
+                    ) : (
+                      <div className="wc-ideate-frame wc-ideate-frame-pending">
+                        <span className="wc-dot-pulse" />
+                        <span className="wc-dot-pulse" style={{ animationDelay: "0.2s" }} />
+                        <span className="wc-dot-pulse" style={{ animationDelay: "0.4s" }} />
+                      </div>
+                    )}
+                    <div className="wc-ideate-card-actions">
+                      {variation ? (
+                        <>
+                          <button
+                            type="button"
+                            className="wc-ideate-action-btn"
+                            onClick={() => setLightboxHtml(variation.html)}
+                            title="expand this mockup"
+                          >
+                            <Maximize2 size={11} strokeWidth={2} />
+                            expand
+                          </button>
+                          <button
+                            type="button"
+                            className="wc-ideate-action-btn wc-ideate-finalize-btn"
+                            onClick={() => onFinalize(variation.html)}
+                            title="finalize this design and build the real widget"
+                          >
+                            <Hammer size={11} strokeWidth={2} />
+                            finalize → build
+                          </button>
+                        </>
+                      ) : (
+                        <span className="wc-ideate-pending-label">waiting for file</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {isGenerating && (
           <div className="wc-generating-hint">
             <span className="wc-dot-pulse" />
@@ -406,6 +524,9 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
           </div>
         )}
       </div>
+      {lightboxHtml && (
+        <MockupLightbox html={lightboxHtml} title="ideate mockup preview" onClose={() => setLightboxHtml(null)} />
+      )}
 
       <div className="wc-chat-footer wc-ideate-footer">
         {rounds.length > 0 && !isGenerating && (
