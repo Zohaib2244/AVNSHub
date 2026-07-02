@@ -84,6 +84,7 @@ export function removeCustomWidgetFiles(id: string): boolean {
 // entry — exactly what this prune treats as an orphan. Skip anything recently
 // touched so pending work can't be swept away by deleting an unrelated widget.
 const PRUNE_MIN_AGE_MS = 48 * 60 * 60 * 1000;
+const CREATOR_PROJECTS_KEY = "nutmag-creator-projects";
 
 function newestMtimeMs(dir: string): number {
   let newest = statSync(dir).mtimeMs;
@@ -95,10 +96,42 @@ function newestMtimeMs(dir: string): number {
   return newest;
 }
 
-export function pruneOrphanCustomWidgetFiles(): string[] {
+function collectProtectedProjectSlugs(raw: unknown): Set<string> {
+  const ids = new Set<string>();
+  if (!Array.isArray(raw)) return ids;
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const project = item as Record<string, unknown>;
+    if (typeof project.slug === "string" && isValidCustomWidgetId(project.slug)) {
+      ids.add(project.slug);
+    }
+    const pending = project.pendingInstall;
+    if (pending && typeof pending === "object") {
+      const slug = (pending as Record<string, unknown>).slug;
+      if (typeof slug === "string" && isValidCustomWidgetId(slug)) ids.add(slug);
+    }
+  }
+  return ids;
+}
+
+async function readProtectedProjectSlugs(): Promise<Set<string> | null> {
+  try {
+    const { prisma } = await import("@/lib/db");
+    const row = await prisma.kV.findUnique({ where: { key: CREATOR_PROJECTS_KEY } });
+    return collectProtectedProjectSlugs(row ? JSON.parse(row.value) : []);
+  } catch {
+    return null;
+  }
+}
+
+export async function pruneOrphanCustomWidgetFiles(): Promise<string[]> {
   if (!existsSync(CUSTOM_WIDGETS_DIR)) return [];
   const registry = readRegistry();
   const keepIds = new Set(Object.keys(registry));
+  const protectedProjectIds = await readProtectedProjectSlugs();
+  if (protectedProjectIds) {
+    for (const id of protectedProjectIds) keepIds.add(id);
+  }
   const removed: string[] = [];
 
   for (const name of readdirSync(CUSTOM_WIDGETS_DIR)) {

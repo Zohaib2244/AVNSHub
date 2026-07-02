@@ -8,8 +8,11 @@ import { useEffect } from "react";
 import {
   updateProject,
   setWorkingProjectId,
-  projectPlanSidKey,
   projectPlanMessagesKey,
+  loadProjectBlob,
+  saveProjectBlob,
+  removeProjectBlob,
+  pullProjectBlob,
   type WidgetBrief,
 } from "@/lib/widget-creator/projectStore";
 
@@ -36,27 +39,16 @@ type Props = {
   activeHarness: HarnessId;
   onBuild: (brief: WidgetBrief) => void;
   onVisualize: (brief: WidgetBrief) => void;
+  /** CLI conversation id from the synced project record — server-machine
+      scoped, so it survives remounts, tab closes, and device switches */
+  planSessionId?: string;
 };
 
-export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: Props) {
-  const sidKey  = projectPlanSidKey(projectId);
+export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, planSessionId }: Props) {
   const msgsKey = projectPlanMessagesKey(projectId);
 
-  function loadSessionId(): string | null {
-    if (typeof window === "undefined") return null;
-    try { return sessionStorage.getItem(sidKey); } catch { return null; }
-  }
-
-  function loadMessages(): Message[] {
-    if (typeof window === "undefined") return [];
-    try {
-      const raw = localStorage.getItem(msgsKey);
-      return raw ? (JSON.parse(raw) as Message[]) : [];
-    } catch { return []; }
-  }
-
-  const [sessionId, setSessionId] = useState<string | null>(loadSessionId);
-  const [messages, setMessages] = useState<Message[]>(loadMessages);
+  const sessionId = planSessionId ?? null;
+  const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(msgsKey) ?? []);
   const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -67,8 +59,23 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: P
 
   // persist messages so they survive mode switches (PlanCanvas unmounts/remounts)
   useEffect(() => {
-    try { localStorage.setItem(msgsKey, JSON.stringify(messages)); } catch {}
+    saveProjectBlob(msgsKey, messages);
   }, [messages, msgsKey]);
+
+  // one-shot server pull so a transcript written from another device appears;
+  // local wins while a send is in flight (we never adopt mid-generation)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await pullProjectBlob<Message[]>(msgsKey);
+      if (cancelled || !remote || !Array.isArray(remote)) return;
+      setMessages((current) => {
+        if (current.length >= remote.length) return current;
+        return remote;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [msgsKey]);
 
   function scrollBottom() {
     requestAnimationFrame(() => {
@@ -81,9 +88,8 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: P
     setMessages([]);
     setHistory([]);
     setActiveBrief(null);
-    setSessionId(null);
-    try { sessionStorage.removeItem(sidKey); } catch {}
-    try { localStorage.removeItem(msgsKey); } catch {}
+    updateProject(projectId, { planSessionId: undefined });
+    removeProjectBlob(msgsKey);
   }
 
   async function send() {
@@ -160,9 +166,8 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: P
           } else if (frame.type === "done") {
             const data = (frame.data ?? {}) as Record<string, unknown>;
             const convId = (data.conversation_id as string | undefined) ?? null;
-            if (convId) {
-              setSessionId(convId);
-              try { sessionStorage.setItem(sidKey, convId); } catch {}
+            if (convId && convId !== sessionId) {
+              updateProject(projectId, { planSessionId: convId });
             }
             setMessages((prev) => {
               const idx = assistantIdxRef.current;

@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       rmSync(join(process.cwd(), "app/api", id), { recursive: true, force: true });
     }
 
-    const removedOrphans = pruneOrphanCustomWidgetFiles();
+    const removedOrphans = await pruneOrphanCustomWidgetFiles();
 
     return NextResponse.json({ ok: true, removedFiles, removedOrphans });
   } catch (error) {

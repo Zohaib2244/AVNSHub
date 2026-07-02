@@ -9,13 +9,13 @@ import {
   getServerProjects,
   subscribeProjects,
   deleteProject,
+  buildProjectView,
   type WidgetProject,
   type ProjectMode,
+  type RegistryLike,
 } from "@/lib/widget-creator/projectStore";
 
-type RawRegistryEntry = { title: string };
-const REGISTRY = customRegistryRaw as Record<string, RawRegistryEntry>;
-const REGISTRY_KEYS = Object.keys(REGISTRY);
+const REGISTRY = customRegistryRaw as RegistryLike;
 
 type Props = {
   onNewWidget: () => void;
@@ -131,30 +131,7 @@ export function CreatorProjectList({ onNewWidget, onOpenProject }: Props) {
     getServerProjects,
   );
 
-  const registryKeySet = new Set(REGISTRY_KEYS);
-  const correctedProjects = storedProjects.map((p) =>
-    p.hasBuildOutput && p.slug && !registryKeySet.has(p.slug)
-      ? { ...p, hasBuildOutput: false as const, slug: undefined }
-      : p,
-  );
-
-  const storedSlugs = new Set(correctedProjects.map((p) => p.slug).filter(Boolean));
-  const virtualCreated: WidgetProject[] = REGISTRY_KEYS.filter(
-    (slug) => !storedSlugs.has(slug),
-  ).map((slug) => ({
-    id: slug,
-    displayName: REGISTRY[slug]?.title ?? slug,
-    slug,
-    activeMode: "build" as ProjectMode,
-    entryMode: "build" as ProjectMode,
-    createdAt: 0,
-    updatedAt: 0,
-    hasBrief: false,
-    hasIdeateRounds: false,
-    hasBuildOutput: true,
-  }));
-
-  const allProjects = [...correctedProjects, ...virtualCreated];
+  const allProjects = buildProjectView(storedProjects, REGISTRY);
 
   const inProgress = allProjects
     .filter((p) => !p.hasBuildOutput)

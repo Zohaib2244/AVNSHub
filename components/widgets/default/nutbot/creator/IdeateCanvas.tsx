@@ -7,8 +7,11 @@ import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import {
   updateProject,
   setWorkingProjectId,
-  projectIdeateSidKey,
   projectIdeateKey,
+  loadProjectBlob,
+  saveProjectBlob,
+  removeProjectBlob,
+  pullProjectBlob,
   type WidgetBrief,
 } from "@/lib/widget-creator/projectStore";
 
@@ -31,6 +34,9 @@ type Props = {
   /** the project's Plan-mode brief, if any — shown as a "carried over from
       plan" indicator so the user knows what's feeding the first prompt */
   brief?: WidgetBrief;
+  /** Ideate session id from the synced project record; also names the
+      scratch directory holding generated mockups. */
+  ideateSessionId?: string;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -112,33 +118,11 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief }: Props) {
-  const sidKey    = projectIdeateSidKey(projectId);
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief, ideateSessionId }: Props) {
   const roundsKey = projectIdeateKey(projectId);
 
-  function loadSessionId(): string {
-    if (typeof window === "undefined") return "";
-    try {
-      const existing = sessionStorage.getItem(sidKey);
-      if (existing) return existing;
-    } catch {}
-    const id = crypto.randomUUID();
-    try { sessionStorage.setItem(sidKey, id); } catch {}
-    return id;
-  }
-
-  function loadRounds(): Round[] {
-    if (typeof window === "undefined") return [];
-    try {
-      const saved = localStorage.getItem(roundsKey);
-      return saved ? (JSON.parse(saved) as Round[]) : [];
-    } catch {
-      return [];
-    }
-  }
-
-  const [sessionId, setSessionId] = useState(loadSessionId);
-  const [rounds, setRounds] = useState<Round[]>(loadRounds);
+  const sessionId = ideateSessionId ?? null;
+  const [rounds, setRounds] = useState<Round[]>(() => loadProjectBlob<Round[]>(roundsKey) ?? []);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
   const [count, setCount] = useState(3);
   const [phase, setPhase] = useState<Phase>({ id: "idle" });
@@ -148,8 +132,28 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const bodyRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try { localStorage.setItem(roundsKey, JSON.stringify(rounds)); } catch {}
+    saveProjectBlob(roundsKey, rounds);
   }, [rounds, roundsKey]);
+
+  useEffect(() => {
+    if (ideateSessionId) return;
+    const id = crypto.randomUUID();
+    updateProject(projectId, { ideateSessionId: id });
+  }, [ideateSessionId, projectId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await pullProjectBlob<Round[]>(roundsKey);
+      if (cancelled || !remote || !Array.isArray(remote)) return;
+      setRounds((current) => {
+        if (current.length > remote.length) return current;
+        if (JSON.stringify(current) === JSON.stringify(remote)) return current;
+        return remote;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [roundsKey]);
 
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
@@ -158,14 +162,16 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const nextIndex = Math.max(0, ...rounds.flatMap((r) => r.variations.map((v) => v.index))) + 1;
   const isGenerating = phase.id === "connecting" || phase.id === "generating";
 
-  async function fetchVariationHtml(file: string): Promise<string> {
-    const res = await fetch(`/api/widget-creator/ideate/file?session=${sessionId}&file=${encodeURIComponent(file)}`);
+  async function fetchVariationHtml(file: string, activeSessionId = sessionId): Promise<string> {
+    if (!activeSessionId) throw new Error("ideate session is not ready yet");
+    const res = await fetch(`/api/widget-creator/ideate/file?session=${activeSessionId}&file=${encodeURIComponent(file)}`);
     if (!res.ok) throw new Error(`couldn't load ${file} (${res.status})`);
     return res.text();
   }
 
   async function generate() {
     if (!prompt.trim() || isGenerating) return;
+    if (!sessionId) return;
     const userPrompt = prompt.trim();
     setPrompt("");
     setPhase({ id: "connecting", harness: activeHarness });
@@ -193,7 +199,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
       const variations: Variation[] = await Promise.all(
         result.variations.map(async (file) => {
           const m = file.match(/variation-(\d+)\.html/);
-          return { index: m ? Number(m[1]) : 0, file, html: await fetchVariationHtml(file) };
+          return { index: m ? Number(m[1]) : 0, file, html: await fetchVariationHtml(file, sessionId) };
         }),
       );
 
@@ -217,6 +223,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
   async function regenerate(file: string, index: number) {
     if (!regenPrompt.trim() || isGenerating) return;
+    if (!sessionId) return;
     const instruction = regenPrompt.trim();
     setRegenPrompt("");
     setRegeneratingFile(null);
@@ -242,7 +249,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         return;
       }
 
-      const html = await fetchVariationHtml(file);
+      const html = await fetchVariationHtml(file, sessionId);
       setRounds((prev) =>
         prev.map((r) => ({
           ...r,
@@ -275,13 +282,10 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   function newSession() {
     if (isGenerating) return;
     const oldSessionId = sessionId;
-    fetch(`/api/widget-creator/ideate/file?session=${oldSessionId}`, { method: "DELETE" }).catch(() => {});
+    if (oldSessionId) fetch(`/api/widget-creator/ideate/file?session=${oldSessionId}`, { method: "DELETE" }).catch(() => {});
     const id = crypto.randomUUID();
-    try {
-      sessionStorage.setItem(sidKey, id);
-      localStorage.removeItem(roundsKey);
-    } catch {}
-    setSessionId(id);
+    updateProject(projectId, { ideateSessionId: id });
+    removeProjectBlob(roundsKey);
     setRounds([]);
     setPhase({ id: "idle" });
     setRegeneratingFile(null);

@@ -18,8 +18,10 @@ import {
   updateProject,
   setWorkingProjectId,
   projectMessagesKey,
-  projectBuildSidKey,
-  projectDoneKey,
+  loadProjectBlob,
+  saveProjectBlob,
+  removeProjectBlob,
+  pullProjectBlob,
   type WidgetBrief,
   type ProjectMode,
 } from "@/lib/widget-creator/projectStore";
@@ -41,6 +43,8 @@ type Message =
   | { role: "ok"; text: string }
   | { role: "error"; text: string };
 
+type DoneRecord = { slug: string; registered: boolean };
+
 type Props = {
   projectId: string;
   settings: GenerateSettings;
@@ -53,6 +57,11 @@ type Props = {
   brief?: WidgetBrief;
   /** which pipeline stage this project started from — recorded in SPEC.md */
   entryMode?: ProjectMode;
+  /** Build-mode CLI session from the synced project record, tagged with the
+      target slug it belongs to so remounts can resume safely. */
+  buildSession?: { id: string; forSlug: string | null };
+  /** Finished-but-not-fully-installed build state from the project record. */
+  pendingInstall?: DoneRecord;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -92,56 +101,28 @@ function validateSettings(settings: GenerateSettings): string | null {
   return null;
 }
 
-type DoneRecord = { slug: string; registered: boolean };
-
-export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarness, harnessChain, initialPrompt, brief, entryMode }: Props) {
+export function ChatCanvas({
+  projectId,
+  settings,
+  onSettingsChange,
+  activeHarness,
+  harnessChain,
+  initialPrompt,
+  brief,
+  entryMode,
+  buildSession,
+  pendingInstall,
+}: Props) {
   const [showMockupPreview, setShowMockupPreview] = useState(false);
   const MESSAGES_KEY  = projectMessagesKey(projectId);
-  const SESSION_KEY   = projectBuildSidKey(projectId);
-  const DONE_KEY_PROJ = projectDoneKey(projectId);
+  const pendingInstallSlug = pendingInstall?.slug ?? null;
+  const pendingInstallRegistered = pendingInstall?.registered ?? false;
 
-  function readDoneRecord(): DoneRecord | null {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = sessionStorage.getItem(DONE_KEY_PROJ);
-      if (!raw) return null;
-      const parsed = JSON.parse(raw) as Partial<DoneRecord>;
-      return typeof parsed.slug === "string" ? { slug: parsed.slug, registered: Boolean(parsed.registered) } : null;
-    } catch { return null; }
-  }
-
-  function writeDoneRecord(record: DoneRecord | null) {
-    try {
-      if (record) sessionStorage.setItem(DONE_KEY_PROJ, JSON.stringify(record));
-      else sessionStorage.removeItem(DONE_KEY_PROJ);
-    } catch {}
-  }
-
-  const [messages, setMessages] = useState<Message[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem(MESSAGES_KEY);
-        return saved ? (JSON.parse(saved) as Message[]) : [];
-      } catch {}
-    }
-    return [];
-  });
-
-  const [creatorSessionId, setCreatorSessionId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      try { return sessionStorage.getItem(SESSION_KEY); } catch {}
-    }
-    return null;
-  });
-
-  const sessionForSlugRef = useRef<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(MESSAGES_KEY) ?? []);
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
-  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => readDoneRecord()?.slug ?? null);
-  const [pendingRegistration, setPendingRegistration] = useState(() => {
-    const done = readDoneRecord();
-    return done ? !done.registered : false;
-  });
-  const [phase, setPhase] = useState<Phase>(() => (readDoneRecord() ? { id: "done" } : { id: "idle" }));
+  const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => pendingInstallSlug);
+  const [pendingRegistration, setPendingRegistration] = useState(() => Boolean(pendingInstallSlug && !pendingInstallRegistered));
+  const [phase, setPhase] = useState<Phase>(() => (pendingInstallSlug ? { id: "done" } : { id: "idle" }));
   const [added, setAdded] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editHidden, setEditHidden] = useState(false);
@@ -174,8 +155,32 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
   }, [messages, phase]);
 
   useEffect(() => {
-    try { localStorage.setItem(MESSAGES_KEY, JSON.stringify(messages)); } catch {}
+    saveProjectBlob(MESSAGES_KEY, messages);
   }, [messages, MESSAGES_KEY]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const remote = await pullProjectBlob<Message[]>(MESSAGES_KEY);
+      if (cancelled || !remote || !Array.isArray(remote)) return;
+      setMessages((current) => {
+        if (current.length > remote.length) return current;
+        if (JSON.stringify(current) === JSON.stringify(remote)) return current;
+        return remote;
+      });
+    })();
+    return () => { cancelled = true; };
+  }, [MESSAGES_KEY]);
+
+  useEffect(() => {
+    setDoneWidgetId(pendingInstallSlug);
+    setPendingRegistration(Boolean(pendingInstallSlug && !pendingInstallRegistered));
+    setPhase((current) => {
+      if (pendingInstallSlug && current.id === "idle") return { id: "done" };
+      if (!pendingInstallSlug && current.id === "done") return { id: "idle" };
+      return current;
+    });
+  }, [pendingInstallSlug, pendingInstallRegistered]);
 
   async function generate() {
     const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
@@ -196,12 +201,12 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     setDoneWidgetId(null);
     setAdded(false);
     setPendingRegistration(false);
-    writeDoneRecord(null);
+    updateProject(projectId, { pendingInstall: undefined });
 
     const currentTarget = (settings.editSlug || settings.slug || "").trim() || null;
-    if (creatorSessionId && sessionForSlugRef.current !== currentTarget) {
-      setCreatorSessionId(null);
-      try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    const sessionForRequest = buildSession && buildSession.forSlug === currentTarget ? buildSession.id : null;
+    if (buildSession && buildSession.forSlug !== currentTarget) {
+      updateProject(projectId, { buildSession: undefined });
     }
 
     assistantIdxRef.current = -1;
@@ -231,7 +236,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           prompt: userText,
           harness: activeHarness,
           harnessChain,
-          sessionId: creatorSessionId ?? undefined,
+          sessionId: sessionForRequest ?? undefined,
           projectMeta: { concept: brief?.concept, entryMode },
         }),
         signal: abort.signal,
@@ -273,9 +278,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
               const registered = Boolean(payload.registered);
               const newSessionId = (payload.sessionId as string | null) ?? null;
               if (newSessionId) {
-                setCreatorSessionId(newSessionId);
-                sessionForSlugRef.current = slug;
-                try { sessionStorage.setItem(SESSION_KEY, newSessionId); } catch {}
+                updateProject(projectId, { buildSession: { id: newSessionId, forSlug: slug } });
               }
               setPhase({ id: "done" });
               setMessages((prev) => {
@@ -308,7 +311,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
                 setAdded(restoredOk);
                 setPendingRegistration(!registered);
                 emitWidgetCreated(slug);
-                writeDoneRecord({ slug, registered });
+                updateProject(projectId, { pendingInstall: { slug, registered } });
                 // promote project to Created in the store
                 updateProject(projectId, {
                   hasBuildOutput: true,
@@ -400,12 +403,9 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     setAdded(false);
     setPendingRegistration(false);
     onSettingsChange({ editSlug: undefined, slug: undefined, name: undefined });
-    writeDoneRecord(null);
-    setCreatorSessionId(null);
-    sessionForSlugRef.current = null;
+    updateProject(projectId, { pendingInstall: undefined, buildSession: undefined });
     try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
-    try { localStorage.removeItem(MESSAGES_KEY); } catch {}
-    try { sessionStorage.removeItem(SESSION_KEY); } catch {}
+    removeProjectBlob(MESSAGES_KEY);
   }
 
   async function placeWithRetry(slug: string, attempts: number, delayMs: number): Promise<boolean> {
@@ -434,8 +434,9 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
       if (cancelled) return;
       try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
       if (ok) {
-        const done = readDoneRecord();
-        if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+        if (pendingInstall?.slug === slug || doneWidgetId === slug) {
+          updateProject(projectId, { pendingInstall: { slug, registered: true } });
+        }
         if (doneWidgetId === slug) {
           setAdded(true);
           setPendingRegistration(false);
@@ -497,8 +498,9 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
       return;
     }
     setPendingRegistration(false);
-    const done = readDoneRecord();
-    if (done?.slug === slug) writeDoneRecord({ slug, registered: true });
+    if (pendingInstall?.slug === slug || doneWidgetId === slug) {
+      updateProject(projectId, { pendingInstall: { slug, registered: true } });
+    }
     const ok = await placeWithRetry(slug, 8, 250);
     try { sessionStorage.removeItem(PENDING_ADD_KEY); } catch {}
     setInstalling(false);

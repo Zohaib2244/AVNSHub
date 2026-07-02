@@ -10,9 +10,11 @@ import {
   subscribeProjects,
   createProject,
   ensureProject,
+  buildProjectView,
   type WidgetProject,
   type ProjectMode,
   type ProjectIdentity,
+  type RegistryLike,
 } from "@/lib/widget-creator/projectStore";
 import { CreatorProjectList } from "./CreatorProjectList";
 import { CreatorEntryPicker } from "./CreatorEntryPicker";
@@ -22,8 +24,6 @@ import { CreatorWorkspace } from "./CreatorWorkspace";
 export type PanelMode = "create" | "edit" | "ideate" | "plan";
 
 type View = "list" | "picker" | "workspace";
-
-const REGISTRY_KEYS = Object.keys(customRegistryRaw as Record<string, unknown>);
 
 // drill-in/out navigation — deeper views (picker, workspace) slide in from
 // the right over the outgoing view; returning to the list reverses it
@@ -50,34 +50,10 @@ export function WidgetCreatorPanel() {
     getServerProjects,
   );
 
-  // Merge logic in render body (not in getSnapshot) so the snapshot stays stable.
-  // Auto-correct hasBuildOutput for any project whose slug left the registry.
-  const registryKeySet = new Set(REGISTRY_KEYS);
-  const correctedProjects = storedProjects.map((p) =>
-    p.hasBuildOutput && p.slug && !registryKeySet.has(p.slug)
-      ? { ...p, hasBuildOutput: false as const, slug: undefined }
-      : p,
-  );
-  const storedSlugs = new Set(correctedProjects.map((p) => p.slug).filter(Boolean));
-  const virtualCreated: WidgetProject[] = REGISTRY_KEYS.filter(
-    (slug) => !storedSlugs.has(slug),
-  ).map((slug) => {
-    const entry = (customRegistryRaw as Record<string, { title?: string }>)[slug];
-    return {
-      id: slug,
-      displayName: entry?.title ?? slug,
-      slug,
-      activeMode: "build" as ProjectMode,
-      entryMode: "build" as ProjectMode,
-      createdAt: 0,
-      updatedAt: 0,
-      hasBrief: false,
-      hasIdeateRounds: false,
-      hasBuildOutput: true,
-    };
-  });
-
-  const allProjects = [...correctedProjects, ...virtualCreated];
+  // Merge logic in render body (not in getSnapshot) so the snapshot stays
+  // stable — buildProjectView corrects Created status against the registry
+  // and appends virtual entries for pre-existing widgets.
+  const allProjects = buildProjectView(storedProjects, customRegistryRaw as RegistryLike);
   const activeProject = allProjects.find((p) => p.id === activeProjectId) ?? null;
 
   // track drill direction for the transition — adjusted directly during

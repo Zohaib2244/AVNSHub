@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -10,6 +10,10 @@ import {
   getWorkingProjectId,
   getServerWorkingProjectId,
   subscribeWorkingProjectId,
+  legacyPlanSidKey,
+  legacyIdeateSidKey,
+  legacyBuildSidKey,
+  legacyDoneKey,
   type WidgetProject,
   type ProjectMode,
   type WidgetBrief,
@@ -147,6 +151,44 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   }
 
   const mode = project.activeMode;
+  const legacyBuildTarget = (project.buildSettings?.editSlug || project.buildSettings?.slug || project.slug || "").trim() || null;
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (project.planSessionId || project.ideateSessionId || project.buildSession || project.pendingInstall) return;
+
+    const patch: Partial<WidgetProject> = {};
+    try {
+      const planSid = sessionStorage.getItem(legacyPlanSidKey(project.id));
+      const ideateSid = sessionStorage.getItem(legacyIdeateSidKey(project.id));
+      const buildSid = sessionStorage.getItem(legacyBuildSidKey(project.id));
+      const doneRaw = sessionStorage.getItem(legacyDoneKey(project.id));
+
+      if (planSid) patch.planSessionId = planSid;
+      if (ideateSid) patch.ideateSessionId = ideateSid;
+      if (buildSid) patch.buildSession = { id: buildSid, forSlug: legacyBuildTarget };
+      if (doneRaw) {
+        const parsed = JSON.parse(doneRaw) as Partial<{ slug: string; registered: boolean }>;
+        if (typeof parsed.slug === "string") {
+          patch.pendingInstall = { slug: parsed.slug, registered: Boolean(parsed.registered) };
+        }
+      }
+
+      sessionStorage.removeItem(legacyPlanSidKey(project.id));
+      sessionStorage.removeItem(legacyIdeateSidKey(project.id));
+      sessionStorage.removeItem(legacyBuildSidKey(project.id));
+      sessionStorage.removeItem(legacyDoneKey(project.id));
+    } catch {}
+
+    if (Object.keys(patch).length > 0) updateProject(project.id, patch);
+  }, [
+    legacyBuildTarget,
+    project.id,
+    project.planSessionId,
+    project.ideateSessionId,
+    project.buildSession,
+    project.pendingInstall,
+  ]);
 
   // track PIB step direction for the transition — adjusted directly during
   // render (React-blessed pattern for deriving state from a state change)
@@ -303,6 +345,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   activeHarness={activeHarness}
                   onBuild={handlePlanBuild}
                   onVisualize={handlePlanVisualize}
+                  planSessionId={project.planSessionId}
                 />
               )}
 
@@ -315,6 +358,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   onFinalize={handleFinalize}
                   initialPrompt={ideateNonce > 0 ? ideateInitialPrompt : undefined}
                   brief={project.brief}
+                  ideateSessionId={project.ideateSessionId}
                 />
               )}
 
@@ -329,6 +373,8 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   initialPrompt={finalizeNonce > 0 ? buildInitialPrompt : undefined}
                   brief={project.brief}
                   entryMode={project.entryMode}
+                  buildSession={project.buildSession}
+                  pendingInstall={project.pendingInstall}
                 />
               )}
             </motion.div>
