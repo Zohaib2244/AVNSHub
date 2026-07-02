@@ -127,7 +127,10 @@ export async function POST(req: Request) {
     removeRegistryEntry(id);
     removeFromComponentMap(id);
     upsertRegistryEntry(newSlug, updatedEntry);
-    addToComponentMap(newSlug, mod);
+    const wired = addToComponentMap(newSlug, mod);
+    if (!wired.ok) {
+      return NextResponse.json({ ok: false, error: wired.error }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true, id: newSlug });
   }

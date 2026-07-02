@@ -226,9 +226,16 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize }: P
       </div>
 
       <div className="wc-chat-body wc-plan-body" ref={bodyRef}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !isLoading && (
           <div className="wc-chat-empty">
-            describe an idea ("I want a widget that shows...") — get concept suggestions, then build or visualize from a brief
+            describe an idea (&ldquo;I want a widget that shows...&rdquo;) — get concept suggestions, then build or visualize from a brief
+          </div>
+        )}
+
+        {messages.length === 0 && isLoading && (
+          <div className="wc-chat-empty wc-status-bar active">
+            <span className="wc-status-dot" />
+            <span className="wc-status-label">thinking...</span>
           </div>
         )}
 

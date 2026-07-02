@@ -61,11 +61,12 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
   const nameRef = useRef<HTMLInputElement>(null);
 
   // keep name input in sync if project displayName changes externally
-  // (e.g. plan mode sets it from the brief)
-  const prevDisplayName = useRef(project.displayName);
-  if (project.displayName !== prevDisplayName.current && !editingName) {
+  // (e.g. plan mode sets it from the brief) — adjusted directly during
+  // render (React-blessed pattern), not in a ref or effect
+  const [prevDisplayName, setPrevDisplayName] = useState(project.displayName);
+  if (project.displayName !== prevDisplayName && !editingName) {
     setNameValue(project.displayName);
-    prevDisplayName.current = project.displayName;
+    setPrevDisplayName(project.displayName);
   }
 
   function commitName() {
@@ -96,7 +97,10 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
     const patch: Partial<GenerateSettings> = {
       name: brief.title,
       slug: brief.slug,
-      icon: brief.icon,
+      // fall back to whatever identity was decided at project creation —
+      // the brief doesn't always suggest an icon, and an explicit
+      // `icon: undefined` here would otherwise wipe a decided one on spread
+      icon: brief.icon ?? project.buildSettings?.icon,
       sizes: brief.sizes ?? ["S", "M"],
       orientations: ["h"],
       sDescription: brief.sContent,
@@ -144,14 +148,15 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
   const mode = project.activeMode;
 
-  // track PIB step direction for the transition (mutated during render — no re-render needed)
-  const pibDirRef = useRef(0);
-  const prevModeRef = useRef<ProjectMode>(mode);
-  if (prevModeRef.current !== mode) {
-    const prevIdx = PIB_ORDER.indexOf(prevModeRef.current);
+  // track PIB step direction for the transition — adjusted directly during
+  // render (React-blessed pattern for deriving state from a state change)
+  const [prevMode, setPrevMode] = useState<ProjectMode>(mode);
+  const [pibDir, setPibDir] = useState(0);
+  if (prevMode !== mode) {
+    const prevIdx = PIB_ORDER.indexOf(prevMode);
     const nextIdx = PIB_ORDER.indexOf(mode);
-    pibDirRef.current = nextIdx > prevIdx ? 1 : -1;
-    prevModeRef.current = mode;
+    setPibDir(nextIdx > prevIdx ? 1 : -1);
+    setPrevMode(mode);
   }
 
   const isEditBuild = mode === "build" && project.hasBuildOutput && !!project.slug;
@@ -221,11 +226,11 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
       <div className="cr-workspace-body">
         {/* left sidebar */}
         <div className="cr-workspace-left">
-          <AnimatePresence mode="wait" initial={false} custom={pibDirRef.current}>
+          <AnimatePresence mode="wait" initial={false} custom={pibDir}>
             <motion.div
               key={mode}
               className="cr-pib-panel"
-              custom={pibDirRef.current}
+              custom={pibDir}
               variants={PIB_VARIANTS}
               initial="enter"
               animate="center"
@@ -281,11 +286,11 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
         {/* right canvas */}
         <div className="cr-workspace-right">
-          <AnimatePresence mode="wait" initial={false} custom={pibDirRef.current}>
+          <AnimatePresence mode="wait" initial={false} custom={pibDir}>
             <motion.div
               key={mode}
               className="cr-pib-panel"
-              custom={pibDirRef.current}
+              custom={pibDir}
               variants={PIB_VARIANTS}
               initial="enter"
               animate="center"
@@ -309,6 +314,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   harnessChain={harnessChain}
                   onFinalize={handleFinalize}
                   initialPrompt={ideateNonce > 0 ? ideateInitialPrompt : undefined}
+                  brief={project.brief}
                 />
               )}
 
@@ -321,6 +327,8 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   activeHarness={activeHarness}
                   harnessChain={harnessChain}
                   initialPrompt={finalizeNonce > 0 ? buildInitialPrompt : undefined}
+                  brief={project.brief}
+                  entryMode={project.entryMode}
                 />
               )}
             </motion.div>

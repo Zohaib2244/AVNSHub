@@ -121,15 +121,16 @@ export function NutBotTerminal() {
   const isCreator  = activeTab === "creator";
   const isChat     = activeTab === "chat";
 
-  // track which direction the active tab moved so the panel slides the
-  // right way (mutated during render — read-only derived value, no re-render needed)
-  const tabDirRef = useRef(0);
-  const prevTabRef = useRef<MainTab>(activeTab);
-  if (prevTabRef.current !== activeTab) {
-    const prevIdx = TAB_ORDER.indexOf(prevTabRef.current);
+  // track which direction the active tab moved so the panel slides the right
+  // way — adjusted directly during render (React-blessed pattern for
+  // deriving state from a prop/state change), not in a ref or effect
+  const [prevTab, setPrevTab] = useState<MainTab>(activeTab);
+  const [tabDir, setTabDir] = useState(0);
+  if (prevTab !== activeTab) {
+    const prevIdx = TAB_ORDER.indexOf(prevTab);
     const nextIdx = TAB_ORDER.indexOf(activeTab);
-    tabDirRef.current = nextIdx > prevIdx ? 1 : -1;
-    prevTabRef.current = activeTab;
+    setTabDir(nextIdx > prevIdx ? 1 : -1);
+    setPrevTab(activeTab);
   }
 
   return (
@@ -192,11 +193,11 @@ export function NutBotTerminal() {
         ].filter(Boolean).join(" ")}
         ref={bodyRef}
       >
-        <AnimatePresence mode="wait" initial={false} custom={tabDirRef.current}>
+        <AnimatePresence mode="wait" initial={false} custom={tabDir}>
           <motion.div
             key={activeTab}
             className="term-tab-panel"
-            custom={tabDirRef.current}
+            custom={tabDir}
             variants={TAB_PANEL_VARIANTS}
             initial="enter"
             animate="center"

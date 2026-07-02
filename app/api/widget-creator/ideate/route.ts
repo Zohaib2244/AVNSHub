@@ -6,6 +6,7 @@ import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
 import { isValidIdeateSessionId, sessionDirFor, variationFile } from "@/lib/widget-creator/ideateStore";
+import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
 
 const REPO_ROOT = process.cwd();
 
@@ -162,6 +163,16 @@ export async function POST(req: Request) {
   const requestedHarness: HarnessId = bodyHarness ?? "claude";
   const chain: HarnessId[] = bodyChain ?? HARNESS_CHAIN_DEFAULT;
 
+  // Same single-generation mutex as the generate route — a mockup run and a
+  // build run (or two mockup runs from different tabs) still race on the repo.
+  const lock = acquireGenerationLock("ideate");
+  if (!lock.ok) {
+    return new Response(
+      `event: error\ndata: ${JSON.stringify({ message: describeBusyError(lock.holder, lock.ageMs) })}\n\n`,
+      { headers: { "Content-Type": "text/event-stream" } },
+    );
+  }
+
   const encoder = new TextEncoder();
   const abortController = new AbortController();
 
@@ -174,6 +185,8 @@ export async function POST(req: Request) {
           // client disconnected
         }
       };
+
+      try {
 
       // On a mid-run harness switch, hand the fallback whatever variation
       // files already exist so it resumes from them instead of re-reading.
@@ -188,6 +201,8 @@ export async function POST(req: Request) {
 
       const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
 
+      // "aborted" (user stop) deliberately skips the done-verification below —
+      // a stopped run reporting "no variation files found" would be noise.
       if (outcome === "done") {
         // Verify what was actually written rather than trusting the harness's
         // claim — same discipline as the real generate route's
@@ -207,6 +222,10 @@ export async function POST(req: Request) {
           }
           sendEvent(write, "status", { type: "done", variations: written });
         }
+      }
+
+      } finally {
+        releaseGenerationLock();
       }
 
       controller.close();

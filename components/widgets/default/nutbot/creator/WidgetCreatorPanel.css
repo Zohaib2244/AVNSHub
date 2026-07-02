@@ -512,6 +512,27 @@
   color: var(--accent-cyan);
 }
 
+/* write-audit warning — the harness touched files outside its lane */
+.wc-msg-audit {
+  border: 1px solid var(--accent-orange);
+  border-left-width: 2px;
+  background: color-mix(in srgb, var(--accent-orange) 7%, transparent);
+  color: var(--text-primary);
+}
+
+.wc-msg-audit-head {
+  color: var(--accent-orange);
+  font-weight: 600;
+  margin-bottom: 3px;
+}
+
+.wc-audit-line {
+  color: var(--nb-muted, var(--text-muted));
+  font-size: calc(0.68rem * var(--nb-scale, 1));
+  margin-top: 2px;
+  word-break: break-all;
+}
+
 .wc-msg-error {
   border: 1px solid var(--status-down, #c0392b);
   border-left-width: 2px;
@@ -1539,6 +1560,31 @@
   margin: 0;
 }
 
+/* ── identity step (name/icon/slug, or "decide later") ───────────────── */
+
+.cr-identity-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--bg-nested);
+  box-shadow: 2px 2px 0 var(--shadow);
+  flex-shrink: 0;
+}
+
+.cr-identity-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cr-identity-later-hint {
+  margin: 0;
+}
+
 .cr-picker-cards {
   display: flex;
   gap: 8px;
@@ -1766,4 +1812,76 @@
 
 .cr-stage:disabled {
   cursor: not-allowed;
+}
+
+/* ── pipeline handoff indicators (what carried over from the previous stage) ── */
+
+.wc-handoff-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.wc-handoff-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(0.6rem * var(--nb-scale, 1));
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 5px;
+  border: 1px solid color-mix(in srgb, var(--accent-cyan) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent-cyan) 7%, transparent);
+  color: var(--accent-cyan);
+}
+
+.wc-handoff-chip.interactive {
+  cursor: pointer;
+  border: none;
+  transition: filter 0.15s;
+}
+
+.wc-handoff-chip.interactive:hover {
+  filter: brightness(1.15);
+}
+
+.wc-handoff-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wc-handoff-preview {
+  flex-shrink: 0;
+  margin-bottom: 6px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--shadow);
+  overflow: hidden;
+  background: var(--bg-page, #13100c);
+}
+
+.wc-handoff-preview-frame {
+  width: 100%;
+  height: calc(140px * var(--nb-scale, 1));
+  border: none;
+  display: block;
+}
+
+.wc-handoff-concept {
+  margin: 0;
+  padding: 6px 8px;
+  border-top: 1px dashed var(--border);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.68rem * var(--nb-scale, 1));
+  line-height: 1.45;
+  color: var(--nb-muted, var(--text-muted));
+  background: var(--bg-card);
 }

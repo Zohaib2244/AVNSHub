@@ -512,6 +512,83 @@ folders to figure out conventions — this guide is the complete spec.** (The
 cube-timer and glyph-matrix widgets are real shipped examples if you want extra
 reference, not required reading.)
 
+### Canvas / animated widgets
+
+For anything drawn frame-by-frame — waveforms, physics sims, visualizers —
+the pattern below is the complete spec, already TypeScript-strict-null-safe.
+You don't need to read `verlet-sim` or any other canvas widget's code to
+find this; copy it directly:
+
+```tsx
+const canvasRef = useRef<HTMLCanvasElement | null>(null);
+const stageRef = useRef<HTMLDivElement | null>(null); // wrapper div, sized by CSS flex/grid
+
+function readVar(el: HTMLElement, name: string, fallback: string) {
+  return getComputedStyle(el).getPropertyValue(name).trim() || fallback;
+}
+function readPalette(el: HTMLElement) {
+  return {
+    accent: readVar(el, "--accent-orange", "CanvasText"),
+    teal: readVar(el, "--accent-cyan", "CanvasText"),
+    primary: readVar(el, "--text-primary", "CanvasText"),
+    muted: readVar(el, "--text-muted", "CanvasText"),
+    border: readVar(el, "--border", "CanvasText"),
+    bg: readVar(el, "--bg-nested", "Canvas"),
+  };
+}
+
+useEffect(() => {
+  const canvas = canvasRef.current;
+  const stage = stageRef.current;
+  const context = canvas?.getContext("2d");
+  if (!canvas || !stage || !context) return; // narrows all three for the closures below
+
+  let frame = 0;
+  let palette = readPalette(stage);
+
+  const resize = () => {
+    const bounds = stage.getBoundingClientRect();
+    const width = Math.max(120, Math.round(bounds.width || 220));
+    const height = Math.max(82, Math.round(bounds.height || 120));
+    const ratio = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(width * ratio);
+    canvas.height = Math.round(height * ratio);
+    canvas.style.width = `${width}px`;
+    canvas.style.height = `${height}px`;
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    palette = readPalette(stage);
+  };
+
+  const observer = new ResizeObserver(resize);
+  observer.observe(stage);
+  resize();
+
+  const tick = () => {
+    // ...draw using `context`, `palette`, canvas.width/ratio-adjusted size...
+    frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
+
+  return () => {
+    observer.disconnect();
+    cancelAnimationFrame(frame);
+  };
+}, [/* settings that should restart the loop */]);
+```
+
+```tsx
+<div ref={stageRef} style={{ flex: "1 1 auto", position: "relative", overflow: "hidden" }}>
+  <canvas ref={canvasRef} style={{ width: "100%", height: "100%", display: "block" }} />
+</div>
+```
+
+The TypeScript-safety trick: guard `canvas`/`stage`/`context` together in one
+`if (!canvas || !stage || !context) return;` at the top of the effect, then
+only ever reference the narrowed local consts (`canvas`, `stage`, `context`)
+inside `resize`/`tick` — reaching back through `canvasRef.current` inside the
+same effect re-introduces the nullable type and defeats the narrowing, which
+is exactly what produces the "possibly null" errors this pattern avoids.
+
 ### Write plain ASCII — no smart punctuation
 
 Generated files are written by an LLM piping output through a subprocess shell.

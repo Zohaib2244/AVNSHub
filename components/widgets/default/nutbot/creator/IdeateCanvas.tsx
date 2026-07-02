@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Square, RefreshCw, Hammer, Plus, Minus } from "lucide-react";
+import { Send, Square, RefreshCw, Hammer, Plus, Minus, Map } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import {
@@ -9,6 +9,7 @@ import {
   setWorkingProjectId,
   projectIdeateSidKey,
   projectIdeateKey,
+  type WidgetBrief,
 } from "@/lib/widget-creator/projectStore";
 
 type Variation = { index: number; file: string; html: string };
@@ -27,6 +28,9 @@ type Props = {
   harnessChain: HarnessId[];
   onFinalize: (html: string) => void;
   initialPrompt?: string;
+  /** the project's Plan-mode brief, if any — shown as a "carried over from
+      plan" indicator so the user knows what's feeding the first prompt */
+  brief?: WidgetBrief;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -108,7 +112,7 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt }: Props) {
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief }: Props) {
   const sidKey    = projectIdeateSidKey(projectId);
   const roundsKey = projectIdeateKey(projectId);
 
@@ -287,10 +291,26 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     <div className="wc-chat">
       <StatusBar phase={phase} />
 
+      {brief && (
+        <div className="wc-handoff-strip">
+          <span className="wc-handoff-chip" title={brief.concept}>
+            <Map size={9} strokeWidth={2} />
+            <span className="wc-handoff-chip-label">carried over from plan: {brief.title}</span>
+          </span>
+        </div>
+      )}
+
       <div className="wc-chat-body wc-ideate-body" ref={bodyRef}>
-        {rounds.length === 0 && (
+        {rounds.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
             describe a widget concept below and pick how many variations to brainstorm
+          </div>
+        )}
+
+        {rounds.length === 0 && isGenerating && (
+          <div className="wc-chat-empty wc-status-bar active">
+            <span className="wc-status-dot" />
+            <span className="wc-status-label">cooking up {count} variation{count > 1 ? "s" : ""}...</span>
           </div>
         )}
 

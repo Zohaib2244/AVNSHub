@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, PlusCircle, Send, Square } from "lucide-react";
+import { Download, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
@@ -20,6 +20,8 @@ import {
   projectMessagesKey,
   projectBuildSidKey,
   projectDoneKey,
+  type WidgetBrief,
+  type ProjectMode,
 } from "@/lib/widget-creator/projectStore";
 
 type Phase =
@@ -35,6 +37,7 @@ type Message =
   | { role: "assistant"; text: string; streaming?: boolean }
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
+  | { role: "audit"; files: string[] }
   | { role: "ok"; text: string }
   | { role: "error"; text: string };
 
@@ -45,6 +48,11 @@ type Props = {
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
   initialPrompt?: string;
+  /** the project's Plan-mode brief, if any — shown as a "carried over from
+      plan" indicator, and folded into the widget's SPEC.md on generate */
+  brief?: WidgetBrief;
+  /** which pipeline stage this project started from — recorded in SPEC.md */
+  entryMode?: ProjectMode;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
@@ -86,7 +94,8 @@ function validateSettings(settings: GenerateSettings): string | null {
 
 type DoneRecord = { slug: string; registered: boolean };
 
-export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarness, harnessChain, initialPrompt }: Props) {
+export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarness, harnessChain, initialPrompt, brief, entryMode }: Props) {
+  const [showMockupPreview, setShowMockupPreview] = useState(false);
   const MESSAGES_KEY  = projectMessagesKey(projectId);
   const SESSION_KEY   = projectBuildSidKey(projectId);
   const DONE_KEY_PROJ = projectDoneKey(projectId);
@@ -223,6 +232,7 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           harness: activeHarness,
           harnessChain,
           sessionId: creatorSessionId ?? undefined,
+          projectMeta: { concept: brief?.concept, entryMode },
         }),
         signal: abort.signal,
       });
@@ -330,6 +340,8 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
           } else if (event === "tsc_errors") {
             hadTscErrors = true;
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
+          } else if (event === "audit") {
+            setMessages((prev) => [...prev, { role: "audit", files: payload.unexpectedFiles as string[] }]);
           } else if (event === "error") {
             clearSignal();
             setWorkingProjectId(null);
@@ -529,10 +541,51 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
     <div className="wc-chat">
       <StatusBar phase={phase} />
 
+      {(brief || settings.designReferenceHtml) && (
+        <div className="wc-handoff-strip">
+          {brief && (
+            <span className="wc-handoff-chip" title={brief.concept}>
+              <Map size={9} strokeWidth={2} />
+              <span className="wc-handoff-chip-label">carried over from plan: {brief.title}</span>
+            </span>
+          )}
+          {settings.designReferenceHtml && (
+            <button
+              type="button"
+              className="wc-handoff-chip interactive"
+              onClick={() => setShowMockupPreview((v) => !v)}
+              title="the finalized Ideate-mode mockup being sent as the build reference"
+            >
+              <Wand2 size={9} strokeWidth={2} />
+              <span className="wc-handoff-chip-label">mockup reference attached</span>
+              {showMockupPreview ? <ChevronUp size={9} strokeWidth={2} /> : <ChevronDown size={9} strokeWidth={2} />}
+            </button>
+          )}
+        </div>
+      )}
+
+      {showMockupPreview && settings.designReferenceHtml && (
+        <div className="wc-handoff-preview">
+          <iframe
+            className="wc-handoff-preview-frame"
+            sandbox="allow-scripts"
+            srcDoc={settings.designReferenceHtml}
+            title="finalized mockup reference"
+          />
+        </div>
+      )}
+
       <div className="wc-chat-body" ref={bodyRef}>
-        {messages.length === 0 && (
+        {messages.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
             fill in the settings on the left, then describe your widget here
+          </div>
+        )}
+
+        {messages.length === 0 && isGenerating && (
+          <div className="wc-chat-empty wc-status-bar active">
+            <span className="wc-status-dot" />
+            <span className="wc-status-label">writing the widget...</span>
           </div>
         )}
 
@@ -561,6 +614,16 @@ export function ChatCanvas({ projectId, settings, onSettingsChange, activeHarnes
                 <div className="wc-msg-tsc-head">[tsc errors — re-sending for self-repair]</div>
                 {msg.errors.slice(0, 6).map((e, j) => (
                   <div key={j} className="wc-tsc-line">{e}</div>
+                ))}
+              </div>
+            );
+          }
+          if (msg.role === "audit") {
+            return (
+              <div key={i} className="wc-msg wc-msg-audit">
+                <div className="wc-msg-audit-head">[write audit] the run touched files outside the widget&apos;s own folders — review before trusting this build:</div>
+                {msg.files.map((f, j) => (
+                  <div key={j} className="wc-audit-line">{f}</div>
                 ))}
               </div>
             );

@@ -105,10 +105,30 @@ export function subscribeProjects(cb: () => void): () => void {
   return () => projectListeners.delete(cb);
 }
 
-export function createProject(entryMode: ProjectMode, displayName = "Untitled"): WidgetProject {
+export type ProjectIdentity = { name?: string; icon?: string; slug?: string };
+
+/**
+ * `identity` is what the user decided in the "new widget" step's name/icon
+ * fields (or left empty via "decide later"). When any field is set it seeds
+ * `buildSettings` so Build mode's identity inputs show it immediately —
+ * whether the project starts in Build directly, or arrives there later via
+ * Plan/Ideate (those handoffs only override the fields their own data
+ * actually supplies, so an undecided field here still gets a chance to be
+ * filled by a later brief).
+ */
+export function createProject(
+  entryMode: ProjectMode,
+  displayName = "Untitled",
+  identity?: ProjectIdentity,
+): WidgetProject {
+  const name = identity?.name?.trim();
+  const icon = identity?.icon?.trim();
+  const slug = identity?.slug?.trim();
+  const hasIdentity = Boolean(name || icon || slug);
+
   const project: WidgetProject = {
     id: crypto.randomUUID(),
-    displayName,
+    displayName: name || displayName,
     activeMode: entryMode,
     entryMode,
     createdAt: Date.now(),
@@ -116,6 +136,9 @@ export function createProject(entryMode: ProjectMode, displayName = "Untitled"):
     hasBrief: false,
     hasIdeateRounds: false,
     hasBuildOutput: false,
+    buildSettings: hasIdentity
+      ? { sizes: ["S", "M", "L"], orientations: ["h"], hoe: false, name, icon, slug }
+      : undefined,
   };
   projects = [project, ...projects];
   writeToStorage(projects);

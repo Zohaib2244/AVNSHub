@@ -80,6 +80,21 @@ export function removeCustomWidgetFiles(id: string): boolean {
   return true;
 }
 
+// A generated-but-not-yet-installed widget has files on disk but no registry
+// entry — exactly what this prune treats as an orphan. Skip anything recently
+// touched so pending work can't be swept away by deleting an unrelated widget.
+const PRUNE_MIN_AGE_MS = 48 * 60 * 60 * 1000;
+
+function newestMtimeMs(dir: string): number {
+  let newest = statSync(dir).mtimeMs;
+  for (const f of readdirSync(dir)) {
+    try {
+      newest = Math.max(newest, statSync(join(dir, f)).mtimeMs);
+    } catch {}
+  }
+  return newest;
+}
+
 export function pruneOrphanCustomWidgetFiles(): string[] {
   if (!existsSync(CUSTOM_WIDGETS_DIR)) return [];
   const registry = readRegistry();
@@ -92,6 +107,7 @@ export function pruneOrphanCustomWidgetFiles(): string[] {
     const widgetDir = join(CUSTOM_WIDGETS_DIR, name);
     try {
       if (!statSync(widgetDir).isDirectory()) continue;
+      if (Date.now() - newestMtimeMs(widgetDir) < PRUNE_MIN_AGE_MS) continue;
       rmSync(widgetDir, { recursive: true, force: true });
       removed.push(name);
     } catch {
@@ -215,13 +231,22 @@ function mapEntryLine(id: string): string {
 
 /** append the lazy declaration + map entry between the markers (idempotent).
     `mod` defaults to the detected module, falling back to the conventional name. */
-export function addToComponentMap(id: string, mod?: ComponentModule): void {
+export function addToComponentMap(id: string, mod?: ComponentModule): { ok: boolean; error?: string } {
   let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  if (content.includes(`const ${localVar(id)} =`)) return; // already registered
+  if (content.includes(`const ${localVar(id)} =`)) return { ok: true }; // already registered
+  // Without both markers String.replace silently no-ops and the widget would
+  // "register" without ever being wired in — fail loudly instead.
+  if (!content.includes("// --- custom-components end ---") || !content.includes("// --- custom-map end ---")) {
+    return {
+      ok: false,
+      error: "config/customComponentMap.tsx is missing its marker comments — restore them or the widget cannot be wired in",
+    };
+  }
   const resolved = mod ?? findComponentModule(id) ?? { file: componentName(id), exportName: componentName(id) };
   content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
   writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");
+  return { ok: true };
 }
 
 /** Wire an already-on-disk component + manifest.json into the split config:
@@ -263,8 +288,23 @@ export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: 
     }
   }
 
+  // Record from DISK whether this widget shipped its own app/api/<id> route —
+  // never from the LLM manifest, which could claim anything. The delete route
+  // uses this to clean the route up; every registration path (generate-route
+  // edit re-registration, deferred register route, import) flows through here
+  // so no cross-route state is needed. The extra flag key is inert to client
+  // flag consumers (they only read plainChrome/customHeader/accent/className).
+  const hasApiRoute = existsSync(join(ROOT, "app/api", input.id, "route.ts"));
+  entry.flags = { ...entry.flags, hasApiRoute };
+
   upsertRegistryEntry(input.id, entry);
-  addToComponentMap(input.id, mod);
+  const wired = addToComponentMap(input.id, mod);
+  if (!wired.ok) {
+    // a FRESH registration must not leave an entry pointing at an unwired
+    // component; a re-registration keeps its (previously working) entry
+    if (!existing) removeRegistryEntry(input.id);
+    return { ok: false, error: wired.error };
+  }
   return { ok: true };
 }
 

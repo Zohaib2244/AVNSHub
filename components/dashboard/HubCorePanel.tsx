@@ -91,6 +91,7 @@ import {
   subscribeSlotLayout,
 } from "@/lib/slotLayout";
 import { REGION_DIMS_BOUNDS, REGION_GRID, REGION_LABELS, type RegionDims, type SlotRegionId } from "@/config/slotLayout";
+import { syncDeletedWidget } from "@/lib/widget-creator/projectStore";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
 type HubCoreTab = "settings" | "widgets";
@@ -805,6 +806,10 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
       if (!res.ok) {
         const payload = await res.json().catch(() => null) as { error?: string } | null;
         setDeleteError(payload?.error ?? `failed to delete ${id}`);
+      } else {
+        // reset the matching creator project (Created → In Progress) so it
+        // doesn't linger pointing at a widget that no longer exists
+        syncDeletedWidget(id);
       }
     } finally {
       setDeletingId(null);

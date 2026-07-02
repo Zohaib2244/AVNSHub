@@ -9,6 +9,7 @@ import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
 import { renameWidgetPlacement } from "@/lib/slotLayout";
+import { LUCIDE_SUGGESTIONS } from "@/lib/widget-creator/lucideSuggestions";
 
 // kept in sync with PanelMode in WidgetCreatorPanel but defined locally to
 // avoid a circular import when SettingsPane is used from CreatorWorkspace
@@ -39,13 +40,6 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
     </div>
   );
 }
-
-const LUCIDE_SUGGESTIONS = [
-  "Box", "Cloud", "Cpu", "Database", "Globe", "HardDrive", "Heart", "Home",
-  "Music", "Rss", "Server", "Smile", "Star", "Sun", "Tv", "Zap",
-  "Activity", "Bell", "Camera", "Clock", "Code", "Eye", "Film",
-  "Map", "Package", "Terminal", "Wifi", "Wind",
-];
 
 const SIZE_OPTIONS = ["S", "M", "L"] as const;
 const ORI_OPTIONS = ["h", "v"] as const;

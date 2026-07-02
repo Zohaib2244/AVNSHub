@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import customRegistryRaw from "@/config/customRegistry.json";
 import { getPrefs, getServerPrefs, subscribePrefs } from "@/lib/prefs";
@@ -12,6 +12,7 @@ import {
   ensureProject,
   type WidgetProject,
   type ProjectMode,
+  type ProjectIdentity,
 } from "@/lib/widget-creator/projectStore";
 import { CreatorProjectList } from "./CreatorProjectList";
 import { CreatorEntryPicker } from "./CreatorEntryPicker";
@@ -79,22 +80,23 @@ export function WidgetCreatorPanel() {
   const allProjects = [...correctedProjects, ...virtualCreated];
   const activeProject = allProjects.find((p) => p.id === activeProjectId) ?? null;
 
-  // track drill direction for the transition (mutated during render — no re-render needed)
-  const viewDirRef = useRef(0);
-  const prevViewRef = useRef<View>(view);
-  if (prevViewRef.current !== view) {
-    const prevIdx = VIEW_ORDER.indexOf(prevViewRef.current);
+  // track drill direction for the transition — adjusted directly during
+  // render (React-blessed pattern for deriving state from a state change)
+  const [prevView, setPrevView] = useState<View>(view);
+  const [viewDir, setViewDir] = useState(0);
+  if (prevView !== view) {
+    const prevIdx = VIEW_ORDER.indexOf(prevView);
     const nextIdx = VIEW_ORDER.indexOf(view);
-    viewDirRef.current = nextIdx > prevIdx ? 1 : -1;
-    prevViewRef.current = view;
+    setViewDir(nextIdx > prevIdx ? 1 : -1);
+    setPrevView(view);
   }
 
   function handleNewWidget() {
     setView("picker");
   }
 
-  function handlePick(mode: ProjectMode) {
-    const project = createProject(mode);
+  function handlePick(mode: ProjectMode, identity?: ProjectIdentity) {
+    const project = createProject(mode, "Untitled", identity);
     setActiveProjectId(project.id);
     setView("workspace");
   }
@@ -113,11 +115,11 @@ export function WidgetCreatorPanel() {
 
   return (
     <div className="wc-panel">
-      <AnimatePresence mode="wait" initial={false} custom={viewDirRef.current}>
+      <AnimatePresence mode="wait" initial={false} custom={viewDir}>
         <motion.div
           key={view}
           className="wc-view"
-          custom={viewDirRef.current}
+          custom={viewDir}
           variants={VIEW_VARIANTS}
           initial="enter"
           animate="center"

@@ -69,7 +69,12 @@ export function runHarness(
   signal: AbortSignal,
   continuationNote?: string,
   opts?: HarnessOpts,
-): Promise<{ status: "done" | "limit" | "error"; limitReason?: LimitReason; newSessionId?: string }> {
+): Promise<{
+  status: "done" | "limit" | "error" | "aborted";
+  limitReason?: LimitReason;
+  errorReason?: string;
+  newSessionId?: string;
+}> {
   return new Promise((resolve) => {
     const isResume = adapter.id === "claude" && Boolean(opts?.sessionId);
 
@@ -175,13 +180,21 @@ export function runHarness(
       if (reason && !limitReason) limitReason = reason;
     });
 
-    child.on("close", () => {
+    child.on("close", (code, killSignal) => {
       if (buffer) processLine(buffer);
-      resolve(
-        limitReason
-          ? { status: "limit", limitReason }
-          : { status: "done", newSessionId: newSessionId ?? undefined },
-      );
+      // Order matters: an aborted child also exits nonzero — if the exit-code
+      // branch ran first, a user pressing stop would be treated as a harness
+      // failure and spawn the next harness in the chain.
+      if (signal.aborted) {
+        resolve({ status: "aborted" });
+      } else if (limitReason) {
+        resolve({ status: "limit", limitReason });
+      } else if (code !== 0) {
+        // code === null means killed by an external signal (not our abort)
+        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}` });
+      } else {
+        resolve({ status: "done", newSessionId: newSessionId ?? undefined });
+      }
     });
 
     child.on("error", (err) => {
@@ -218,7 +231,7 @@ export async function runHarnessChain(
   signal: AbortSignal,
   partialWork?: () => string,
   opts?: HarnessOpts,
-): Promise<{ outcome: "done" | "failed"; sessionId?: string }> {
+): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string }> {
   const startIdx = chain.indexOf(requestedHarness);
   const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
 
@@ -234,24 +247,28 @@ export async function runHarnessChain(
     // harnesses always start fresh with the full prompt.
     const harnessOpts = i === 0 ? opts : undefined;
 
-    const { status, limitReason, newSessionId } = await runHarness(
+    const { status, limitReason, errorReason, newSessionId } = await runHarness(
       adapter, fullPrompt, write, signal, continuationNote, harnessOpts,
     );
 
     if (newSessionId) capturedSessionId = newSessionId;
+
+    // User stop — terminal. No switch/error events, and critically no
+    // fallback: pressing stop must never spawn the next harness.
+    if (status === "aborted") return { outcome: "aborted" };
 
     if (status === "limit" || status === "error") {
       const nextId = orderedChain[i + 1];
       if (nextId) {
         const reason = status === "limit"
           ? (limitReason === "quota" ? "rate limit / quota reached" : limitReason === "overload" ? "upstream service overloaded (not your quota)" : "unknown")
-          : "failed to start";
+          : errorReason ?? "failed to start";
         sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-        if (status === "limit") {
-          // A limit means the previous CLI actually ran and may have written
-          // partial work. Hand that work to the fallback inline so it doesn't
-          // re-read it from disk. (A "failed to start" never touched disk, so
-          // there is nothing to carry — leave the note undefined.)
+        if (status === "limit" || errorReason) {
+          // The previous CLI actually ran (limit, or started-then-crashed) and
+          // may have written partial work. Hand that work to the fallback
+          // inline so it doesn't re-read it from disk. (A "failed to start"
+          // never touched disk, so there is nothing to carry.)
           const partial = partialWork?.().trim();
           continuationNote = partial
             ? `The previous harness (${harnessId}) started but hit: ${reason}. It had already written the file(s) below. CONTINUE from this exact on-disk state and finish the remaining work — do NOT re-read these from disk, do NOT restart from scratch:\n\n${partial}`
@@ -263,6 +280,10 @@ export async function runHarnessChain(
       }
       if (status === "limit") {
         sendEvent(write, "error", { message: `All harnesses hit a limit (${limitReason ?? "unknown"}). Try again later.` });
+      } else if (errorReason) {
+        // Chain exhausted on a crash — previously this path ended silently
+        // and the client stream just stopped with no explanation.
+        sendEvent(write, "error", { message: `All harnesses failed (last: ${harnessId} ${errorReason}). Check the CLI installs and try again.` });
       }
       return { outcome: "failed" };
     }

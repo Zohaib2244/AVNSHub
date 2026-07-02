@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Per-widget SPEC.md.** After every successful build turn the Widget Creator writes a `SPEC.md` into the widget's own folder ([`lib/widget-creator/projectSpec.ts`](lib/widget-creator/projectSpec.ts)) capturing its intent, per-size content, data shape, and pipeline origin; edit-mode prompts read it back as authoritative context so the harness (or a fresh session on another device) never has to re-derive what the widget is for.
+- **Name/icon/slug at project creation.** The Widget Creator's "new widget" step now has an identity form (with auto-derived slug and a "decide later" toggle); decided values seed Build mode's settings and survive Plan-mode handoffs that don't supply their own icon.
+- **Pipeline handoff indicators.** Ideate and Build now show a "carried over from plan" chip (with the brief's title) when a brief exists, and Build shows a "mockup reference attached" chip that expands into a live preview of the finalized Ideate mockup — what each stage feeds the next is visible instead of implicit.
+- **Canvas-widget worked example in the `avn-widget-build` skill** (and `docs/CREATING_WIDGETS.md`): a complete strict-null-safe refs + ResizeObserver + DPR + RAF pattern, so canvas/animation widgets no longer send the harness exploring other widgets' source for conventions.
+- **Widget Creator server-side generation mutex.** "One generation at a time" is now enforced on the server ([`lib/widget-creator/generationLock.ts`](lib/widget-creator/generationLock.ts)) instead of only in one browser tab's memory — a second tab or device starting a build/ideate run while one is in flight gets a clear "already running" error instead of two harnesses racing on `customComponentMap.tsx`, the registry JSON, and each other's tsc checks. Lock lives on `globalThis` (survives dev-server HMR), stale takeover after 30 min, always released on completion or client abort.
+- **Post-run write audit.** After every build turn the generate route diffs `git status --porcelain` from before the run ([`lib/widget-creator/gitAudit.ts`](lib/widget-creator/gitAudit.ts)); the harness runs with `bypassPermissions`, so any file it touched outside the widget's own folders (`components/widgets/custom/<slug>/`, `app/api/<slug>/`, the registry files) now surfaces as a warning card in the build chat instead of silently landing in the working tree. Skipped gracefully when git is unavailable.
+- **Generated API routes are now tracked and cleaned up.** Registration records from disk whether a widget shipped its own `app/api/<slug>` route (`flags.hasApiRoute` — never trusted from the LLM-authored manifest); deleting the widget now removes that route too instead of orphaning it forever. Creating a widget whose slug collides with an existing `app/api` route (e.g. `uptime`) is rejected up front so a generated route can never overwrite a core one.
+
+### Fixed
+- **Plan/Ideate/Build no longer show their idle placeholder text while generating** — an empty transcript now shows a live "thinking… / cooking up N variations… / writing the widget…" status instead of "describe a widget concept below".
+- **Harness exit codes are no longer ignored.** A CLI that crashed with a nonzero exit (without tripping a rate-limit pattern) used to resolve as "done" — a crashed edit that still typechecked could be committed with zero signal. Crashes now fall forward through the harness chain with an "exited with code N" switch notice, and an exhausted chain reports an error instead of ending silently. A user pressing stop is now a distinct "aborted" outcome that never spawns the fallback harness.
+- **Generated `app/api/<slug>` routes now count against the TypeScript gate.** The post-generation tsc check filtered errors to the widget component tree only, so a type-broken generated API route sailed through and 500'd at runtime.
+- **Orphan pruning can no longer eat a generated-but-not-yet-installed widget.** `pruneOrphanCustomWidgetFiles` (run on every widget delete) treated any folder without a registry entry as garbage — which described exactly a widget awaiting its "install" click. Folders touched within the last 48 h are now skipped.
+- **`slug`/`editSlug` are validated server-side** in the generate route before being joined into filesystem paths (previously client-side only).
+- **`customComponentMap.tsx` marker comments are verified before registration** — a hand-edit that removed them used to make `addToComponentMap` silently no-op, "registering" a widget that never loads; now every registration path (generate, register, import, rename) reports an actionable error instead.
+- **Deleting a custom widget from the Widget Manager now resets its creator project** back to In Progress (`syncDeletedWidget` existed but was never wired up).
+
 ## [2.3.0-alpha.2] — 2026-07-02
 
 ### Changed
