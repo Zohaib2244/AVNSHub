@@ -4,7 +4,7 @@ import "./creator/WidgetCreatorPanel.css";
 import "./chat/NutBotChat.css";
 
 // NutBot's full terminal: log, chat, shells (sidebar + live pty), and widget creator.
-// Shell sessions stay mounted (display:none) when not active so the pty + scrollback survive.
+// Visited tabs stay mounted (display:none when inactive) so ptys and streams survive tab switches.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,14 +45,6 @@ function renderLogLine(text: string) {
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
 const TAB_ORDER: MainTab[] = ["log", "chat", "shells", "creator"];
 
-// direction-aware crossfade+slide — tabs to the right slide in from the
-// right (and push the outgoing tab left), tabs to the left do the reverse
-const TAB_PANEL_VARIANTS = {
-  enter: (dir: number) => ({ opacity: 0, x: dir * 10 }),
-  center: { opacity: 1, x: 0 },
-  exit: (dir: number) => ({ opacity: 0, x: dir * -10 }),
-};
-
 function sanitizeTab(raw: string | null): MainTab {
   if (raw === "log" || raw === "chat" || raw === "shells" || raw === "creator") return raw;
   // old shell-N ids map to shells
@@ -90,6 +82,7 @@ export function NutBotTerminal() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
+  const [mountedTabs, setMountedTabs] = useState<Set<MainTab>>(() => new Set(["log"]));
   const skipTabWrite = useRef(true);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -120,17 +113,21 @@ export function NutBotTerminal() {
   const isShells   = activeTab === "shells";
   const isCreator  = activeTab === "creator";
   const isChat     = activeTab === "chat";
+  const activeTabIndex = TAB_ORDER.indexOf(activeTab);
 
-  // track which direction the active tab moved so the panel slides the right
-  // way — adjusted directly during render (React-blessed pattern for
-  // deriving state from a prop/state change), not in a ref or effect
-  const [prevTab, setPrevTab] = useState<MainTab>(activeTab);
-  const [tabDir, setTabDir] = useState(0);
-  if (prevTab !== activeTab) {
-    const prevIdx = TAB_ORDER.indexOf(prevTab);
-    const nextIdx = TAB_ORDER.indexOf(activeTab);
-    setTabDir(nextIdx > prevIdx ? 1 : -1);
-    setPrevTab(activeTab);
+  if (!mountedTabs.has(activeTab)) {
+    const next = new Set(mountedTabs);
+    next.add(activeTab);
+    setMountedTabs(next);
+  }
+
+  function panelAnimate(tab: MainTab) {
+    if (tab === activeTab) return { opacity: 1, x: 0, display: "flex" };
+    return {
+      opacity: 0,
+      x: 10 * Math.sign(TAB_ORDER.indexOf(tab) - activeTabIndex),
+      transitionEnd: { display: "none" },
+    };
   }
 
   return (
@@ -193,18 +190,15 @@ export function NutBotTerminal() {
         ].filter(Boolean).join(" ")}
         ref={bodyRef}
       >
-        <AnimatePresence mode="wait" initial={false} custom={tabDir}>
+        {TAB_ORDER.map((tab) => mountedTabs.has(tab) && (
           <motion.div
-            key={activeTab}
+            key={tab}
             className="term-tab-panel"
-            custom={tabDir}
-            variants={TAB_PANEL_VARIANTS}
-            initial="enter"
-            animate="center"
-            exit="exit"
+            initial={false}
+            animate={panelAnimate(tab)}
             transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
           >
-            {activeTab === "log" && (
+            {tab === "log" && (
               <>
                 <AnimatePresence initial={false}>
                   {logLines.map((line) => (
@@ -223,11 +217,11 @@ export function NutBotTerminal() {
               </>
             )}
 
-            {activeTab === "chat" && <NutBotChat />}
+            {tab === "chat" && <NutBotChat />}
 
-            {activeTab === "shells" && <ShellsScreen />}
+            {tab === "shells" && <ShellsScreen />}
 
-            {activeTab === "creator" && (
+            {tab === "creator" && (
               prefs.creatorEnabled ? (
                 <WidgetCreatorPanel />
               ) : (
@@ -240,7 +234,7 @@ export function NutBotTerminal() {
               )
             )}
           </motion.div>
-        </AnimatePresence>
+        ))}
       </div>
     </div>
   );

@@ -34,6 +34,14 @@ function stripBrief(text: string): string {
   return text.replace(/```widget-brief[\s\S]*?```/g, "").trim();
 }
 
+function historyFromMessages(messages: Message[]): Array<{ role: "user" | "assistant"; text: string }> {
+  return messages.flatMap((msg) => (
+    msg.role === "user" || msg.role === "assistant"
+      ? [{ role: msg.role, text: msg.text }]
+      : []
+  ));
+}
+
 type Props = {
   projectId: string;
   activeHarness: HarnessId;
@@ -49,7 +57,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
 
   const sessionId = planSessionId ?? null;
   const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(msgsKey) ?? []);
-  const [history, setHistory] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [activeBrief, setActiveBrief] = useState<WidgetBrief | null>(null);
@@ -86,7 +93,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
   function clearChat() {
     if (isLoading) return;
     setMessages([]);
-    setHistory([]);
     setActiveBrief(null);
     updateProject(projectId, { planSessionId: undefined });
     removeProjectBlob(msgsKey);
@@ -103,7 +109,7 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
     setWorkingProjectId(projectId);
     scrollBottom();
 
-    const currentHistory = history;
+    const currentHistory = historyFromMessages(messages);
     assistantIdxRef.current = -1;
     let accText = "";
 
@@ -182,11 +188,6 @@ export function PlanCanvas({ projectId, activeHarness, onBuild, onVisualize, pla
               setActiveBrief(brief);
               updateProject(projectId, { hasBrief: true, brief, displayName: brief.title });
             }
-            setHistory((prev) => [
-              ...prev,
-              { role: "user", text: userText },
-              { role: "assistant", text: accText },
-            ]);
           } else if (frame.type === "error") {
             setMessages((prev) => [...prev, { role: "error", text: frame.data as string }]);
           }

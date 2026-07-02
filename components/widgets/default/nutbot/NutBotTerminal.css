@@ -165,6 +165,8 @@
 
 .term-tab-panel {
   min-height: 0;
+  width: 100%;
+  flex-direction: column;
 }
 
 .term-body-shells .term-tab-panel,

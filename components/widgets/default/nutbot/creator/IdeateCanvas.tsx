@@ -131,6 +131,18 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const abortRef = useRef<AbortController | null>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
 
+  // if this canvas is unmounted mid-generation (e.g. stage/canvas switch),
+  // abort the request and clear this tab's working indicator
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        clearSignal();
+        setWorkingProjectId(null);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     saveProjectBlob(roundsKey, rounds);
   }, [rounds, roundsKey]);
