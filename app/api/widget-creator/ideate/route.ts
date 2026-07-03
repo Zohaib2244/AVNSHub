@@ -68,6 +68,8 @@ const STYLE_REFERENCE = `<style>
 function briefContextSection(brief?: WidgetBrief): string {
   if (!brief) return "";
   const lines = [
+    brief.requirements && `- Full requirements (the complete spec — every listed field/control/behavior must appear in the mockups):\n${brief.requirements}`,
+    brief.sizes?.length && `- Sizes this widget will actually ship in: ${brief.sizes.join(", ")} — only mock up content for these sizes, don't design for one that was ruled out`,
     brief.sContent && `- S size shows: ${brief.sContent}`,
     brief.mContent && `- M size shows: ${brief.mContent}`,
     brief.lContent && `- L size shows: ${brief.lContent}`,
@@ -102,7 +104,21 @@ Rules:
 - Border radius 12-16px, 1.5px solid border, hard-offset box-shadow (no blur) — the "sticker" look.
 - Any motion must be CSS \`@keyframes\`/\`transition\` only. Inline \`<script>\` is allowed ONLY for simple stateful interactions (e.g. toggling a class on click) — never an external script, never a framework.
 - DotGothic16 for labels/headline numbers, JetBrains Mono for data values and body text.
-- Show the concept inside one or more \`.block\` cards with a \`.block-label\` header (icon + uppercase label), matching the reference markup shape.`;
+- Show the concept inside one or more \`.block\` cards with a \`.block-label\` header (icon + uppercase label), matching the reference markup shape.
+
+## Space budget — the mockup must fit the real widget footprint
+
+This is NOT a freeform web page. The real widget lives in a dashboard grid cell with a hard size budget. Render each size variant as a \`.block\` with these FIXED dimensions (width × height, use exact \`width\`/\`height\` in px):
+- S: 220 × 140
+- M horizontal: 440 × 140 · M vertical: 440 × 300
+- L horizontal: 680 × 300 · L vertical: 440 × 460
+
+Hard rules for fitting that budget:
+- ALL content must fit inside the fixed block — no overflow, no clipping, no page-level scrolling. If there's more content than fits, that's a design error: cut, condense, or move it behind a compact interaction (tabs, a scrolling list, a collapsed section).
+- Only an internal list/log area may scroll (\`overflow-y: auto\` on that area alone), never the block itself.
+- Density over decoration: paddings 8-12px, small gaps, compact controls (inputs ~24-28px tall), no hero whitespace. Every element must earn its pixels.
+- A smaller size is NOT the bigger one squeezed — it shows fewer things. If the concept has many fields/sections, the S/M mockups show the essential subset, not a shrunken version of everything.
+- Prefer one focused view with a compact switcher (tabs/dropdown) over side-by-side panels — side-by-side almost never fits the budget.`;
 
   if (regenerateIndex) {
     return `${sharedRules}
@@ -128,7 +144,7 @@ Start writing the file now.`;
 ${contextSection}
 ## Your task — generating ${count} variation${count > 1 ? "s" : ""}
 
-Concept: ${prompt}
+Concept: ${prompt || `${brief?.concept || brief?.title || ""} (follow the plan context carried over above — it is the full spec for this widget)`}
 
 Write exactly ${count} separate, complete HTML files at these exact absolute paths:
 ${fileList}
@@ -163,7 +179,15 @@ export async function POST(req: Request) {
       { headers: { "Content-Type": "text/event-stream" } },
     );
   }
-  if (!prompt?.trim()) {
+  // An empty prompt is fine when a Plan-mode brief is carried over — the
+  // brief (concept + per-size content, folded in via briefContextSection) is
+  // the spec, and requiring the user to re-type it defeated the handoff.
+  const briefIsSubstantive = Boolean(
+    brief && (brief.concept || brief.title || brief.sContent || brief.mContent || brief.lContent || brief.notes),
+  );
+  // (Regeneration always needs an instruction — "revise this per: <nothing>"
+  // is meaningless even with a brief.)
+  if (!prompt?.trim() && (regenerateIndex || !briefIsSubstantive)) {
     return new Response(
       `event: error\ndata: ${JSON.stringify({ message: "prompt is required" })}\n\n`,
       { headers: { "Content-Type": "text/event-stream" } },

@@ -443,6 +443,18 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
       )}
 
       {isCreateMode && (
+        <Section title="requirements" defaultOpen={Boolean(settings.requirements)}>
+          <textarea
+            className="wc-textarea"
+            placeholder="the complete spec — every field, control, behavior, state (carried over from Plan, or write it here)"
+            value={settings.requirements ?? ""}
+            onChange={(e) => onChange({ requirements: e.target.value })}
+            rows={6}
+          />
+        </Section>
+      )}
+
+      {isCreateMode && (
         <Section title="per-size content">
           <div className="wc-size-tabs">
             {(["S", "M", "L"] as const).map((s) => (

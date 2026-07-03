@@ -35,6 +35,11 @@ function windowsPromptFileArg(sendablePrompt: string) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SESSION_KEYS = new Set(["session_id", "sessionId", "conversation_id", "conversationId"]);
 
+// Matches the normalized "[tool: Read] some/path" text every adapter's
+// parseChunk already produces for a Read/Glob/Grep call (case-insensitive —
+// claude capitalizes tool names, opencode lowercases them).
+const SIBLING_READ_RE = /^\[tool: (read|glob|grep)\]\s*(.+)$/i;
+
 function findSessionId(value: unknown, depth = 0): string | null {
   if (depth > 3 || value == null) return null;
   if (typeof value === "string") return UUID_RE.test(value) ? value : null;
@@ -81,6 +86,12 @@ export function runHarness(
   signal: AbortSignal,
   continuationNote?: string,
   opts?: HarnessOpts,
+  /** The widget slug this run is scoped to (its own folder under
+      components/widgets/custom/) — used to (a) scope claude's own tool
+      permissions away from sibling widget folders, and (b) flag, for every
+      adapter, when a Read/Glob/Grep targets a *different* widget's folder
+      even though the prompt already says not to. */
+  watchSlug?: string,
 ): Promise<{
   status: "done" | "limit" | "error" | "aborted";
   limitReason?: LimitReason;
@@ -114,6 +125,18 @@ export function runHarness(
     // codex/opencode use their static adapter.args unchanged.
     let args: string[];
     if (adapter.id === "claude") {
+      // Deny Read/Glob/Grep on every other widget's folder, allow only this
+      // run's own — on top of bypassPermissions, which skips the interactive
+      // "ask" step but still respects an explicit deny list (deny always
+      // wins over bypass). The prompt already asks the model not to explore
+      // sibling folders; this is the actual enforcement of that, for claude
+      // specifically (codex/opencode have no equivalent flag wired up here —
+      // see the sibling-read detection in processLine below, which covers
+      // all three adapters instead).
+      const toolScope = watchSlug ? [
+        "--disallowedTools", "Read(./components/widgets/custom/**)", "Glob(./components/widgets/custom/**)", "Grep(./components/widgets/custom/**)",
+        "--allowedTools", `Read(./components/widgets/custom/${watchSlug}/**)`, `Glob(./components/widgets/custom/${watchSlug}/**)`, `Grep(./components/widgets/custom/${watchSlug}/**)`,
+      ] : [];
       if (isResume) {
         // Continue an existing session. The model already has the authoring
         // guide and full widget spec from turn 1, so sendablePrompt is just
@@ -124,6 +147,7 @@ export function runHarness(
           "--output-format", "stream-json",
           "--verbose",
           "--permission-mode", "bypassPermissions",
+          ...toolScope,
         ];
       } else {
         // First turn — mint a session ID so the next refinement can resume.
@@ -133,6 +157,7 @@ export function runHarness(
           "--output-format", "stream-json",
           "--verbose",
           "--permission-mode", "bypassPermissions",
+          ...toolScope,
         ];
       }
     } else if (adapter.promptViaArg) {
@@ -200,7 +225,31 @@ export function runHarness(
         }
       }
       const text = adapter.parseChunk(line);
-      if (text) sendEvent(write, "chunk", { text });
+      if (text) {
+        // Every adapter's parseChunk already normalizes tool calls to the
+        // same "[tool: Name] detail" text (see formatToolUse / opencode's
+        // equivalent in harnessAdapters.ts) before this point, so sibling-read
+        // detection can be adapter-agnostic instead of re-parsing each CLI's
+        // raw JSON shape — this is what actually makes it work uniformly
+        // across claude, codex, and opencode. (Codex currently doesn't
+        // surface Read/Glob/Grep as tool-use text at all, so this only fires
+        // in practice for claude/opencode until that's added.)
+        if (watchSlug) {
+          const m = SIBLING_READ_RE.exec(text.trim());
+          if (m) {
+            const path = m[2];
+            const marker = "components/widgets/custom/";
+            const idx = path.indexOf(marker);
+            if (idx !== -1) {
+              const otherSlug = path.slice(idx + marker.length).split("/")[0];
+              if (otherSlug && otherSlug !== watchSlug) {
+                sendEvent(write, "sibling_read", { tool: m[1], path, slug: otherSlug });
+              }
+            }
+          }
+        }
+        sendEvent(write, "chunk", { text });
+      }
     }
 
     child.stdout.on("data", (data: Buffer) => {
@@ -269,24 +318,30 @@ export async function runHarnessChain(
   signal: AbortSignal,
   partialWork?: () => string,
   opts?: HarnessOpts,
+  /** widget slug this whole chain is scoped to — see runHarness's watchSlug */
+  watchSlug?: string,
 ): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string }> {
   const startIdx = chain.indexOf(requestedHarness);
   const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
 
   let continuationNote: string | undefined;
   let capturedSessionId: string | undefined;
+  // Tracks whether the one-time same-harness retry (below) has already
+  // happened, so a genuinely broken harness still falls through to the next
+  // one instead of retrying forever.
+  let resumeRetried = false;
 
   for (let i = 0; i < orderedChain.length; i++) {
     const harnessId = orderedChain[i];
     const adapter = HARNESS_ADAPTERS[harnessId];
     if (!adapter) continue;
 
-    // opts (session resume) only apply to the first harness. Fallback
-    // harnesses always start fresh with the full prompt.
-    const harnessOpts = i === 0 ? opts : undefined;
+    // opts (session resume) only apply to the first harness, and only until
+    // the resume-retry below (if any) has consumed it once.
+    const harnessOpts = i === 0 && !resumeRetried ? opts : undefined;
 
     const { status, limitReason, errorReason, newSessionId } = await runHarness(
-      adapter, fullPrompt, write, signal, continuationNote, harnessOpts,
+      adapter, fullPrompt, write, signal, continuationNote, harnessOpts, watchSlug,
     );
 
     if (newSessionId) capturedSessionId = newSessionId;
@@ -294,6 +349,18 @@ export async function runHarnessChain(
     // User stop — terminal. No switch/error events, and critically no
     // fallback: pressing stop must never spawn the next harness.
     if (status === "aborted") return { outcome: "aborted" };
+
+    // A `--resume` attempt that fails to even run often just means the CLI's
+    // own session store expired (e.g. picking an edit back up weeks later) —
+    // not that this harness can't do the job. Retry it once, fresh, with the
+    // full prompt (no session) before falling through to a different,
+    // possibly weaker, harness in the chain.
+    if (status === "error" && harnessOpts?.sessionId && !resumeRetried) {
+      resumeRetried = true;
+      sendEvent(write, "status", { type: "harness_start", harness: harnessId });
+      i--;
+      continue;
+    }
 
     if (status === "limit" || status === "error") {
       const nextId = orderedChain[i + 1];

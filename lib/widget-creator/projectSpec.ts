@@ -60,6 +60,10 @@ export function buildProjectSpecMarkdown(
     lines.push("", "## Concept", "", meta.concept);
   }
 
+  if (settings.requirements) {
+    lines.push("", "## Requirements", "", settings.requirements);
+  }
+
   const perSize: [string, string | undefined][] = [
     ["S", settings.sDescription],
     ["M", settings.mDescription],

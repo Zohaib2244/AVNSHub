@@ -1,5 +1,7 @@
 ﻿import { spawn } from "child_process";
-import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync } from "fs";
+import { randomUUID } from "crypto";
+import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
@@ -72,6 +74,44 @@ function deleteWidgetBackups(slug: string): void {
   } catch {}
 }
 
+// --- Attached image delivery -------------------------------------------
+// Data-URL images (chat attachments + the per-size visual refs) are written
+// to temp files and referenced by absolute path in the prompt, so the harness
+// can actually open them with its Read tool — base64 pasted into prompt text
+// is just megabytes of characters the model can't see as pixels. (Before
+// this, the per-size refs only produced an "[image attached]" line with no
+// image behind it.)
+const IMAGE_DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/=]+)$/;
+const MAX_IMAGES = 4;
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+
+function writeImageTempFiles(
+  images: Array<{ label: string; dataUrl: string }>,
+): { section: string; paths: string[] } {
+  const paths: string[] = [];
+  const lines: string[] = [];
+  for (const { label, dataUrl } of images.slice(0, MAX_IMAGES)) {
+    const m = IMAGE_DATA_URL_RE.exec(dataUrl);
+    if (!m) continue;
+    const bytes = Buffer.from(m[2], "base64");
+    if (bytes.length === 0 || bytes.length > MAX_IMAGE_BYTES) continue;
+    const path = join(tmpdir(), `avnhub-ref-${randomUUID()}.${m[1] === "jpeg" ? "jpg" : m[1]}`);
+    try { writeFileSync(path, bytes); } catch { continue; }
+    paths.push(path);
+    lines.push(`- ${label}: ${path}`);
+  }
+  const section = lines.length
+    ? `\n\n## Attached reference images\n\nThe user attached ${lines.length} reference image(s). View each with the Read tool BEFORE writing any code — they show exactly what is wanted:\n${lines.join("\n")}`
+    : "";
+  return { section, paths };
+}
+
+function cleanupImageTempFiles(paths: string[]): void {
+  for (const p of paths) {
+    try { unlinkSync(p); } catch {}
+  }
+}
+
 // Core user-facing prompt. The authoring guide itself lives in the
 // "avn-widget-build" harness skill (.claude/skills/, .agents/skills/ — see
 // scripts/sync-widget-skill.mjs, which regenerates it from
@@ -100,15 +140,21 @@ function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string
     !isEdit && settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
     !isEdit && settings.orientations?.length && `Orientations: ${settings.orientations.join(", ")}`,
     !isEdit && settings.hoe && `HOE (Hover On Expand): enabled, mode: ${settings.hoeMode ?? "default"}`,
-    settings.sDescription && `S size content: ${settings.sDescription}`,
-    settings.mDescription && `M size content: ${settings.mDescription}`,
-    settings.lDescription && `L size content: ${settings.lDescription}`,
-    settings.sImageRef && `S size visual reference: [image attached]`,
-    settings.mImageRef && `M size visual reference: [image attached]`,
-    settings.lImageRef && `L size visual reference: [image attached]`,
+    !isEdit && settings.requirements && `Full requirements (the complete spec — every listed field/control/behavior must be implemented; the per-size content fields below only divide these across sizes):\n${settings.requirements}`,
+    // Per-size descriptions/notes are create-time snapshots from the original
+    // Plan/Ideate brief — they never track chat-only edits made since, so on
+    // edit turns they'd contradict the current code and tempt the model into
+    // resurrecting already-removed elements. Edit turns rely on existingCode +
+    // SPEC.md + the fresh user prompt instead.
+    !isEdit && settings.sDescription && `S size content: ${settings.sDescription}`,
+    !isEdit && settings.mDescription && `M size content: ${settings.mDescription}`,
+    !isEdit && settings.lDescription && `L size content: ${settings.lDescription}`,
+    settings.sImageRef && `S size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
+    settings.mImageRef && `M size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
+    settings.lImageRef && `L size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
     settings.dataUrl && `Polling endpoint: ${settings.dataUrl}`,
     settings.dataShape && `Data shape: ${settings.dataShape}`,
-    settings.notes && `Additional notes: ${settings.notes}`,
+    !isEdit && settings.notes && `Additional notes: ${settings.notes}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -119,18 +165,19 @@ function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string
 You are MODIFYING the existing widget with slug \`${settings.editSlug}\`. DO NOT create a new widget.
 - Overwrite \`components/widgets/custom/${settings.editSlug}/${comp}.tsx\` with the updated component (keep the named export \`export function ${comp}() { ... }\`)
 - If sizes / icon / settings-schema change, also overwrite \`components/widgets/custom/${settings.editSlug}/manifest.json\` to match
+- Also overwrite \`components/widgets/custom/${settings.editSlug}/SPEC.md\` so it keeps describing the widget accurately: update or remove any line that describes something you just changed or removed, and add a line for anything new. Keep everything else in it intact. This file is the durable record of intent for future edit turns (possibly weeks from now, or from a different device) — if it drifts from the real code, a future turn can misread old, already-removed intent as something still to build.
 - DO NOT touch any file under \`config/\` - the registration is managed automatically. The slug must stay the same.
 ${existingSpec ? `
-## Project spec (authoritative — read this instead of exploring/guessing)
-
-This describes the widget's intent and settings as of its last successful build. You do NOT need to Glob or Read other widgets' folders to understand what this one is for.
+## Project spec (as of its last successful build — may be stale)
 
 ${existingSpec}` : ""}
-## Current implementation (modify this)
+## Current implementation (modify this — the source of truth for what actually exists right now)
 
 \`\`\`tsx
 ${existingCode || "(could not read existing file - write a corrected version)"}
-\`\`\``
+\`\`\`
+
+The "Widget spec from the user" section below may still contain the *original* per-size descriptions/notes from when this widget was first planned — they are not automatically kept in sync with edits made since. Where they conflict with what you can see in the current implementation above (e.g. it describes something already removed), trust the current implementation and follow the fresh instruction in "User prompt" instead of reintroducing the old, already-changed content.`
     : `## Your task - creating a new widget
 
 Write a new widget following the rules in the \`avn-widget-build\` skill. The widget lives entirely within its own folder \`components/widgets/custom/${slug || "<slug>"}/\`:
@@ -185,8 +232,10 @@ ${userPrompt}
 \`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) - use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
 
 3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/${slug || "<slug>"}/route.ts\`.
-
-4. Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work — a dev server for this project is very likely already running, and a competing build process can corrupt its \`.next\` cache or fight over the port. Verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Just write the files and stop — do not attempt to compile or run anything to check your own work.
+${isEdit ? `
+4. Overwrite \`components/widgets/custom/${settings.editSlug}/SPEC.md\` so it stays an accurate description of the widget after this edit (see the note about this above).
+` : ""}
+Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work — a dev server for this project is very likely already running, and a competing build process can corrupt its \`.next\` cache or fight over the port. Verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Just write the files and stop — do not attempt to compile or run anything to check your own work.
 
 Design rules to follow:
 - Use CSS variables for all colors: \`--text-primary\`, \`--text-muted\`, \`--accent-orange\`, \`--accent-cyan\`, \`--border\`, \`--bg-card\`, \`--bg-nested\`, \`--shadow\`
@@ -209,6 +258,9 @@ export type GenerateSettings = {
   orientations?: string[];
   hoe?: boolean;
   hoeMode?: string;
+  /** the Plan brief's master requirements record — the complete spec every
+      stated field/control/behavior lives in; per-size descriptions divide it */
+  requirements?: string;
   sDescription?: string;
   mDescription?: string;
   lDescription?: string;
@@ -248,6 +300,9 @@ export async function POST(req: Request) {
         the widget's SPEC.md so intent survives independent of the harness
         session or the browser's localStorage */
     projectMeta?: ProjectSpecMeta;
+    /** base64 data-URL images attached to this chat turn (screenshots,
+        design references) — written to temp files the harness can Read */
+    images?: string[];
   };
   const { settings, prompt: userPrompt, harness: bodyHarness, harnessChain: bodyChain, sessionId: incomingSessionId, projectMeta } = body;
 
@@ -289,7 +344,20 @@ export async function POST(req: Request) {
     return sseError(`slug "${settings.slug}" collides with an existing app/api route — pick another slug`);
   }
 
-  const corePrompt = buildCorePrompt(settings, effectivePrompt);
+  // Write any attached images to temp files and fold a Read-tool pointer
+  // section into the user prompt — this augmented prompt feeds both the full
+  // core prompt and the bare --resume prompt, so images work on every turn.
+  const { section: imageSection, paths: imagePaths } = writeImageTempFiles([
+    ...(Array.isArray(body.images)
+      ? body.images.map((dataUrl, i) => ({ label: `chat attachment ${i + 1}`, dataUrl }))
+      : []),
+    ...(settings.sImageRef ? [{ label: "S size visual reference", dataUrl: settings.sImageRef }] : []),
+    ...(settings.mImageRef ? [{ label: "M size visual reference", dataUrl: settings.mImageRef }] : []),
+    ...(settings.lImageRef ? [{ label: "L size visual reference", dataUrl: settings.lImageRef }] : []),
+  ]);
+  const promptWithImages = effectivePrompt + imageSection;
+
+  const corePrompt = buildCorePrompt(settings, promptWithImages);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
@@ -303,6 +371,7 @@ export async function POST(req: Request) {
   // has no idea what the framework rules are.
   const skillError = checkSkillOrError("avn-widget-build", requestedHarness);
   if (skillError) {
+    cleanupImageTempFiles(imagePaths);
     return sseError(skillError, "skill-missing");
   }
 
@@ -312,6 +381,7 @@ export async function POST(req: Request) {
   // workingProjectId lock is per-tab and can't see other tabs/devices.)
   const lock = acquireGenerationLock("generate");
   if (!lock.ok) {
+    cleanupImageTempFiles(imagePaths);
     return sseError(describeBusyError(lock.holder, lock.ageMs));
   }
 
@@ -347,15 +417,16 @@ export async function POST(req: Request) {
       const partialWork = targetId ? () => readExistingWidget(targetId) : undefined;
 
       // resumePrompt: for claude --resume turns the model already has full
-      // context, so just send the bare user instruction. Full prompt is still
-      // used for fallback harnesses that don't share the claude session.
+      // context, so just send the bare user instruction (plus any attached
+      // image pointers). Full prompt is still used for fallback harnesses
+      // that don't share the claude session.
       const resumePrompt = incomingSessionId
-        ? effectivePrompt
+        ? promptWithImages
         : undefined;
 
       const { outcome, sessionId: outSessionId } = await runHarnessChain(
         corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { sessionId: incomingSessionId, resumePrompt },
+        { sessionId: incomingSessionId, resumePrompt }, targetId || undefined,
       );
 
       // Audit what the harness actually touched — the prompt tells it to stay
@@ -443,10 +514,17 @@ export async function POST(req: Request) {
             // tsc clean — safe to drop the safety backup
             if (existedBeforeThisRun && targetId) deleteWidgetBackups(targetId);
             const doneSlug = settings.editSlug ?? settings.slug ?? null;
-            // Keep SPEC.md current so the next turn — a fresh session, a
-            // different device, or a "virtual" edit with no local project
-            // history — has full intent/settings context without exploring.
-            if (doneSlug) {
+            // Write SPEC.md fresh only on the initial create — `settings` is
+            // accurate at that point. On an edit turn, `settings` still holds
+            // whatever per-size descriptions/notes were set back at Plan/Ideate
+            // time (never kept in sync with chat-only edits since), so
+            // regenerating SPEC.md from it here would re-bake stale text as
+            // "authoritative" on every turn. The edit-mode prompt instead asks
+            // the harness to update SPEC.md itself as part of its own output,
+            // so it stays in sync with what actually changed — if it doesn't,
+            // leaving the last-known-good SPEC.md alone is still safer than
+            // overwriting it with stale settings.
+            if (doneSlug && !existedBeforeThisRun) {
               writeProjectSpec(doneSlug, buildProjectSpecMarkdown(doneSlug, settings, projectMeta));
             }
             // Include sessionId so ChatCanvas can --resume on the next
@@ -465,6 +543,7 @@ export async function POST(req: Request) {
         // Always release — a client abort flows cancel() → abort → the chain
         // resolves ("aborted") → here, so the lock can't leak on disconnect.
         releaseGenerationLock();
+        cleanupImageTempFiles(imagePaths);
       }
 
       controller.close();

@@ -68,6 +68,34 @@ return <RichView />;                         // L: more rows, detail, controls
 A widget with L-only content must include `"L"` in its manifest `sizes`, or
 the user can never reach that layout.
 
+## Space discipline (widgets live in a hard size budget)
+
+A widget renders inside a dashboard grid cell, NOT a page. Rough footprints
+(width x height, varies with screen, rows are 128px-based):
+
+- S: ~220 x 140
+- M: ~440 x 140 horizontal / ~440 x 300 vertical
+- L: ~680 x 300 horizontal / ~440 x 460 vertical
+
+Rules that follow from this:
+
+- The root element must fill its container (`height: 100%`) and NEVER
+  overflow it. No fixed pixel heights taller than the footprint, no
+  `min-width` that exceeds it, no page-level scrolling.
+- If content can outgrow the space (lists, logs, history), give THAT inner
+  area `overflow-y: auto` and `min-height: 0` on its flex parents - the
+  block itself never scrolls.
+- Density over decoration: paddings 8-12px, gaps 4-8px, inputs ~24-28px
+  tall, font sizes on the small end of the token scale. Every element must
+  earn its pixels.
+- A smaller size shows FEWER things, not everything smaller. If the widget
+  has many fields/sections, S/M show the essential subset; the full set is
+  an L-only layout (and `"L"` goes in manifest `sizes`).
+- Prefer one focused view with a compact switcher (tabs, dropdown, chips)
+  over side-by-side panels - side-by-side rarely fits, especially at M.
+- Long text truncates (`text-overflow: ellipsis` + `min-width: 0` on flex
+  children) instead of wrapping into multiple lines that blow the height.
+
 ## manifest.json shape
 
 ```json

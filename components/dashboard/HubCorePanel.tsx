@@ -806,8 +806,8 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
         const payload = await res.json().catch(() => null) as { error?: string } | null;
         setDeleteError(payload?.error ?? `failed to delete ${id}`);
       } else {
-        // reset the matching creator project (Created → In Progress) so it
-        // doesn't linger pointing at a widget that no longer exists
+        // fully remove the matching creator project (chat/brief history and
+        // all) so it doesn't linger pointing at a widget that no longer exists
         syncDeletedWidget(id);
       }
     } finally {

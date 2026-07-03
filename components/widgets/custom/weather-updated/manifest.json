@@ -1,0 +1,8 @@
+{
+  "title": "Weather",
+  "iconName": "CloudSun",
+  "sizes": ["S", "M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": []
+}

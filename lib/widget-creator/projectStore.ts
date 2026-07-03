@@ -17,6 +17,11 @@ export type WidgetBrief = {
   slug: string;
   icon?: string;
   sizes?: string[];
+  /** the master record: EVERYTHING the user asked for — purpose, every
+      field/control/behavior, data, interactions, persistence, edge cases.
+      The per-size content fields below are views dividing this up; this is
+      the field downstream stages treat as the complete spec. */
+  requirements?: string;
   sContent?: string;
   mContent?: string;
   lContent?: string;
@@ -332,11 +337,8 @@ export function ensureProject(project: WidgetProject): void {
   persistAndPush();
 }
 
-/** Deletes an In Progress project and wipes all its keyed storage (local + server). */
-export function deleteProject(id: string): void {
-  const project = projects.find((p) => p.id === id);
-  if (!project || project.hasBuildOutput) return; // guard: Created projects cannot be deleted from creator
-
+/** Removes a project from the list and wipes all its keyed storage (local + server). */
+function removeProjectAndBlobs(id: string): void {
   projects = projects.filter((p) => p.id !== id);
 
   removeProjectBlob(projectMessagesKey(id));
@@ -352,28 +354,23 @@ export function deleteProject(id: string): void {
   persistAndPush();
 }
 
+/** Deletes an In Progress project and wipes all its keyed storage (local + server). */
+export function deleteProject(id: string): void {
+  const project = projects.find((p) => p.id === id);
+  if (!project || project.hasBuildOutput) return; // guard: Created projects cannot be deleted from creator
+  removeProjectAndBlobs(id);
+}
+
 /**
- * Called when a widget is deleted from Hub Core — resets the matching Created
- * project back to In Progress so it doesn't linger as a stale Created entry.
- * Virtual-only entries (id === slug) are removed entirely since they have no
- * conversation history worth keeping.
+ * Called when a widget is deleted from Hub Core — fully removes the matching
+ * creator project (chat/brief/ideate history included), the same as deleting
+ * an In Progress project by hand. A deleted widget shouldn't leave any trace
+ * behind in either the "Created" or "In Progress" list.
  */
 export function syncDeletedWidget(slug: string): void {
   const project = projects.find((p) => p.slug === slug);
   if (!project) return;
-
-  if (project.id === slug) {
-    // virtual-only entry (pre-existing widget with no project history) — remove
-    projects = projects.filter((p) => p.id !== slug);
-  } else {
-    // real project with history — reset build status, keep the conversation
-    projects = projects.map((p) =>
-      p.id === project.id
-        ? { ...p, hasBuildOutput: false, slug: undefined, pendingInstall: undefined, updatedAt: Date.now() }
-        : p,
-    );
-  }
-  persistAndPush();
+  removeProjectAndBlobs(project.id);
 }
 
 // ── merged project view (registry correction + virtual entries) ──────────────

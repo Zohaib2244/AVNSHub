@@ -1,0 +1,8 @@
+{
+  "title": "Publishing Email Builder",
+  "iconName": "ClipboardCheck",
+  "sizes": ["M", "L"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": []
+}

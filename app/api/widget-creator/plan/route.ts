@@ -61,15 +61,21 @@ When the concept is specific, produce a structured brief in this exact format �
   "slug": "kebab-case-slug",
   "icon": "LucideIconName",
   "sizes": ["S", "M"],
-  "sContent": "what S shows — one stat or label",
-  "mContent": "what M shows — the main card view",
-  "lContent": "what L shows — omit key if L is not useful",
+  "requirements": "THE MASTER RECORD — the complete widget spec. Everything the user asked for: what the widget is, its purpose, every field/control/button with its exact label, every behavior and interaction, data handling, persistence, formatting rules, empty/error states, edge cases, things to avoid. Written as a numbered list, one requirement per line (\\n-separated inside this JSON string).",
+  "sContent": "how S presents this — which parts of the requirements it shows, laid out top to bottom",
+  "mContent": "how M presents this — which parts of the requirements it shows, laid out top to bottom",
+  "lContent": "how L presents this — omit key if L is not useful",
   "dataSource": "URL or API the widget polls (empty string if static)",
   "dataShape": "JSON shape of the response (empty string if static)",
-  "concept": "One or two sentences describing the widget for a visual mockup tool",
-  "notes": "Anything else worth carrying forward that doesn't fit the fields above — constraints, inspiration, things to avoid, edge cases. Omit the key entirely if there's nothing extra."
+  "concept": "One or two sentences describing the widget's purpose",
+  "notes": "Anything that fits nowhere above. Omit the key entirely if there's nothing extra."
 }
 \`\`\`
+
+The brief is the ONLY thing the downstream mockup and build stages receive — they never see this conversation. Anything you leave out of the brief is lost. So:
+- \`requirements\` must capture EVERY requirement the user stated across the whole conversation, verbatim where they gave specifics — exact field names, labels, example values, formats. Never compress a list the user actually gave into "e.g." or "etc.". Before emitting, re-read the conversation and check nothing they asked for is missing.
+- The per-size content fields don't repeat the requirements — they divide them up: which requirements appear at that size and in what order, so each size is a purpose-built view, not a summary. The builder should be able to lay out each size from its content field plus the requirements list, with zero guessing.
+- When the user asks for a change to an existing brief, re-emit the FULL updated brief block — every field, with \`requirements\` updated to reflect the change (added, amended, or removed) — so the latest block is always the complete spec.
 
 After the brief, invite the user to refine any field or explore alternatives. Keep replies concise. Do not write code or TSX.`;
 }

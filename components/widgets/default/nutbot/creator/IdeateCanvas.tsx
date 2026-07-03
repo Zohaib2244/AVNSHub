@@ -14,6 +14,7 @@ import {
   pullProjectBlob,
   type WidgetBrief,
 } from "@/lib/widget-creator/projectStore";
+import { useStickToBottom } from "@/lib/widget-creator/useStickToBottom";
 import { MockupLightbox } from "./MockupLightbox";
 
 type Variation = { index: number; file: string; html: string };
@@ -32,9 +33,9 @@ type Props = {
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
   onFinalize: (html: string) => void;
-  initialPrompt?: string;
-  /** the project's Plan-mode brief, if any — shown as a "carried over from
-      plan" indicator so the user knows what's feeding the first prompt */
+  /** the project's Plan-mode brief, if any — the actual input to generation
+      when the prompt box is left empty, and shown as a "carried over from
+      plan" indicator */
   brief?: WidgetBrief;
   /** Ideate session id from the synced project record; also names the
       scratch directory holding generated mockups. */
@@ -121,12 +122,12 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, initialPrompt, brief, ideateSessionId, readOnly = false }: Props) {
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, brief, ideateSessionId, readOnly = false }: Props) {
   const roundsKey = projectIdeateKey(projectId);
 
   const sessionId = ideateSessionId ?? null;
   const [rounds, setRounds] = useState<Round[]>(() => loadProjectBlob<Round[]>(roundsKey) ?? []);
-  const [prompt, setPrompt] = useState(initialPrompt ?? "");
+  const [prompt, setPrompt] = useState("");
   const [count, setCount] = useState(3);
   const [phase, setPhase] = useState<Phase>({ id: "idle" });
   const [regeneratingFile, setRegeneratingFile] = useState<string | null>(null);
@@ -135,7 +136,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const [lightboxHtml, setLightboxHtml] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const { ref: bodyRef, onScroll: onBodyScroll } = useStickToBottom<HTMLDivElement>([rounds.length, pendingRound, phase]);
 
   function clearPendingPoll() {
     if (pollRef.current) {
@@ -180,10 +181,6 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     })();
     return () => { cancelled = true; };
   }, [roundsKey]);
-
-  useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [rounds.length, pendingRound, phase]);
 
   const nextIndex = Math.max(0, ...rounds.flatMap((r) => r.variations.map((v) => v.index))) + 1;
   const isGenerating = phase.id === "connecting" || phase.id === "generating";
@@ -237,6 +234,9 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     const hasPrompt = prompt.trim();
     if (!hasPrompt && !isBriefSubstantive()) return;
     const userPrompt = prompt.trim();
+    // Transcript label for the round — an empty prompt means "generate from
+    // the carried-over plan", which should read as that, not as a blank bubble.
+    const roundLabel = userPrompt || `from plan: ${brief?.title ?? "brief"}`;
     const expectedFiles = Array.from({ length: count }, (_, i) => `variation-${nextIndex + i}.html`);
     setPrompt("");
     setPhase({ id: "connecting", harness: activeHarness });
@@ -245,7 +245,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
     const abort = new AbortController();
     abortRef.current = abort;
-    startProgressPolling(userPrompt, expectedFiles, sessionId);
+    startProgressPolling(roundLabel, expectedFiles, sessionId);
 
     try {
       const result = await streamIdeate(
@@ -271,7 +271,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         }),
       );
 
-      setRounds((prev) => [...prev, { prompt: userPrompt, variations }]);
+      setRounds((prev) => [...prev, { prompt: roundLabel, variations }]);
       updateProject(projectId, { hasIdeateRounds: true });
       clearPendingPoll();
       setPendingRound(null);
@@ -386,10 +386,12 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         </div>
       )}
 
-      <div className="wc-chat-body wc-ideate-body" ref={bodyRef}>
+      <div className="wc-chat-body wc-ideate-body" ref={bodyRef} onScroll={onBodyScroll}>
         {rounds.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
-            describe a widget concept below and pick how many variations to brainstorm
+            {isBriefSubstantive()
+              ? "your plan is carried over — just press send to generate mockups from it (the box below is only for extra notes)"
+              : "describe a widget concept below and pick how many variations to brainstorm"}
           </div>
         )}
 

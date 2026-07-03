@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import {
@@ -20,18 +20,17 @@ import {
 } from "@/lib/widget-creator/projectStore";
 import { CreatorPipelineBar } from "./CreatorPipelineBar";
 import { SettingsPane } from "./SettingsPane";
+import { PlanBriefPanel } from "./PlanBriefPanel";
+import { ModeInfoButton } from "./ModeInfoButton";
 import { PlanCanvas } from "./PlanCanvas";
 import { IdeateCanvas } from "./IdeateCanvas";
 import { ChatCanvas } from "./ChatCanvas";
-import { useLayout } from "@/components/dashboard/LayoutProvider";
 
 const EMPTY_SETTINGS: GenerateSettings = {
   sizes: ["S", "M", "L"],
   orientations: ["h"],
   hoe: false,
 };
-
-const FOCUS_HINT_KEY = "nutmag-creator-focus-hint";
 
 // pipeline-stage transition — plan → ideate → build reads as a vertical
 // step progression, distinct from the horizontal drill-in used for
@@ -53,23 +52,12 @@ type Props = {
 };
 
 export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain }: Props) {
-  const { focusWidgetId } = useLayout();
   const workingId = useSyncExternalStore(
     subscribeWorkingProjectId,
     getWorkingProjectId,
     getServerWorkingProjectId,
   );
   const isLocked = workingId === project.id;
-  const isFocusMode = focusWidgetId === "nutbot";
-  const [focusHintDismissed, setFocusHintDismissed] = useState(() => {
-    if (typeof window === "undefined") return true;
-    try { return localStorage.getItem(FOCUS_HINT_KEY) === "dismissed"; } catch { return true; }
-  });
-
-  function dismissFocusHint() {
-    setFocusHintDismissed(true);
-    try { localStorage.setItem(FOCUS_HINT_KEY, "dismissed"); } catch {}
-  }
 
   // editable project name
   const [editingName, setEditingName] = useState(false);
@@ -102,8 +90,11 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
     }
   }
 
-  // plan → ideate bridge
-  const [ideateInitialPrompt, setIdeateInitialPrompt] = useState<string | undefined>(undefined);
+  // plan → ideate bridge — the nonce forces a fresh IdeateCanvas mount on
+  // handoff. Deliberately no prompt prefill: the brief itself is the input
+  // (isBriefSubstantive lets generation run with an empty prompt), so
+  // stuffing brief.concept into the textbox just made it look like the user
+  // still had to write something.
   const [ideateNonce, setIdeateNonce] = useState(0);
 
   function buildSettingsFromBrief(brief: WidgetBrief): Partial<GenerateSettings> {
@@ -113,6 +104,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
       icon: brief.icon ?? project.buildSettings?.icon,
       sizes: brief.sizes ?? ["S", "M"],
       orientations: ["h"],
+      requirements: brief.requirements,
       sDescription: brief.sContent,
       mDescription: brief.mContent,
       lDescription: brief.lContent,
@@ -139,7 +131,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
 
   function handlePlanVisualize(brief: WidgetBrief) {
     updateProject(project.id, { hasBrief: true, brief, displayName: brief.title, activeMode: "ideate", workflowMode: "ideate" });
-    setIdeateInitialPrompt(brief.concept || brief.title);
     setIdeateNonce((n) => n + 1);
   }
 
@@ -281,15 +272,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
           onStage={handleStage}
           locked={isLocked}
         />
-
-        {!isFocusMode && !focusHintDismissed && (
-          <div className="cr-focus-hint">
-            <span>tip: the ⤢ button gives the creator the whole frame</span>
-            <button type="button" className="cr-focus-hint-close" onClick={dismissFocusHint} aria-label="dismiss focus hint">
-              <X size={10} strokeWidth={2} />
-            </button>
-          </div>
-        )}
       </div>
 
       {/* workspace body */}
@@ -308,48 +290,51 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
               transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             >
               {mode === "plan" && (
-                <div className="wc-settings">
-                  <div className="wc-section">
-                    <div className="wc-section-body" style={{ padding: "8px 4px" }}>
-                      <p className="wc-ideate-help">
-                        Chat with AI to figure out what to build. Describe a use case or vague
-                        idea — get concept suggestions, then a structured brief.
-                      </p>
-                      <p className="wc-stage-lock-note">
-                        Moving to Ideate or Build locks Plan for edits. You can still come back to review this chat.
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                <PlanBriefPanel
+                  brief={project.brief}
+                  hasBrief={project.hasBrief}
+                  locked={isLocked}
+                  readOnly={isReviewMode}
+                  onBuild={handlePlanBuild}
+                  onVisualize={handlePlanVisualize}
+                  onSave={(brief) => updateProject(project.id, { hasBrief: true, brief, displayName: brief.title })}
+                />
               )}
 
               {mode === "ideate" && (
                 <div className="wc-settings">
                   <div className="wc-section">
                     <div className="wc-section-body" style={{ padding: "8px 4px" }}>
-                      <p className="wc-ideate-help">
-                        Describe a widget concept and how many variations to brainstorm. Each
-                        variation renders live as an HTML/CSS mockup — no real component yet.
-                        Regenerate a variation in place, or finalize a design to switch into
-                        {` ${buildModeLabel}`} mode with it as the reference.
-                      </p>
-                      <p className="wc-stage-lock-note">
-                        Moving to {buildModeLabel} locks Ideate for edits. You can still come back to review the mockups.
-                      </p>
+                      <div className="wc-mode-info-head">
+                        <span className="wc-field-label">ideate</span>
+                        <ModeInfoButton
+                          text={`Describe a widget concept and how many variations to brainstorm. Each variation renders live as an HTML/CSS mockup — no real component yet. Regenerate a variation in place, or finalize a design to switch into ${buildModeLabel} mode with it as the reference. Moving to ${buildModeLabel} locks Ideate for edits — you can still come back to review the mockups.`}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
               )}
 
               {mode === "build" && (
-                <SettingsPane
-                  settings={effectiveBuildSettings}
-                  onChange={patchBuildSettings}
-                  mode={settingsPaneMode}
-                  onModeChange={() => {}}
-                  showModeToggle={false}
-                  disabled={isLocked}
-                />
+                <>
+                  <div className="wc-mode-info-head" style={{ padding: "4px 8px 0" }}>
+                    <span className="wc-field-label">{buildModeLabel}</span>
+                    <ModeInfoButton
+                      text={isEditBuild
+                        ? "Chat on the right to describe an edit to this widget, or change identity/settings here. Edits apply on top of the current code — no need to re-describe things you haven't changed."
+                        : "Fill in identity and per-size content here, or just describe the widget in chat and hit send — settings are optional, the prompt is the source of truth."}
+                    />
+                  </div>
+                  <SettingsPane
+                    settings={effectiveBuildSettings}
+                    onChange={patchBuildSettings}
+                    mode={settingsPaneMode}
+                    onModeChange={() => {}}
+                    showModeToggle={false}
+                    disabled={isLocked}
+                  />
+                </>
               )}
             </motion.div>
           </AnimatePresence>
@@ -374,8 +359,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                 <PlanCanvas
                   projectId={project.id}
                   activeHarness={activeHarness}
-                  onBuild={handlePlanBuild}
-                  onVisualize={handlePlanVisualize}
                   planSessionId={project.planSessionId}
                   readOnly={isReviewMode}
                 />
@@ -388,7 +371,6 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   activeHarness={activeHarness}
                   harnessChain={harnessChain}
                   onFinalize={handleFinalize}
-                  initialPrompt={ideateNonce > 0 ? ideateInitialPrompt : undefined}
                   brief={project.brief}
                   ideateSessionId={project.ideateSessionId}
                   readOnly={isReviewMode}

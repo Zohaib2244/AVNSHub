@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Download, Maximize2, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Maximize2, Paperclip, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
@@ -16,6 +16,7 @@ import {
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { getManifest } from "@/config/widgets";
 import { isValidSlug } from "@/lib/widget-creator/slug";
+import { useStickToBottom } from "@/lib/widget-creator/useStickToBottom";
 import {
   updateProject,
   setWorkingProjectId,
@@ -45,6 +46,7 @@ type Message =
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
   | { role: "audit"; files: string[] }
+  | { role: "sibling_read"; paths: string[] }
   | { role: "ok"; text: string }
   | { role: "error"; text: string }
   | { role: "action"; text: string; action: "reload" | "open-widget-manager" | "sync-skills" };
@@ -131,12 +133,22 @@ export function ChatCanvas({
   const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => pendingInstallSlug);
   const [pendingRegistration, setPendingRegistration] = useState(() => Boolean(pendingInstallSlug && !pendingInstallRegistered));
   const [phase, setPhase] = useState<Phase>(() => (pendingInstallSlug ? { id: "done" } : { id: "idle" }));
-  const [added, setAdded] = useState(false);
+  // If the pending-install widget is already placed on the canvas (e.g. the
+  // page reloaded after install+placement, or the user placed it from Widget
+  // Manager), start in the "added ✓" state instead of offering a redundant
+  // "add to layout" button for a widget that's already on screen.
+  const [added, setAdded] = useState(() =>
+    Boolean(pendingInstallSlug && getPlacementSnapshot(pendingInstallSlug).kind !== "none"),
+  );
   const [adding, setAdding] = useState(false);
   const [editHidden, setEditHidden] = useState(false);
   const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
   const { setInstalling, setHubCoreTab } = useLayout();
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const { ref: bodyRef, onScroll: onBodyScroll } = useStickToBottom<HTMLDivElement>([messages, phase]);
+  // Chat image attachments (data URLs) for the next send — screenshots and
+  // design references the harness views via its Read tool. Not persisted.
+  const [attachedImages, setAttachedImages] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
   const hasDesignReference = Boolean(settings.designReferenceHtml);
@@ -211,10 +223,6 @@ export function ChatCanvas({
   }, []);
 
   useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [messages, phase]);
-
-  useEffect(() => {
     saveProjectBlob(MESSAGES_KEY, messages);
   }, [messages, MESSAGES_KEY]);
 
@@ -242,6 +250,25 @@ export function ChatCanvas({
     });
   }, [pendingInstallSlug, pendingInstallRegistered]);
 
+  const MAX_ATTACHED_IMAGES = 4;
+
+  function handleFilesSelected(files: FileList | null) {
+    if (!files) return;
+    const remaining = MAX_ATTACHED_IMAGES - attachedImages.length;
+    for (const file of Array.from(files).slice(0, Math.max(0, remaining))) {
+      if (!file.type.startsWith("image/")) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        if (typeof dataUrl === "string") {
+          setAttachedImages((prev) => prev.length >= MAX_ATTACHED_IMAGES ? prev : [...prev, dataUrl]);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
   async function generate() {
     const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
     const promptText = prompt.trim();
@@ -253,8 +280,11 @@ export function ChatCanvas({
       return;
     }
 
-    const userText = promptText || "(build from the finalized design reference)";
+    const imagesForRequest = attachedImages;
+    const userText = (promptText || "(build from the finalized design reference)")
+      + (imagesForRequest.length ? `  [+${imagesForRequest.length} image${imagesForRequest.length > 1 ? "s" : ""}]` : "");
     setPrompt("");
+    setAttachedImages([]);
 
     const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
     let hadTscErrors = false;
@@ -299,6 +329,7 @@ export function ChatCanvas({
           harnessChain,
           sessionId: sessionForRequest ?? undefined,
           projectMeta: { concept: brief?.concept, entryMode },
+          images: imagesForRequest.length ? imagesForRequest : undefined,
         }),
         signal: abort.signal,
       });
@@ -408,6 +439,18 @@ export function ChatCanvas({
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
           } else if (event === "audit") {
             setMessages((prev) => [...prev, { role: "audit", files: payload.unexpectedFiles as string[] }]);
+          } else if (event === "sibling_read") {
+            // fires mid-stream, potentially several times in one run — collapse
+            // into a single running message instead of one bubble per read
+            const path = payload.path as string;
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last?.role === "sibling_read") {
+                if (last.paths.includes(path)) return prev;
+                return [...prev.slice(0, -1), { role: "sibling_read", paths: [...last.paths, path] }];
+              }
+              return [...prev, { role: "sibling_read", paths: [path] }];
+            });
           } else if (event === "error") {
             clearSignal();
             setWorkingProjectId(null);
@@ -578,9 +621,14 @@ export function ChatCanvas({
       updateProject(projectId, { pendingInstall: { slug, registered: true } });
     }
     const ok = await placeWithRetry(slug, 8, 250);
+    // Deliberately NOT clearing CREATOR_RESTORE_PROJECT_KEY here on success —
+    // writing config/customComponentMap.tsx triggers a Fast Refresh full
+    // page reload that Next fires asynchronously, sometime after this call
+    // returns. WidgetCreatorPanel's mount-time restore effect consumes and
+    // clears the key itself once that reload actually lands; clearing it
+    // early here raced it and left the reload landing on the Projects List.
     try {
       sessionStorage.removeItem(PENDING_ADD_KEY);
-      sessionStorage.removeItem(CREATOR_RESTORE_PROJECT_KEY);
     } catch {}
     setInstalling(false);
     setAdding(false);
@@ -659,7 +707,7 @@ export function ChatCanvas({
         </div>
       )}
 
-      <div className="wc-chat-body" ref={bodyRef}>
+      <div className="wc-chat-body" ref={bodyRef} onScroll={onBodyScroll}>
         {messages.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
             {isEditMode
@@ -714,6 +762,16 @@ export function ChatCanvas({
               </div>
             );
           }
+          if (msg.role === "sibling_read") {
+            return (
+              <div key={i} className="wc-msg wc-msg-audit">
+                <div className="wc-msg-audit-head">[read audit] the harness looked at another widget&apos;s code, even though the skill says it shouldn&apos;t need to — if it seemed confused about something, that gap belongs in the skill file, not in reading this:</div>
+                {msg.paths.map((p, j) => (
+                  <div key={j} className="wc-audit-line">{p}</div>
+                ))}
+              </div>
+            );
+          }
           if (msg.role === "ok") {
             return <div key={i} className="wc-msg wc-msg-ok">{msg.text}</div>;
           }
@@ -751,7 +809,44 @@ export function ChatCanvas({
         )}
       </div>
 
+      {attachedImages.length > 0 && (
+        <div className="wc-attach-strip">
+          {attachedImages.map((img, i) => (
+            <div key={i} className="wc-attach-thumb">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview, next/image gains nothing */}
+              <img src={img} alt={`attachment ${i + 1}`} />
+              <button
+                type="button"
+                className="wc-attach-remove"
+                onClick={() => setAttachedImages((prev) => prev.filter((_, j) => j !== i))}
+                aria-label="remove image"
+              >
+                <X size={9} strokeWidth={2.5} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="wc-chat-footer">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: "none" }}
+          onChange={(e) => handleFilesSelected(e.target.files)}
+        />
+        <button
+          type="button"
+          className="wc-attach-btn"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isGenerating || attachedImages.length >= MAX_ATTACHED_IMAGES}
+          title="attach screenshots / design references — the AI views them before making changes"
+          aria-label="attach images"
+        >
+          <Paperclip size={12} strokeWidth={2} />
+        </button>
         {isDoneOrError && (
           <>
             <button type="button" className="wc-clear-btn" onClick={clearChat}>
@@ -794,10 +889,10 @@ export function ChatCanvas({
           placeholder={
             isGenerating
               ? "generating..."
-              : hasDesignReference
-                ? "optional notes — or just hit send to build the finalized mockup"
-                : isEditMode
-                  ? "describe the edit... (shift+enter for newline)"
+              : isEditMode
+                ? "describe the edit... (shift+enter for newline)"
+                : hasDesignReference
+                  ? "optional notes — or just hit send to build the finalized mockup"
                   : "describe your widget... (shift+enter for newline)"
           }
           value={prompt}

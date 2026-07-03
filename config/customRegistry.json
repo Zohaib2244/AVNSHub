@@ -558,5 +558,44 @@
     "flags": {
       "hasApiRoute": false
     }
+  },
+  "publishing-email-builder": {
+    "title": "Publishing Email Builder",
+    "iconName": "ClipboardCheck",
+    "sizes": [
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [],
+    "flags": {
+      "hasApiRoute": false
+    }
+  },
+  "weather-updated": {
+    "title": "Weather",
+    "iconName": "CloudSun",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [],
+    "flags": {
+      "hasApiRoute": true
+    }
   }
 }
