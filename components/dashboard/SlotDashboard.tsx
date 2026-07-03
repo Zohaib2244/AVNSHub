@@ -194,7 +194,7 @@ export function SlotDashboard() {
   }
 
   return (
-    <div className="slot-page mx-auto max-w-[1800px] px-5 py-6" style={{ position: "relative" }}>
+    <div className="slot-page mx-auto max-w-[1800px] pl-5 pr-9 py-6" style={{ position: "relative" }}>
       <div className="frame frame-with-tabs">
         <HubCorePanel />
         <div

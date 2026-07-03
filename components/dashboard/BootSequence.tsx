@@ -65,13 +65,13 @@ export function BootSequence() {
     <AnimatePresence>
       {!done && (
         <motion.div
-          className="fixed inset-0 z-[9999] bg-[var(--bg-page)] flex items-center justify-center"
+          className="fixed inset-0 z-[9999] bg-[var(--bg-page)] flex items-center justify-center px-4"
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
         >
-          <div className="w-[26rem] font-[family-name:var(--font-display)] text-sm leading-7 select-none">
+          <div className="w-full max-w-[26rem] font-[family-name:var(--font-display)] text-xs sm:text-sm leading-6 sm:leading-7 select-none">
             {LINES.slice(0, visibleLines).map((line, i) => (
               <motion.div
                 key={i}

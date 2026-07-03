@@ -102,6 +102,7 @@
 }
 
 .more-row > span:first-child {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }

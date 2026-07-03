@@ -121,6 +121,17 @@ const accentButtonStyle: CSSProperties = {
   color: "var(--bg-card)",
 };
 
+// narrow-column fallback (a widget can render far narrower than its S/M/L
+// tier suggests inside Slot Layout's flexible regions) — shed the refresh
+// button and the "check" label before the row would overflow the card
+const DICT_FORM_STYLES = `
+  @container widget (max-width: 190px) {
+    .dict-refresh-btn { display: none; }
+    .dict-check-label { display: none; }
+    .dict-check-btn { min-width: 30px !important; padding: 0 !important; }
+  }
+`;
+
 const quietButtonStyle: CSSProperties = {
   ...buttonBaseStyle,
   background: "var(--bg-nested)",
@@ -252,7 +263,8 @@ export function DictionaryWidget() {
   };
 
   const searchForm = (
-    <form onSubmit={onSubmit} style={{ display: "flex", gap: 7, minWidth: 0 }}>
+    <form className="dict-search-form" onSubmit={onSubmit} style={{ display: "flex", gap: 7, minWidth: 0 }}>
+      <style>{DICT_FORM_STYLES}</style>
       <input
         aria-label="word to check"
         autoCapitalize="none"
@@ -263,13 +275,14 @@ export function DictionaryWidget() {
         style={inputStyle}
         value={draft}
       />
-      <button aria-label="check word" style={iconButtonStyle} type="submit">
+      <button aria-label="check word" className="dict-check-btn" style={iconButtonStyle} type="submit">
         <Search size={compact ? 13 : 14} strokeWidth={1.9} />
-        {!compact && <span>check</span>}
+        {!compact && <span className="dict-check-label">check</span>}
       </button>
       {!compact && (
         <button
           aria-label="refresh dictionary result"
+          className="dict-refresh-btn"
           onClick={refresh}
           style={{
             ...quietButtonStyle,

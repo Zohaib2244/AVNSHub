@@ -45,6 +45,7 @@
   border-bottom: 1px solid var(--border);
   margin-bottom: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -69,6 +70,13 @@
   align-items: stretch;
   flex: 1;
   min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+
+.term-tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .term-row-right {
@@ -78,6 +86,35 @@
   padding: 4px 0 4px 8px;
   border-left: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+/* narrow widget column (mobile stacked flow, or a slim S-size slot): title +
+   controls don't leave enough room for four nowrap tabs on the same row, so
+   drop the tabs to their own full-width line (still horizontally scrollable
+   as a fallback at the very narrowest columns) instead of letting them get
+   clipped past the card edge — that made "shells"/"creator" unreachable. */
+@container widget (max-width: 480px) {
+  .term-row {
+    row-gap: 4px;
+  }
+
+  .term-row-right {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .term-tabs {
+    order: 3;
+    flex: 1 1 100%;
+    border-top: 1px solid var(--border);
+    padding-top: 4px;
+  }
+}
+
+@container widget (max-width: 260px) {
+  .nutbot-v2-scale-nano {
+    display: none;
+  }
 }
 
 /* ── tab button (pill indicator style) ───────────────────────── */
