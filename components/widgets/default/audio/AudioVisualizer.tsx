@@ -9,6 +9,7 @@
 import { useEffect, useRef } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { subscribeWallpaperAudio, getWallpaperAudio, useWallpaperPaused } from "@/lib/wallpaperEngineBridge";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 const BASELINE_PCT = 6;
 
@@ -37,8 +38,8 @@ function Bars({ count, barRefs }: { count: number; barRefs: React.MutableRefObje
 export function AudioVisualizer() {
   const { size } = useWidget();
   const paused = useWallpaperPaused();
+  const rootRef = useRef<HTMLDivElement>(null);
   const barRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const rafRef = useRef<number | null>(null);
   const barCount = size === "L" ? 28 : size === "M" ? 18 : 10;
 
   useEffect(() => {
@@ -46,31 +47,32 @@ export function AudioVisualizer() {
       barRefs.current.forEach((bar) => bar?.style.setProperty("height", `${BASELINE_PCT}%`));
       return;
     }
+    const root = rootRef.current;
+    if (!root) return;
 
     function tick() {
       const samples = getWallpaperAudio();
-      // left channel only (buckets 0-62) is plenty for a desktop visualizer
-      const channel = samples.slice(0, 63);
-      const binsPerBar = Math.max(1, Math.floor(channel.length / barCount));
+      // Left channel only (buckets 0-62) is plenty. Read it in place instead
+      // of allocating a sliced array on every frame.
+      const binsPerBar = Math.max(1, Math.floor(63 / barCount));
       for (let i = 0; i < barCount; i++) {
         let sum = 0;
-        for (let j = 0; j < binsPerBar; j++) sum += Math.abs(channel[i * binsPerBar + j] ?? 0);
+        for (let j = 0; j < binsPerBar; j++) sum += Math.abs(samples[i * binsPerBar + j] ?? 0);
         const pct = Math.max(BASELINE_PCT, Math.min(100, (sum / binsPerBar) * 100));
         barRefs.current[i]?.style.setProperty("height", `${pct}%`);
       }
-      rafRef.current = requestAnimationFrame(tick);
     }
-    rafRef.current = requestAnimationFrame(tick);
+    const stopAnimation = startAnimationLoop({ element: root, fps: 30, onFrame: tick });
     const unsubscribe = subscribeWallpaperAudio(() => {});
 
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      stopAnimation();
       unsubscribe();
     };
   }, [paused, barCount]);
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
+    <div ref={rootRef} style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
       <div
         className="block-label"
         style={{

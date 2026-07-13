@@ -15,6 +15,7 @@ import type { HostTelemetry } from "@/lib/homelab";
 
 const CACHE_TTL_MS = 10_000;
 let cache: { data: HostTelemetry; expiresAt: number } | null = null;
+let inFlight: Promise<HostTelemetry> | null = null;
 
 // pseudo/virtual filesystems that clutter `si.fsSize()` inside containers —
 // not real storage, never worth showing
@@ -91,7 +92,14 @@ async function readHostTelemetry(): Promise<HostTelemetry> {
 
 export async function getSystemStats(): Promise<HostTelemetry> {
   if (cache && cache.expiresAt > Date.now()) return cache.data;
-  const data = await readHostTelemetry();
-  cache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
-  return data;
+  if (inFlight) return inFlight;
+  inFlight = readHostTelemetry()
+    .then((data) => {
+      cache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
+      return data;
+    })
+    .finally(() => {
+      inFlight = null;
+    });
+  return inFlight;
 }

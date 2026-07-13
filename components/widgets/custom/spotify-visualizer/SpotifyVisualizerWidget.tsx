@@ -3,6 +3,7 @@
 import { type CSSProperties, useEffect, useRef, useState, type MutableRefObject } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { usePolling } from "@/lib/usePolling";
+import { startAnimationLoop } from "@/lib/animationLoop";
 import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
 import type { NowPlaying as NowPlayingData, PlayerAction, SpotifyCreds } from "@/lib/spotify";
 
@@ -102,16 +103,11 @@ function runCanvas(
   stage: HTMLDivElement,
   trackRef: MutableRefObject<string>,
   isPlayingRef: MutableRefObject<boolean>,
-  fetchTimeRef: MutableRefObject<number>,
-  progressRef: MutableRefObject<number>,
-  elapsedRef: MutableRefObject<string>,
-  durRef: MutableRefObject<string>,
-  progressMsRef: MutableRefObject<number>,
-  durationMsRef: MutableRefObject<number>,
 ): () => void {
   const ctx = canvas.getContext("2d")!;
   if (!ctx) return () => {};
-  let animFrame = 0;
+  let ratio = 1;
+  let paletteReadAt = 0;
   let palette = readPalette(stage);
   let prevSeed = -1;
   let params: WaveParams = seedParams(0);
@@ -120,12 +116,12 @@ function runCanvas(
     const b = stage.getBoundingClientRect();
     const W = Math.max(120, Math.round(b.width || 300));
     const H = Math.max(48, Math.round(b.height || 80));
-    const r = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * r);
-    canvas.height = Math.round(H * r);
+    ratio = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * ratio);
+    canvas.height = Math.round(H * ratio);
     canvas.style.width = `${W}px`;
     canvas.style.height = `${H}px`;
-    ctx.setTransform(r, 0, 0, r, 0, 0);
+    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
     palette = readPalette(stage);
   }
 
@@ -166,10 +162,13 @@ function runCanvas(
   }
 
   function tick(ts: number) {
-    if (Math.round(ts) % 30 === 0) palette = readPalette(stage);
+    if (paletteReadAt === 0 || ts - paletteReadAt >= 1000) {
+      palette = readPalette(stage);
+      paletteReadAt = ts;
+    }
 
-    const W = canvas.width / (window.devicePixelRatio || 1);
-    const H = canvas.height / (window.devicePixelRatio || 1);
+    const W = canvas.width / ratio;
+    const H = canvas.height / ratio;
     const midY = H / 2;
 
     ctx.clearRect(0, 0, W, H);
@@ -185,8 +184,6 @@ function runCanvas(
     const isPlaying = isPlayingRef.current;
     const [freqs, amps, modBase] = params;
     const wave: number[] = [];
-    let maxVal = 0;
-    let sumAbs = 0;
 
     const beat = isPlaying ? 1 : 0.3;
     const energy = isPlaying ? 1 : 0.35;
@@ -204,9 +201,6 @@ function runCanvas(
       y *= modAmp;
       y = Math.max(-1, Math.min(1, y));
       wave.push(y);
-      const a = Math.abs(y);
-      if (a > maxVal) maxVal = a;
-      sumAbs += a;
     }
 
     // Main cyan waveform
@@ -264,23 +258,13 @@ function runCanvas(
     ctx.arc(trigX, midY, trigR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Live progress update for parent
-    if (isPlaying && progressMsRef.current > 0 && durationMsRef.current > 0) {
-      const liveMs = progressMsRef.current + (Date.now() - fetchTimeRef.current);
-      const capped = Math.min(liveMs, durationMsRef.current);
-      progressRef.current = (capped / durationMsRef.current) * 100;
-      elapsedRef.current = fmtMs(capped);
-      durRef.current = fmtMs(durationMsRef.current);
-    }
-
-    animFrame = requestAnimationFrame(tick);
   }
 
-  animFrame = requestAnimationFrame(tick);
+  const stopAnimation = startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
 
   return () => {
     ro.disconnect();
-    cancelAnimationFrame(animFrame);
+    stopAnimation();
   };
 }
 
@@ -295,12 +279,6 @@ export function SpotifyVisualizerWidget() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef("");
   const isPlayingRef = useRef(false);
-  const fetchTimeRef = useRef(Date.now());
-  const progressRef = useRef(0);
-  const elapsedRef = useRef("0:00");
-  const durRef = useRef("0:00");
-  const progressMsRef = useRef(0);
-  const durationMsRef = useRef(0);
 
   const [controlErr, setControlErr] = useState<string | null>(null);
 
@@ -311,11 +289,6 @@ export function SpotifyVisualizerWidget() {
   useEffect(() => {
     trackRef.current = data?.trackName ?? "";
     isPlayingRef.current = data?.isPlaying ?? false;
-    if (data) {
-      fetchTimeRef.current = Date.now();
-      progressMsRef.current = data.progressMs ?? 0;
-      durationMsRef.current = data.durationMs ?? 0;
-    }
   }, [data]);
 
   // Canvas animation (mount once)
@@ -323,12 +296,7 @@ export function SpotifyVisualizerWidget() {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!canvas || !stage) return;
-    return runCanvas(
-      canvas, stage,
-      trackRef, isPlayingRef, fetchTimeRef,
-      progressRef, elapsedRef, durRef,
-      progressMsRef, durationMsRef,
-    );
+    return runCanvas(canvas, stage, trackRef, isPlayingRef);
   }, []);
 
   const control = async (action: PlayerAction) => {
@@ -336,7 +304,11 @@ export function SpotifyVisualizerWidget() {
     setControlErr(await sendControl(action, refresh, creds));
   };
 
-  const progressPercent = data?.isPlaying ? progressRef.current : 0;
+  const progressPercent = data?.progressMs != null && data.durationMs
+    ? Math.min(100, Math.max(0, (data.progressMs / data.durationMs) * 100))
+    : 0;
+  const elapsed = fmtMs(data?.progressMs ?? 0);
+  const duration = fmtMs(data?.durationMs ?? 0);
 
   // ── S: compact ──────────────────────────────────────────────────
   if (compact) {
@@ -373,6 +345,7 @@ export function SpotifyVisualizerWidget() {
 
   // ── M / L: standard + rich ─────────────────────────────────────
   const albumArt = data?.albumArtUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element -- remote Spotify art is already delivered at thumbnail size
     <img src={data.albumArtUrl} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
   ) : (
     <Music size={showFooter ? 20 : 16} strokeWidth={1.75} />
@@ -539,7 +512,7 @@ export function SpotifyVisualizerWidget() {
               fontSize: "0.55rem",
               flex: "none",
             }}>
-              {elapsedRef.current}
+              {elapsed}
             </span>
             <div style={{
               background: "var(--bg-nested)",
@@ -565,7 +538,7 @@ export function SpotifyVisualizerWidget() {
               fontSize: "0.55rem",
               flex: "none",
             }}>
-              {durRef.current}
+              {duration}
             </span>
           </div>
         )}

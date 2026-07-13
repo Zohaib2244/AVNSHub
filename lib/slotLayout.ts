@@ -353,7 +353,7 @@ async function syncWithServer() {
 
 if (typeof window !== "undefined") {
   syncWithServer();
-  pollWhileVisible(syncWithServer);
+  pollWhileVisible(syncWithServer, 15_000, "slot-layout");
 }
 
 /** widgets that aren't placed in any region — the candidates offered by the

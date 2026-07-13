@@ -25,6 +25,10 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
+On Windows, you can instead double-click `install.bat` once, then use
+`run.bat` to start AVN Hub. The installer checks Node/npm, installs packages,
+creates `.env.local`, and prepares the SQLite database.
+
 Stop helpers:
 
 ```bash

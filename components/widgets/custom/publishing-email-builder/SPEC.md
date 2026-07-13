@@ -67,7 +67,7 @@ Zohaib Shahjehan
 
 - **S**: S is not supported because the widget needs a saved-game list, release form, and copy action.
 - **M**: Two-column workspace with a compact saved-game selector and Add/Edit controls on the left; the game editor replaces the build form when Add Game or Edit Game is pressed. Build fields for Stage, Version Number, Bundle Code, Previous RollOut, New RollOut, Country Based, Bundle Link, and Release Notes with a Copy Email button below them and a short copied state.
-- **L**: Two-column workspace with saved-game list and Add/Edit controls on the left; selected game summary and build fields (with Copy Email button and short copied state) in the center. The game editor replaces the build fields when Add Game or Edit Game is pressed.
+- **L**: Two-column workspace with saved-game list and Add/Edit controls on the left; collapsible selected game summary (default collapsed) and build fields in the center. The Copy Email button sits in the panel header above the build fields. The game editor replaces the build fields when Add Game or Edit Game is pressed.
 
 ## Additional notes
 
@@ -75,7 +75,9 @@ Game ID is included in saved game details because the provided email format requ
 
 The widget intentionally does not render a visible email preview and does not include a Clear Draft control.
 
-The Copy Email button lives within the build fields section, not in a separate Gmail panel. The game editor replaces the build form when Add or Edit is pressed, and a Close button returns to the build form.
+The Copy Email button lives in the panel header above the build fields, not within the build fields section itself. The game editor replaces the build form when Add or Edit is pressed, and a Close button returns to the build form.
+
+In the L layout, the selected game summary (name, store, live link) is hidden behind a collapsible toggle; collapsed by default so build fields are immediately visible.
 
 ## Design reference
 

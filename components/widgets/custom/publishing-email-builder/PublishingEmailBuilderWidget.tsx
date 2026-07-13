@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
 
 type StageOption = "Beta" | "Production" | "Other/custom";
@@ -27,6 +27,15 @@ type BuildDraft = {
 
 type GameForm = Omit<SavedGame, "uid">;
 
+type BuilderInitialState = {
+  drafts: Record<string, BuildDraft>;
+  editingGameId: string | null;
+  gameForm: GameForm;
+  games: SavedGame[];
+  isEditorOpen: boolean;
+  selectedGameId: string;
+};
+
 const GAMES_STORAGE_KEY = "publishing-email-builder:games";
 const DRAFTS_STORAGE_KEY = "publishing-email-builder:drafts";
 const SELECTED_STORAGE_KEY = "publishing-email-builder:selected-game";
@@ -51,7 +60,8 @@ const panelStyle: CSSProperties = {
   borderRadius: 12,
   boxShadow: "2px 2px 0 var(--shadow)",
   minHeight: 0,
-  overflow: "hidden",
+  overflowX: "hidden",
+  overflowY: "hidden",
   padding: 8,
 };
 
@@ -110,6 +120,17 @@ const emptyGameForm: GameForm = {
   storeName: "",
   liveLink: "",
 };
+
+function createEmptyBuilderState(): BuilderInitialState {
+  return {
+    drafts: {},
+    editingGameId: null,
+    gameForm: emptyGameForm,
+    games: [],
+    isEditorOpen: true,
+    selectedGameId: "",
+  };
+}
 
 function createDefaultDraft(): BuildDraft {
   return {
@@ -213,6 +234,40 @@ function gameToForm(game: SavedGame): GameForm {
     storeName: game.storeName,
     liveLink: game.liveLink,
   };
+}
+
+function readInitialBuilderState(): BuilderInitialState {
+  if (typeof window === "undefined") return createEmptyBuilderState();
+
+  const storedGames = parseGames(readStoredJson(GAMES_STORAGE_KEY));
+  const storedDrafts = parseDrafts(readStoredJson(DRAFTS_STORAGE_KEY));
+  const storedSelected = readString(readStoredJson(SELECTED_STORAGE_KEY));
+  const selected = storedGames.find((game) => game.uid === storedSelected) ?? storedGames[0] ?? null;
+
+  return {
+    drafts: storedDrafts,
+    editingGameId: selected?.uid ?? null,
+    gameForm: selected ? gameToForm(selected) : emptyGameForm,
+    games: storedGames,
+    isEditorOpen: storedGames.length === 0,
+    selectedGameId: selected?.uid ?? "",
+  };
+}
+
+function subscribeHydrated() {
+  return () => {};
+}
+
+function getHydratedSnapshot() {
+  return true;
+}
+
+function getServerHydratedSnapshot() {
+  return false;
+}
+
+function useHydrated() {
+  return useSyncExternalStore(subscribeHydrated, getHydratedSnapshot, getServerHydratedSnapshot);
 }
 
 function displayText(value: string | undefined, fallback: string) {
@@ -319,59 +374,39 @@ async function copyText(text: string) {
 }
 
 export function PublishingEmailBuilderWidget() {
+  const hydrated = useHydrated();
+  const initialState = useMemo(() => (hydrated ? readInitialBuilderState() : null), [hydrated]);
+
+  if (!initialState) {
+    return <div style={{ ...monoStyle, height: "100%", minHeight: 0, overflowX: "hidden", overflowY: "hidden" }} />;
+  }
+
+  return <PublishingEmailBuilderContent initialState={initialState} />;
+}
+
+function PublishingEmailBuilderContent({ initialState }: { initialState: BuilderInitialState }) {
   const { size } = useWidget();
-  const [games, setGames] = useState<SavedGame[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, BuildDraft>>({});
-  const [selectedGameId, setSelectedGameId] = useState("");
-  const [gameForm, setGameForm] = useState<GameForm>(emptyGameForm);
-  const [editingGameId, setEditingGameId] = useState<string | null>(null);
-  const [isEditorOpen, setIsEditorOpen] = useState(true);
+  const [games, setGames] = useState<SavedGame[]>(initialState.games);
+  const [drafts, setDrafts] = useState<Record<string, BuildDraft>>(initialState.drafts);
+  const [selectedGameId, setSelectedGameId] = useState(initialState.selectedGameId);
+  const [gameForm, setGameForm] = useState<GameForm>(initialState.gameForm);
+  const [editingGameId, setEditingGameId] = useState<string | null>(initialState.editingGameId);
+  const [isEditorOpen, setIsEditorOpen] = useState(initialState.isEditorOpen);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [showGameInfo, setShowGameInfo] = useState(false);
   const copyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const storedGames = parseGames(readStoredJson(GAMES_STORAGE_KEY));
-    const storedDrafts = parseDrafts(readStoredJson(DRAFTS_STORAGE_KEY));
-    const storedSelected = readString(readStoredJson(SELECTED_STORAGE_KEY));
-    const selected = storedGames.find((game) => game.uid === storedSelected) ?? storedGames[0] ?? null;
-
-    setGames(storedGames);
-    setDrafts(storedDrafts);
-    setSelectedGameId(selected?.uid ?? "");
-    setEditingGameId(selected?.uid ?? null);
-    setGameForm(selected ? gameToForm(selected) : emptyGameForm);
-    setIsEditorOpen(storedGames.length === 0);
-    setIsLoaded(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isLoaded) return;
     writeStoredJson(GAMES_STORAGE_KEY, games);
-  }, [games, isLoaded]);
+  }, [games]);
 
   useEffect(() => {
-    if (!isLoaded) return;
     writeStoredJson(DRAFTS_STORAGE_KEY, drafts);
-  }, [drafts, isLoaded]);
+  }, [drafts]);
 
   useEffect(() => {
-    if (!isLoaded) return;
     writeStoredJson(SELECTED_STORAGE_KEY, selectedGameId);
-  }, [selectedGameId, isLoaded]);
-
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (games.length === 0) {
-      setSelectedGameId("");
-      setIsEditorOpen(true);
-      return;
-    }
-
-    if (!games.some((game) => game.uid === selectedGameId)) {
-      setSelectedGameId(games[0]?.uid ?? "");
-    }
-  }, [games, isLoaded, selectedGameId]);
+  }, [selectedGameId]);
 
   useEffect(() => {
     return () => {
@@ -451,7 +486,8 @@ export function PublishingEmailBuilderWidget() {
     setCopyState("idle");
   }
 
-  async function handleCopy() {
+  async function handleCopy(event: MouseEvent<HTMLButtonElement>) {
+    event.stopPropagation();
     if (!selectedGame) return;
 
     await copyText(composeEmail(selectedGame, currentDraft));
@@ -489,6 +525,7 @@ export function PublishingEmailBuilderWidget() {
         className="more-head"
         style={{
           alignItems: "center",
+          borderTop: "none",
           color: "var(--text-muted)",
           display: "flex",
           fontFamily: "var(--font-dot-gothic), monospace",
@@ -496,6 +533,7 @@ export function PublishingEmailBuilderWidget() {
           justifyContent: "space-between",
           letterSpacing: "0.12em",
           marginBottom: 6,
+          paddingTop: 0,
           textTransform: "uppercase",
         }}
       >
@@ -848,7 +886,7 @@ export function PublishingEmailBuilderWidget() {
       >
         <div style={{ ...panelStyle, display: "grid", gap: 7, gridTemplateRows: "minmax(0, 1fr) auto", padding: 8 }}>
           <div style={{ minHeight: 0, overflow: "hidden" }}>
-            {renderPanelTitle("game vault", <span style={badgeStyle("ok")}>local</span>)}
+            {renderPanelTitle("game vault")}
             {games.length > 0 ? (
               <div style={{ display: "grid", gap: 5, maxHeight: "100%", overflowY: "auto", paddingRight: 2 }}>
                 {games.map((game) => renderGameCard(game))}
@@ -871,33 +909,56 @@ export function PublishingEmailBuilderWidget() {
 
         <div style={{ ...panelStyle, display: "grid", gap: 7, gridTemplateRows: "auto minmax(0, 1fr)", padding: 8 }}>
           <div style={{ minHeight: 0 }}>
-            {renderPanelTitle("selected game", <span style={badgeStyle(selectedGame ? "ok" : "warn")}>{selectedGame ? "saved" : "empty"}</span>)}
-            <div style={{ display: "grid", gap: 4 }}>
-              <div className="more-row" style={rowStyle}>
-                <span className="block-label" style={labelStyle}>
-                  name
-                </span>
-                <span className="block-value" style={{ color: "var(--text-primary)", fontSize: "0.62rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayText(selectedGame?.name, "No game")}
-                </span>
-              </div>
-              <div className="more-row" style={rowStyle}>
-                <span className="block-label" style={labelStyle}>
-                  store
-                </span>
-                <span className="block-sub" style={{ color: "var(--text-muted)", fontSize: "0.56rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayText(selectedGame?.storeName, "No store")}
-                </span>
-              </div>
-              <div className="more-row" style={rowStyle}>
-                <span className="block-label" style={labelStyle}>
-                  live
-                </span>
-                <span className="block-sub" style={{ color: "var(--text-muted)", fontSize: "0.56rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {displayText(selectedGame?.liveLink, "No live link")}
-                </span>
-              </div>
+            <div
+              className="more-head"
+              style={{
+                alignItems: "center",
+                borderTop: "none",
+                color: "var(--text-muted)",
+                cursor: "pointer",
+                display: "flex",
+                fontFamily: "var(--font-dot-gothic), monospace",
+                fontSize: "0.56rem",
+                justifyContent: "space-between",
+                letterSpacing: "0.12em",
+                marginBottom: 6,
+                paddingTop: 0,
+                textTransform: "uppercase",
+                userSelect: "none",
+              }}
+              onClick={() => setShowGameInfo((prev) => !prev)}
+            >
+              <span>selected game {showGameInfo ? "\u25BE" : "\u25B8"}</span>
+              {renderCopyButton()}
             </div>
+            {showGameInfo && (
+              <div style={{ display: "grid", gap: 4 }}>
+                <div className="more-row" style={rowStyle}>
+                  <span className="block-label" style={labelStyle}>
+                    name
+                  </span>
+                  <span className="block-value" style={{ color: "var(--text-primary)", fontSize: "0.62rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayText(selectedGame?.name, "No game")}
+                  </span>
+                </div>
+                <div className="more-row" style={rowStyle}>
+                  <span className="block-label" style={labelStyle}>
+                    store
+                  </span>
+                  <span className="block-sub" style={{ color: "var(--text-muted)", fontSize: "0.56rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayText(selectedGame?.storeName, "No store")}
+                  </span>
+                </div>
+                <div className="more-row" style={rowStyle}>
+                  <span className="block-label" style={labelStyle}>
+                    live
+                  </span>
+                  <span className="block-sub" style={{ color: "var(--text-muted)", fontSize: "0.56rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {displayText(selectedGame?.liveLink, "No live link")}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
 
           <div style={{ minHeight: 0, overflowY: "auto" }}>
@@ -907,7 +968,6 @@ export function PublishingEmailBuilderWidget() {
               <>
                 {renderPanelTitle("build fields")}
                 {renderBuildForm()}
-                <div style={{ marginTop: 6 }}>{renderCopyButton()}</div>
               </>
             )}
           </div>

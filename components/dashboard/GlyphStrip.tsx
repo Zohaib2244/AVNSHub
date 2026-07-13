@@ -1,6 +1,5 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { usePolling } from "@/lib/usePolling";
 import type { HomelabStatus } from "@/lib/homelab";
 
@@ -15,19 +14,9 @@ export function GlyphStrip() {
       className="absolute left-0 top-0 bottom-0 w-[3px]"
       aria-hidden
     >
-      <motion.div
+      <div
         className="absolute inset-0"
-        animate={
-          anyDown
-            ? { opacity: [1, 0.3, 1, 0.6, 1, 0.2, 1] }
-            : { opacity: [0.6, 1, 0.6] }
-        }
-        transition={{
-          duration: anyDown ? 1.2 : 2.5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-        style={{ background: color }}
+        style={{ background: color, opacity: anyDown ? 1 : 0.8 }}
       />
     </div>
   );

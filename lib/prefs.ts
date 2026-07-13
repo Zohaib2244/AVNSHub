@@ -122,5 +122,5 @@ async function syncWithServer() {
 
 if (typeof window !== "undefined") {
   syncWithServer();
-  pollWhileVisible(syncWithServer);
+  pollWhileVisible(syncWithServer, 15_000, "prefs");
 }

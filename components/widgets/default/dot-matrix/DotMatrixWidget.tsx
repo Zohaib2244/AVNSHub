@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useCallback, useEffect, useRef } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 interface Particle {
   hx: number;
@@ -44,7 +45,6 @@ export function DotMatrixWidget() {
   const mouseRef = useRef({ x: -9999, y: -9999 });
   const timeRef = useRef(0);
   const dimRef = useRef({ w: 0, h: 0 });
-  const rafRef = useRef(0);
 
   const colorMode = String(settings.colorMode ?? "orange");
   const interactionMode = String(settings.interaction ?? "repel");
@@ -72,7 +72,7 @@ export function DotMatrixWidget() {
     const container = containerRef.current;
     const canvas = canvasRef.current;
     if (!container || !canvas) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const ro = new ResizeObserver((entries) => {
       const rect = entries[0]?.contentRect;
       if (!rect) return;
@@ -93,11 +93,13 @@ export function DotMatrixWidget() {
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let paletteReadAt = 0;
+    let mutedClr = "";
+    let accentClr = "";
 
-    const tick = () => {
-      rafRef.current = requestAnimationFrame(tick);
-      timeRef.current += 0.011;
+    const tick = (now: number, deltaMs: number) => {
+      timeRef.current += deltaMs * 0.00066;
       const t = timeRef.current;
       const { w, h } = dimRef.current;
       const ps = particlesRef.current;
@@ -107,13 +109,14 @@ export function DotMatrixWidget() {
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Read design tokens once per frame so theme switches apply immediately
-      const rs = getComputedStyle(document.documentElement);
-      const mutedClr = rs.getPropertyValue("--text-muted").trim();
-      const accentClr =
-        colorMode === "cyan"
-          ? rs.getPropertyValue("--accent-cyan").trim()
-          : rs.getPropertyValue("--accent-orange").trim();
+      if (paletteReadAt === 0 || now - paletteReadAt >= 1000) {
+        const rs = getComputedStyle(document.documentElement);
+        mutedClr = rs.getPropertyValue("--text-muted").trim();
+        accentClr = rs.getPropertyValue(
+          colorMode === "cyan" ? "--accent-cyan" : "--accent-orange",
+        ).trim();
+        paletteReadAt = now;
+      }
       const sign = interactionMode === "attract" ? -1 : 1;
 
       for (const p of ps) {
@@ -169,8 +172,7 @@ export function DotMatrixWidget() {
       ctx.globalAlpha = 1;
     };
 
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
+    return startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
   }, [colorMode, damp, dotR, flowStr, hasFlow, interactionMode, mouseR, spring]);
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {

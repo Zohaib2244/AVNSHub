@@ -16,7 +16,7 @@ A slim `next build` / `next start` production image does not have those properti
 
 ## Requirements
 
-- Node.js 20+
+- Node.js 20.9+
 - npm
 - No separate database server — shared hub data lives in a bundled SQLite
   database (via Prisma), set up automatically the first time you run the app.
@@ -33,6 +33,10 @@ A slim `next build` / `next start` production image does not have those properti
 - Optional for containerized runtime: Docker and Docker Compose
 
 ## Install
+
+On Windows, double-click `install.bat` once, then use `run.bat` to start AVN
+Hub. The scripts perform the same dependency, environment, database, and dev
+server steps shown below.
 
 ```bash
 git clone https://github.com/Zohaib2244/AVN-Hub.git

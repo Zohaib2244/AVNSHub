@@ -7,10 +7,18 @@ import "./NutBotFaceWidget.css";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
-import { LOG_MESSAGES, NutBotTerminal } from "@/components/widgets/default/nutbot/NutBotTerminal";
+import { LOG_MESSAGES } from "@/components/widgets/default/nutbot/nutbotLogs";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { getSignal, getServerSignal, subscribeSignal } from "@/lib/nutbotSignal";
+
+// xterm, shells, chat, and the creator workspace are only needed at L size.
+// Keep that large subtree out of the normal dashboard's initial JS/heap.
+const NutBotTerminal = dynamic(
+  () => import("@/components/widgets/default/nutbot/NutBotTerminal").then((module) => module.NutBotTerminal),
+  { ssr: false, loading: () => <div className="block-sub">loading terminal...</div> },
+);
 
 export function NutBotFaceWidget() {
   const { size } = useWidget();

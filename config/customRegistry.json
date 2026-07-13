@@ -597,5 +597,164 @@
     "flags": {
       "hasApiRoute": true
     }
+  },
+  "mini-ping-pong": {
+    "title": "Mini Ping Pong",
+    "iconName": "Gamepad2",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [],
+    "flags": {
+      "hasApiRoute": false
+    }
+  },
+  "gym-ledger": {
+    "title": "Gym Ledger",
+    "iconName": "Dumbbell",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [
+      {
+        "key": "hoverExpand",
+        "label": "slot hover expand",
+        "type": "toggle",
+        "default": true
+      },
+      {
+        "key": "hoverExpandAxis",
+        "label": "expand axis",
+        "type": "select",
+        "default": "both",
+        "options": [
+          {
+            "value": "both",
+            "label": "default"
+          },
+          {
+            "value": "height",
+            "label": "height"
+          },
+          {
+            "value": "width",
+            "label": "width"
+          }
+        ]
+      },
+      {
+        "key": "targetCalories",
+        "label": "daily calories",
+        "type": "number",
+        "default": 2400,
+        "min": 0,
+        "max": 10000
+      },
+      {
+        "key": "targetProtein",
+        "label": "daily protein",
+        "type": "number",
+        "default": 160,
+        "min": 0,
+        "max": 400
+      },
+      {
+        "key": "targetCarbs",
+        "label": "daily carbs",
+        "type": "number",
+        "default": 250,
+        "min": 0,
+        "max": 800
+      },
+      {
+        "key": "targetFats",
+        "label": "daily fats",
+        "type": "number",
+        "default": 70,
+        "min": 0,
+        "max": 300
+      },
+      {
+        "key": "targetWater",
+        "label": "daily water ml",
+        "type": "number",
+        "default": 2500,
+        "min": 0,
+        "max": 8000
+      },
+      {
+        "key": "weeklyWorkoutGoal",
+        "label": "weekly workout goal",
+        "type": "number",
+        "default": 4,
+        "min": 0,
+        "max": 14
+      },
+      {
+        "key": "weightUnit",
+        "label": "weight unit",
+        "type": "select",
+        "default": "lb",
+        "options": [
+          {
+            "value": "lb",
+            "label": "lb"
+          },
+          {
+            "value": "kg",
+            "label": "kg"
+          }
+        ]
+      },
+      {
+        "key": "preferredSplit",
+        "label": "preferred split",
+        "type": "select",
+        "default": "push-pull-legs",
+        "options": [
+          {
+            "value": "push-pull-legs",
+            "label": "push pull legs"
+          },
+          {
+            "value": "upper-lower",
+            "label": "upper lower"
+          },
+          {
+            "value": "full body",
+            "label": "full body"
+          },
+          {
+            "value": "bro split",
+            "label": "bro split"
+          },
+          {
+            "value": "custom",
+            "label": "custom"
+          }
+        ]
+      }
+    ],
+    "flags": {
+      "hasApiRoute": false
+    }
   }
 }

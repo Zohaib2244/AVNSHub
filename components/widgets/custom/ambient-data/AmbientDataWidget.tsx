@@ -233,6 +233,7 @@ const AMBIENT_DATA_STYLES = `
   }
 
   .ambient-data-mosaic {
+    animation: ambientDataMosaicPulse 5.6s steps(4) infinite;
     display: grid;
     gap: 7px;
     grid-template-columns: repeat(var(--ambient-columns), minmax(0, 1fr));
@@ -249,8 +250,6 @@ const AMBIENT_DATA_STYLES = `
   }
 
   .ambient-data-cell {
-    animation: ambientDataCellIdle 5.6s steps(4) infinite;
-    animation-delay: var(--ambient-delay);
     aspect-ratio: 1;
     background: var(--accent-cyan);
     border: 1.5px solid var(--border);
@@ -270,58 +269,30 @@ const AMBIENT_DATA_STYLES = `
   }
 
   .ambient-data-cell--hot {
-    animation-duration: 2.8s;
-    animation-name: ambientDataCellHot;
     background: var(--accent-orange);
+    opacity: 0.82;
   }
 
   .ambient-data-cell--dim {
-    animation-duration: 7.2s;
     background: var(--text-muted-dim, var(--text-muted));
+    opacity: 0.16;
   }
 
   .ambient-data-cell--core {
-    animation-duration: 4.2s;
-    animation-name: ambientDataCellCore;
     background: var(--text-primary);
+    opacity: 0.62;
   }
 
-  @keyframes ambientDataCellIdle {
+  /* Pulse the mosaic as one composited surface. Animating all 64 cells
+     independently promoted dozens of layers on an always-on dashboard. */
+  @keyframes ambientDataMosaicPulse {
     0%,
     100% {
-      opacity: 0.18;
-      transform: scale(0.88);
-    }
-
-    50% {
       opacity: 0.72;
-      transform: scale(1);
-    }
-  }
-
-  @keyframes ambientDataCellHot {
-    0%,
-    100% {
-      opacity: 0.36;
-      transform: translateY(0) scale(0.9);
     }
 
     50% {
       opacity: 1;
-      transform: translateY(var(--ambient-hot-rise, -5px)) scale(1);
-    }
-  }
-
-  @keyframes ambientDataCellCore {
-    0%,
-    100% {
-      opacity: 0.42;
-      transform: rotate(0deg) scale(0.92);
-    }
-
-    50% {
-      opacity: 0.9;
-      transform: rotate(8deg) scale(1);
     }
   }
 

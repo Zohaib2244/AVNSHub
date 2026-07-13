@@ -310,5 +310,5 @@ if (typeof window !== "undefined") {
   pollWhileVisible(() => {
     syncModesWithServer();
     syncWallpaperMeta();
-  });
+  }, 15_000, "wallpaper");
 }

@@ -7,6 +7,7 @@ import {
   type Signal,
 } from "@/lib/nutbotSignal";
 import { getHoeActive } from "@/lib/hoeSignal";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 function signalToExpression(s: Signal): string {
   if (!s) return "idle";
@@ -55,10 +56,10 @@ export function NutBotFaceV2({ compact = false }: Props) {
 
   const signal    = useSyncExternalStore(subscribeSignal, getSignal, getServerSignal);
   const signalRef = useRef(signal);
-  signalRef.current = signal;
 
   // Map incoming signal → expression; cancel any active click override first
   useEffect(() => {
+    signalRef.current = signal;
     if (clickTimerRef.current) {
       clearTimeout(clickTimerRef.current);
       clickTimerRef.current = null;
@@ -116,12 +117,6 @@ export function NutBotFaceV2({ compact = false }: Props) {
     const easeIO  = (t: number) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
 
     // ── SVG fragment builders ────────────────────────────────────────────
-    function arcEye(cx: number, cy: number, fill = C) {
-      const w = 17, outer = 15, inner = 4;
-      return `<path d="M${cx-w} ${cy} Q${cx} ${cy-outer} ${cx+w} ${cy} Q${cx} ${cy-inner} ${cx-w} ${cy}Z"
-        fill="${fill}" filter="url(#${GC})"/>`;
-    }
-
     function heartEye(cx: number, cy: number, s = 0.85, fill = P) {
       const p = (dx: number, dy: number) => `${cx + dx * s} ${cy + dy * s}`;
       return `<path d="M${p(0,-8)} C${p(0,-8)} ${p(-5,-15)} ${p(-10,-10)}
@@ -460,16 +455,23 @@ export function NutBotFaceV2({ compact = false }: Props) {
 
     // ── blink system ─────────────────────────────────────────────────────
     let blinkTimer: ReturnType<typeof setTimeout> | null = null;
+    let blinkCloseTimer: ReturnType<typeof setTimeout> | null = null;
+    let disposed = false;
     const currentKeyRef = { current: "idle" };
 
     function scheduleBlink() {
+      if (disposed) return;
       if (blinkTimer) clearTimeout(blinkTimer);
       blinkTimer = setTimeout(() => {
+        blinkTimer = null;
+        if (disposed) return;
         if (currentKeyRef.current !== "idle") return;
         isBlinkingRef.current = true;
         setBar(EL, LX, EY, 18, 5);
         setBar(ER, RX, EY, 18, 5);
-        setTimeout(() => {
+        blinkCloseTimer = setTimeout(() => {
+          blinkCloseTimer = null;
+          if (disposed) return;
           isBlinkingRef.current = false;
           scheduleBlink();
         }, 105);
@@ -478,12 +480,9 @@ export function NutBotFaceV2({ compact = false }: Props) {
 
     // ── animation loop ────────────────────────────────────────────────────
     let startTime: number | null = null;
-    let rafId: number;
-
     function tick(ts: number) {
       if (!startTime) startTime = ts;
       EXPRS[currentKeyRef.current]?.tick((ts - startTime) / 1000);
-      rafId = requestAnimationFrame(tick);
     }
 
     // ── expression switcher ───────────────────────────────────────────────
@@ -493,6 +492,9 @@ export function NutBotFaceV2({ compact = false }: Props) {
       currentExprRef.current = key; // expose to click handler outside the effect
       startTime = null;
       if (blinkTimer) clearTimeout(blinkTimer);
+      if (blinkCloseTimer) clearTimeout(blinkCloseTimer);
+      blinkTimer = null;
+      blinkCloseTimer = null;
       isBlinkingRef.current = false;
 
       const ex = EXPRS[key];
@@ -511,13 +513,20 @@ export function NutBotFaceV2({ compact = false }: Props) {
 
     switchToRef.current = switchTo;
     switchTo("idle");
-    rafId = requestAnimationFrame(tick);
+    // The face is intentionally chunky and its ambient movements are slow.
+    // Twelve updates per second keeps those movements readable without making
+    // this always-visible widget one of the dashboard's hottest code paths.
+    const stopAnimation = startAnimationLoop({ element: bodyRef.current ?? MO, fps: 12, onFrame: tick });
 
     return () => {
-      cancelAnimationFrame(rafId);
+      disposed = true;
+      stopAnimation();
       if (blinkTimer) clearTimeout(blinkTimer);
+      if (blinkCloseTimer) clearTimeout(blinkCloseTimer);
+      if (clickTimerRef.current) clearTimeout(clickTimerRef.current);
+      switchToRef.current = null;
     };
-  }, []); // intentionally empty — everything lives in refs
+  }, [GC, GR, GW]);
 
   return (
     <div
@@ -554,8 +563,12 @@ export function NutBotFaceV2({ compact = false }: Props) {
               </pattern>
             </defs>
 
-            <rect ref={elRef} rx="4.5" ry="4.5" filter={`url(#${GC})`} />
-            <rect ref={erRef} rx="4.5" ry="4.5" filter={`url(#${GC})`} />
+            {/* These two bars move continuously while NutBot is idle. Keeping
+                the Gaussian glow on them forced a full SVG filter repaint on
+                every eye update; the surrounding screen glow carries the same
+                visual accent without that persistent rendering cost. */}
+            <rect ref={elRef} rx="4.5" ry="4.5" />
+            <rect ref={erRef} rx="4.5" ry="4.5" />
             <g ref={seRef} />
             <g ref={bwRef} />
             <g ref={moRef} />

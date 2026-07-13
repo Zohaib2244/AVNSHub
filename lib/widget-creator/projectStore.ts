@@ -209,7 +209,7 @@ async function syncWithServer() {
 if (typeof window !== "undefined") {
   projects = readFromStorage();
   syncWithServer();
-  pollWhileVisible(syncWithServer);
+  pollWhileVisible(syncWithServer, 15_000, "widget-creator-projects");
 }
 
 // ── per-project blobs (conversations, ideate rounds) ─────────────────────────

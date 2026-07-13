@@ -6,9 +6,7 @@
   flex-direction: column;
   align-items: center;
   filter: drop-shadow(6px 6px 0 #070604);
-  animation: nutbot-v2-float 3.2s ease-in-out infinite;
 }
-@keyframes nutbot-v2-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
 
 .nutbot-v2-body.bounce { animation: nutbot-v2-bounce .38s ease-in-out infinite; }
 @keyframes nutbot-v2-bounce { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-14px) rotate(2deg)} }

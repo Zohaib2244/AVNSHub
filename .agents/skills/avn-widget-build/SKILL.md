@@ -197,6 +197,8 @@ this is the whole pattern, already TypeScript-strict-null-safe. You do not
 need to read any other widget's code to find this pattern; copy it:
 
 ```tsx
+import { startAnimationLoop } from "@/lib/animationLoop";
+
 const canvasRef = useRef<HTMLCanvasElement | null>(null);
 const stageRef = useRef<HTMLDivElement | null>(null); // wrapper div sized by CSS flex/grid
 
@@ -220,7 +222,6 @@ useEffect(() => {
   const context = canvas?.getContext("2d");
   if (!canvas || !stage || !context) return; // narrows all three for the closures below
 
-  let frame = 0;
   let palette = readPalette(stage);
 
   const resize = () => {
@@ -240,15 +241,14 @@ useEffect(() => {
   observer.observe(stage);
   resize();
 
-  const tick = () => {
-    // ...draw using `context`, `palette`, canvas.width/ratio-adjusted size...
-    frame = requestAnimationFrame(tick);
+  const tick = (time: number, deltaMs: number) => {
+    // ...advance by deltaMs and draw using context/palette/canvas dimensions...
   };
-  frame = requestAnimationFrame(tick);
+  const stopAnimation = startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
 
   return () => {
     observer.disconnect();
-    cancelAnimationFrame(frame);
+    stopAnimation();
   };
 }, [/* settings that should restart the loop */]);
 
@@ -263,6 +263,9 @@ in one `if (!canvas || !stage || !context) return;` at the top of the effect
 (`canvas`, `stage`, `context`) inside `resize`/`tick` — never `canvasRef.current`
 again inside the same effect, since the ref access re-introduces the nullable
 type and defeats the narrowing.
+`startAnimationLoop` caps draw work and pauses completely while the widget is
+off-screen or the document is hidden. Use 20-30 FPS for decorative motion;
+reserve 60 FPS for interaction that demonstrably needs it.
 
 ## Optional API route
 

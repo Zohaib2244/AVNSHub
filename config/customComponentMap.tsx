@@ -23,6 +23,8 @@ const _office_time_tracker = lazy(() => import("@/components/widgets/custom/offi
 const _pomodoro_timer = lazy(() => import("@/components/widgets/custom/pomodoro-timer/PomodoroTimerWidget").then((m) => ({ default: m.PomodoroTimerWidget })));
 const _publishing_email_builder = lazy(() => import("@/components/widgets/custom/publishing-email-builder/PublishingEmailBuilderWidget").then((m) => ({ default: m.PublishingEmailBuilderWidget })));
 const _weather_updated = lazy(() => import("@/components/widgets/custom/weather-updated/WeatherUpdatedWidget").then((m) => ({ default: m.WeatherUpdatedWidget })));
+const _mini_ping_pong = lazy(() => import("@/components/widgets/custom/mini-ping-pong/MiniPingPongWidget").then((m) => ({ default: m.MiniPingPongWidget })));
+const _gym_ledger = lazy(() => import("@/components/widgets/custom/gym-ledger/GymLedgerWidget").then((m) => ({ default: m.GymLedgerWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -40,5 +42,7 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "pomodoro-timer": _pomodoro_timer,
   "publishing-email-builder": _publishing_email_builder,
   "weather-updated": _weather_updated,
+  "mini-ping-pong": _mini_ping_pong,
+  "gym-ledger": _gym_ledger,
 // --- custom-map end ---
 };

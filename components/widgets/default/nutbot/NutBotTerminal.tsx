@@ -8,25 +8,20 @@ import "./chat/NutBotChat.css";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from "next/dynamic";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { NutBotModelPicker } from "@/components/widgets/default/nutbot/NutBotModelPicker";
 import { ShellsScreen } from "@/components/widgets/default/nutbot/ShellsScreen";
-import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { LOG_MESSAGES } from "@/components/widgets/default/nutbot/nutbotLogs";
 
-export const LOG_MESSAGES = [
-  "[ok] homelab uplink ... stable",
-  "[ok] spotify.auth ... connected",
-  "[ok] github.sync ... up to date",
-  "[info] checking jellyfin sessions...",
-  "[ok] jellyfin ... 2 active sessions",
-  "[info] arr stack queue ... items pending",
-  "[ok] storage apps ... nominal",
-  "[info] nutbot v2.3 ready",
-];
+const WidgetCreatorPanel = dynamic(
+  () => import("@/components/widgets/default/nutbot/creator/WidgetCreatorPanel").then((module) => module.WidgetCreatorPanel),
+  { ssr: false },
+);
 
 type MainTab = "log" | "chat" | "shells" | "creator";
 type LogLine = { id: number; text: string };

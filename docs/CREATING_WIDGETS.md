@@ -520,6 +520,8 @@ You don't need to read `verlet-sim` or any other canvas widget's code to
 find this; copy it directly:
 
 ```tsx
+import { startAnimationLoop } from "@/lib/animationLoop";
+
 const canvasRef = useRef<HTMLCanvasElement | null>(null);
 const stageRef = useRef<HTMLDivElement | null>(null); // wrapper div, sized by CSS flex/grid
 
@@ -543,7 +545,6 @@ useEffect(() => {
   const context = canvas?.getContext("2d");
   if (!canvas || !stage || !context) return; // narrows all three for the closures below
 
-  let frame = 0;
   let palette = readPalette(stage);
 
   const resize = () => {
@@ -563,15 +564,14 @@ useEffect(() => {
   observer.observe(stage);
   resize();
 
-  const tick = () => {
-    // ...draw using `context`, `palette`, canvas.width/ratio-adjusted size...
-    frame = requestAnimationFrame(tick);
+  const tick = (time: number, deltaMs: number) => {
+    // ...advance by deltaMs and draw using context/palette/canvas dimensions...
   };
-  frame = requestAnimationFrame(tick);
+  const stopAnimation = startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
 
   return () => {
     observer.disconnect();
-    cancelAnimationFrame(frame);
+    stopAnimation();
   };
 }, [/* settings that should restart the loop */]);
 ```
@@ -588,6 +588,9 @@ only ever reference the narrowed local consts (`canvas`, `stage`, `context`)
 inside `resize`/`tick` — reaching back through `canvasRef.current` inside the
 same effect re-introduces the nullable type and defeats the narrowing, which
 is exactly what produces the "possibly null" errors this pattern avoids.
+`startAnimationLoop` also caps draw work and completely pauses while the
+widget is off-screen or the document is hidden. Use 20-30 FPS for decorative
+motion; reserve 60 FPS for interaction that demonstrably needs it.
 
 ### Write plain ASCII — no smart punctuation
 

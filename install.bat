@@ -11,6 +11,15 @@ if errorlevel 1 (
   exit /b 1
 )
 
+node -e "const [major, minor] = process.versions.node.split('.').map(Number); process.exit(major > 20 || (major === 20 && minor >= 9) ? 0 : 1)"
+if errorlevel 1 (
+  echo AVN Hub requires Node.js 20.9 or newer. Found:
+  node --version
+  echo Update Node.js from https://nodejs.org/ and then run this script again.
+  pause
+  exit /b 1
+)
+
 echo Checking for npm...
 where npm >nul 2>&1
 if errorlevel 1 (
