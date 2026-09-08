@@ -247,7 +247,7 @@ export async function POST(req: Request) {
           .map((f) => `<!-- ${f} -->\n${readFileSync(join(sessionDir, f), "utf-8")}`)
           .join("\n\n");
 
-      const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork);
+      const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork, { stage: "ideate" });
 
       // "aborted" (user stop) deliberately skips the done-verification below —
       // a stopped run reporting "no variation files found" would be noise.

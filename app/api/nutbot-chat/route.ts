@@ -3,6 +3,8 @@ import { NUTBOT_PERSONA, NUTBOT_PERSONA_NSFW, type PersonaPreset } from "@/lib/n
 import { streamHarnessChat } from "@/lib/nutbot/chatHarness";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 
+import { readModelDefaults, resolveSession } from "@/lib/widget-creator/runStore";
+
 // NutBot's chat brain: proxies to a self-hosted Bonfire instance
 // (github.com/shahwaizse/bonfire) running a local Dolphin 3.0 model behind
 // llama.cpp. Never expose the Bonfire URL client-side — same pattern as every
@@ -111,11 +113,14 @@ export async function POST(request: Request) {
     if (!isHarnessId(backend)) {
       return NextResponse.json({ error: "invalid chat backend" }, { status: 400 });
     }
+    const modelChoice = (await readModelDefaults())[backend];
+    const sessionId = await resolveSession(body.conversationId, backend, modelChoice.model);
     return new Response(
       streamHarnessChat({
+        modelChoice,
         harness: backend,
         message: body.message,
-        sessionId: body.conversationId ?? null,
+        sessionId,
         persona: NUTBOT_PERSONA.system_prompt,
         history: Array.isArray(body.history) ? body.history : [],
       }),

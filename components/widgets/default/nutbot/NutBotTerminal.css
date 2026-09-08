@@ -37,48 +37,15 @@
   min-height: 60px;
 }
 
-/* ── single combined row: title + tabs + controls ────────────── */
-
-.term-row {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.term-title {
-  font-family: var(--font-dot-gothic), monospace;
-  font-size: calc(0.62rem * var(--nb-scale, 1));
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--nb-muted, var(--text-muted));
-  padding: 0 10px 0 2px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  opacity: 0.9;
-  border-right: 1px solid var(--border);
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-}
-
-.term-tabs {
-  display: flex;
-  align-items: stretch;
-  flex: 1;
-  min-width: 0;
-}
-
-.term-row-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0 4px 8px;
-  border-left: 1px solid var(--border);
-  flex-shrink: 0;
-}
+/* NutBot 2.4: identity/actions above a dedicated navigation row. */
+.term-header { flex-shrink: 0; min-width: 0; margin-bottom: 8px; }
+.term-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 2px 2px 8px; }
+.term-identity, .term-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.term-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-dot-gothic), monospace; font-size: calc(.75rem * var(--nb-scale, 1)); letter-spacing: .1em; color: var(--text-primary); white-space: nowrap; }
+.term-version { color: var(--nb-muted, var(--text-muted)); font-family: var(--font-jetbrains-mono), monospace; font-size: .65em; letter-spacing: 0; padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; }
+.term-actions .term-focus-btn { width: 30px; height: 30px; display: grid; place-items: center; }
+.term-actions .model-settings-trigger { height: 30px; }
+.term-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; padding: 3px; gap: 2px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--bg-nested); }
 
 /* ── tab button (pill indicator style) ───────────────────────── */
 
@@ -91,7 +58,7 @@
   font-size: calc(0.64rem * var(--nb-scale, 1));
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  padding: 0 11px;
+  padding: 0 4px;
   height: calc(34px * var(--nb-scale, 1));
   border: none;
   background: transparent;
@@ -113,7 +80,10 @@
 /* animated background pill (motion.div with layoutId="term-tab-bg") */
 .term-tab-bg {
   position: absolute;
-  inset: 5px 3px;
+  inset: 0;
+  opacity: 0;
+  transform: scale(.94);
+  transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1);
   border-radius: 6px;
   background: color-mix(in srgb, var(--accent-orange) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent-orange) 22%, transparent);
@@ -143,6 +113,11 @@
 .term-body {
   height: 112px;
   overflow-y: auto;
+  /* tabs change this container's padding/height/overflow; easing the geometry
+     means the swap settles instead of snapping. overflow/display still flip
+     instantly, which is why the panel swap happens while opacity is 0. */
+  transition: height 0.18s cubic-bezier(0.4, 0, 0.2, 1),
+    padding 0.18s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: calc(0.8rem * var(--nb-scale, 1));
   /* JetBrains Mono variable — 500 reads much better at these sizes; DotGothic
      labels are protected by font-synthesis: none on .nutbot-terminal above */
@@ -164,9 +139,17 @@
 /* ── tab panel — the animated wrapper around each tab's content ─── */
 
 .term-tab-panel {
+  /* was missing `display: flex` while setting flex-direction — the log panel
+     rendered as a block and the property did nothing. Inactive panels get an
+     inline `display: none` from the component (never animated). */
+  display: flex;
   min-height: 0;
+  min-width: 0;
   width: 100%;
   flex-direction: column;
+  /* the fade animates opacity + a small translate; promoting the layer keeps
+     it off the main thread and stops text re-rastering mid-fade */
+  will-change: opacity, transform;
 }
 
 .term-body-shells .term-tab-panel,
@@ -580,3 +563,8 @@
   color: var(--nb-muted, var(--text-muted));
   flex-shrink: 0;
 }
+
+.term-tab.active .term-tab-bg { opacity: 1; transform: scale(1); }
+.term-tab:focus-visible, .term-actions button:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 2px; }
+@container widget (max-width: 280px) { .term-tab-icon { display: none; } .term-title { gap: 5px; } .term-identity { gap: 4px; } }
+@media (prefers-reduced-motion: reduce) { .term-tab-bg, .term-body { transition: none; } }

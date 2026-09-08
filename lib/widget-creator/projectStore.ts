@@ -1,3 +1,4 @@
+import type { HarnessId } from "./harnessAdapters";
 // Client-side project store for Widget Creator.
 // Each custom widget is a "project". Projects in In Progress = not yet built.
 // Projects in Created = their widget exists in the registry.
@@ -64,7 +65,7 @@ export type WidgetProject = {
   ideateSessionId?: string;
   /** Build-mode CLI session, tagged with the slug it was minted for so a
       target change invalidates it (survives remounts, unlike the old ref). */
-  buildSession?: { id: string; forSlug: string | null };
+  buildSession?: { id: string; forSlug: string | null; harness?: HarnessId };
   /** A build finished but the widget isn't installed/placed yet — powers the
       "install widget" button. Lives here (synced) instead of sessionStorage so
       closing the tab can't strand generated files with no way to install them. */
@@ -122,6 +123,7 @@ export function sanitizeProjects(raw: unknown): WidgetProject[] {
       && typeof (p.buildSession as Record<string, unknown>).id === "string"
       ? {
           id: (p.buildSession as Record<string, unknown>).id as string,
+          harness: ["claude", "codex", "opencode"].includes(String((p.buildSession as Record<string, unknown>).harness)) ? (p.buildSession as Record<string, unknown>).harness as HarnessId : "claude",
           forSlug: typeof (p.buildSession as Record<string, unknown>).forSlug === "string"
             ? ((p.buildSession as Record<string, unknown>).forSlug as string)
             : null,

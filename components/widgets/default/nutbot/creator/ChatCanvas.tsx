@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmProviderSwitch } from "@/lib/widget-creator/confirmSwitch";
+
 import { useEffect, useRef, useState } from "react";
 import { Download, Maximize2, Paperclip, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
@@ -67,7 +69,7 @@ type Props = {
   entryMode?: ProjectMode;
   /** Build-mode CLI session from the synced project record, tagged with the
       target slug it belongs to so remounts can resume safely. */
-  buildSession?: { id: string; forSlug: string | null };
+  buildSession?: { id: string; forSlug: string | null; harness?: HarnessId };
   /** Finished-but-not-fully-installed build state from the project record. */
   pendingInstall?: DoneRecord;
 };
@@ -286,6 +288,7 @@ export function ChatCanvas({
     setPrompt("");
     setAttachedImages([]);
 
+    const lastValidation = messages.findLast((m) => m.role === "tsc_errors" || (m.role === "ok" && (m.text.includes("widget updated") || m.text.includes("widget written"))));
     const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
     let hadTscErrors = false;
 
@@ -328,6 +331,8 @@ export function ChatCanvas({
           harness: activeHarness,
           harnessChain,
           sessionId: sessionForRequest ?? undefined,
+          sessionHarness: buildSession?.harness ?? "claude",
+          repairErrors: lastValidation?.role === "tsc_errors" ? lastValidation.errors : undefined,
           projectMeta: { concept: brief?.concept, entryMode },
           images: imagesForRequest.length ? imagesForRequest : undefined,
         }),
@@ -370,7 +375,7 @@ export function ChatCanvas({
               const registered = Boolean(payload.registered);
               const newSessionId = (payload.sessionId as string | null) ?? null;
               if (newSessionId) {
-                updateProject(projectId, { buildSession: { id: newSessionId, forSlug: slug } });
+                updateProject(projectId, { buildSession: { id: newSessionId, forSlug: slug, harness: (payload.harness as HarnessId) ?? activeHarness } });
               }
               setPhase({ id: "done" });
               setMessages((prev) => {
@@ -428,6 +433,10 @@ export function ChatCanvas({
               updated[idx] = { ...msg, text: msg.text + text };
               return updated;
             });
+          } else if (event === "session") {
+            updateProject(projectId, { buildSession: { id: payload.sessionId as string, forSlug: payload.slug as string | null, harness: payload.harness as HarnessId } });
+          } else if (event === "switch_required") {
+            confirmProviderSwitch(payload, abort.signal);
           } else if (event === "switch") {
             const from = payload.from as HarnessId;
             const to = payload.to as HarnessId;
@@ -745,7 +754,7 @@ export function ChatCanvas({
           if (msg.role === "tsc_errors") {
             return (
               <div key={i} className="wc-msg wc-msg-tsc">
-                <div className="wc-msg-tsc-head">[tsc errors — re-sending for self-repair]</div>
+                <div className="wc-msg-tsc-head">[tsc errors — included with your next request]</div>
                 {msg.errors.slice(0, 6).map((e, j) => (
                   <div key={j} className="wc-tsc-line">{e}</div>
                 ))}

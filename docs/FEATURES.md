@@ -14,9 +14,9 @@ The main view is a living canvas with left and right widget regions, a base stri
 
 ---
 
-## NutBot v2.3
+## NutBot v2.4
 
-NutBot lives in the center terminal slot. The terminal is a single combined header bar — title label, four tabs, and controls all in one row.
+NutBot lives in the center terminal slot. The terminal uses two header rows: NutBot identity, Models, and expand controls above a dedicated Log / Chat / Shells / Creator navigation bar.
 
 ![NutBot terminal v2.2 — tab bar close-up](<screenshots/nutbot-terminal-v2.2.png>)
 
@@ -41,18 +41,11 @@ The shells tab is its own screen with a sidebar listing mounted terminal session
 
 ![NutBot shells tab with sidebar](<screenshots/nutbot-shells.png>)
 
-### Model Picker
+### Models and usage
 
-The unified model picker in the top-right of the terminal controls which backend both Chat and Widget Creator use. Selecting a model here sets it for both tabs simultaneously.
+The **Models** button opens saved Claude/Codex model defaults, supported reasoning effort, the Creator provider, and Chat backend (including Auto, Bonfire, and Off). Auto no longer occupies the header. Model cards describe strengths; custom IDs are supported, and account access is checked by the CLI when used.
 
-| Dot color | Backend |
-| --- | --- |
-| Orange | Bonfire (local LLM) |
-| Cyan | claude CLI |
-| Purple | codex CLI |
-| Green | opencode CLI |
-
-![NutBot model picker dropdown](<screenshots/nutbot-model-picker.png>)
+The menu includes stage totals and the last 200 CLI attempts, including failures and unreported counts. Provider fallback pauses for confirmation. Entry, hover, and save-feedback animations respect reduced motion. See [Models and usage](NUTBOT_MODELS.md) for accounting details.
 
 ---
 

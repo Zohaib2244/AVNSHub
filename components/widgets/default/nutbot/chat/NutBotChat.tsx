@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw, Send, Square } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { clearSignal, emitThinking, emitSpeaking, emitBrowsing, emitError } from "@/lib/nutbotSignal";
+import { showHubDialog } from "@/lib/hubDialog";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs, type ChatBackend } from "@/lib/prefs";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 
@@ -28,6 +29,9 @@ const CONV_KEY = "nutmag-nutbot-conv";
 const CONV_BACKEND_KEY = "nutmag-nutbot-conv-backend";
 const NSFW_KEY = "nutmag-nutbot-nsfw";
 const SEARCH_KEY = "nutmag-nutbot-search";
+const HISTORY_KEY = "nutmag-nutbot-history";
+/** how many sent prompts the up-arrow recall keeps, oldest dropped first */
+const HISTORY_LIMIT = 100;
 
 function readSession(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -35,6 +39,17 @@ function readSession(key: string): string | null {
     return sessionStorage.getItem(key);
   } catch {
     return null;
+  }
+}
+
+function readHistory(): string[] {
+  const raw = readSession(HISTORY_KEY);
+  if (!raw) return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((v): v is string => typeof v === "string") : [];
+  } catch {
+    return [];
   }
 }
 
@@ -71,9 +86,20 @@ export function NutBotChat() {
   const [conversationBackend, setConversationBackend] = useState<ConcreteBackend | null>(() => readStoredBackend());
   const [nsfw, setNsfw] = useState(() => readSession(NSFW_KEY) === "true");
   const [searchEnabled, setSearchEnabled] = useState(() => readSession(SEARCH_KEY) !== "false");
+  // CLI-style prompt recall. `history` is newest-last and deliberately NOT
+  // cleared by "new chat" — a shell keeps its history across commands, and the
+  // whole point is getting a prompt back after you've moved on. `historyIdx`
+  // is -1 while composing normally and otherwise indexes back from the end;
+  // `draftRef` stashes whatever was typed before the first Up so Down can
+  // return it, exactly like readline.
+  const [history, setHistory] = useState<string[]>(() => readHistory());
+  const [historyIdx, setHistoryIdx] = useState(-1);
+  const draftRef = useRef("");
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const bodyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const approvedAutoBackend = useRef<ConcreteBackend | null>(null);
   const assistantIdxRef = useRef(-1);
   const hydratedConvRef = useRef<string | null>(null);
 
@@ -92,6 +118,15 @@ export function NutBotChat() {
       sessionStorage.setItem(SEARCH_KEY, String(searchEnabled));
     } catch {}
   }, [searchEnabled]);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch {
+      // sessionStorage can throw (private mode / blocked site data) — recall
+      // just won't survive a remount, which is not worth breaking chat over
+    }
+  }, [history]);
 
   useEffect(() => {
     try {
@@ -283,6 +318,10 @@ export function NutBotChat() {
     if (!prompt.trim() || sending || !resolvedBackend) return;
 
     const backend = resolvedBackend;
+    if (backendState.kind === "ready" && backendState.autoFallback && approvedAutoBackend.current !== backend) {
+      showHubDialog({ title: `Use ${backendLabel(backend)} for chat?`, body: "Bonfire is unavailable. Continuing uses your CLI subscription. Cancel keeps your message unsent.", confirmLabel: "use this provider", onConfirm: () => { approvedAutoBackend.current = backend; void send(); } });
+      return;
+    }
     const userText = prompt.trim();
     const history = backend === "bonfire"
       ? undefined
@@ -290,6 +329,12 @@ export function NutBotChat() {
           msg.role === "user" || msg.role === "assistant" ? [{ role: msg.role, text: msg.text }] : []
         )).slice(-8);
     setPrompt("");
+    // consecutive duplicates collapse, like a shell ignoring a repeated command
+    setHistory((prev) => (prev[prev.length - 1] === userText
+      ? prev
+      : [...prev, userText].slice(-HISTORY_LIMIT)));
+    setHistoryIdx(-1);
+    draftRef.current = "";
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setSending(true);
     emitThinking();
@@ -363,6 +408,38 @@ export function NutBotChat() {
       abortRef.current = null;
       finalizeStreaming();
     }
+  }
+
+  /** Up/Down walk `history` newest-first. Returns false when there is nothing
+      to move to, so the caller can let the key do its normal caret thing. */
+  function recall(direction: -1 | 1): boolean {
+    if (history.length === 0) return false;
+
+    if (direction === -1) {
+      const next = historyIdx < 0 ? 0 : historyIdx + 1;
+      if (next >= history.length) return false; // already at the oldest
+      if (historyIdx < 0) draftRef.current = prompt; // stash the live draft once
+      setHistoryIdx(next);
+      setPrompt(history[history.length - 1 - next]);
+      return true;
+    }
+
+    if (historyIdx < 0) return false; // not in recall mode
+    const next = historyIdx - 1;
+    setHistoryIdx(next);
+    // stepping past the newest entry restores whatever was being typed
+    setPrompt(next < 0 ? draftRef.current : history[history.length - 1 - next]);
+    return true;
+  }
+
+  /** Recall only when the caret is on the edge line the key would leave, so
+      Up/Down still navigate normally inside a multi-line draft — same rule a
+      terminal uses. Requires a collapsed selection. */
+  function shouldRecall(el: HTMLTextAreaElement, direction: -1 | 1): boolean {
+    if (el.selectionStart !== el.selectionEnd) return false;
+    return direction === -1
+      ? !el.value.slice(0, el.selectionStart).includes("\n")
+      : !el.value.slice(el.selectionEnd).includes("\n");
   }
 
   function stop() {
@@ -490,14 +567,33 @@ export function NutBotChat() {
 
       <div className="nb-chat-footer">
         <textarea
+          ref={inputRef}
           className="nb-chat-input"
           placeholder={placeholder}
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => {
+            setPrompt(e.target.value);
+            // typing over a recalled prompt drops out of recall, so the next
+            // Down doesn't clobber the edit with a stale history entry
+            if (historyIdx !== -1) setHistoryIdx(-1);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
               send();
+              return;
+            }
+            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+              const direction = e.key === "ArrowUp" ? -1 : 1;
+              const el = e.currentTarget;
+              if (!shouldRecall(el, direction) || !recall(direction)) return;
+              e.preventDefault();
+              // a recalled prompt lands with the caret at the end, ready to
+              // edit or re-send — setPrompt hasn't painted yet, so defer
+              requestAnimationFrame(() => {
+                const end = inputRef.current?.value.length ?? 0;
+                inputRef.current?.setSelectionRange(end, end);
+              });
             }
           }}
           rows={1}

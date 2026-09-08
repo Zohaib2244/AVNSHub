@@ -145,7 +145,7 @@ export const HARNESS_ADAPTERS: Record<HarnessId, HarnessAdapter> = {
     id: "codex",
     label: "codex",
     command: "codex",
-    args: ["exec", "--full-auto", "--json"],
+    args: ["exec", "--sandbox", "workspace-write", "--json"],
     parseChunk: parseCodexLine,
   },
   opencode: {

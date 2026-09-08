@@ -2,14 +2,11 @@
 
 import { type CSSProperties } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
+import { usePolling } from "@/lib/usePolling";
+import { formatRate, type HostTelemetry } from "@/lib/homelab";
 
 type CellTone = "idle" | "hot" | "dim" | "core";
 type CSSVars = CSSProperties & Record<`--${string}`, string | number>;
-
-interface CellData {
-  tone: CellTone;
-  delay: string;
-}
 
 interface LoomData {
   label: string;
@@ -19,84 +16,58 @@ interface LoomData {
   delay: string;
 }
 
-const MOSAIC_CELLS: CellData[] = [
-  { tone: "dim", delay: "-0.2s" },
-  { tone: "idle", delay: "-1.4s" },
-  { tone: "hot", delay: "-2.6s" },
-  { tone: "idle", delay: "-3.1s" },
-  { tone: "core", delay: "-0.9s" },
-  { tone: "idle", delay: "-2.2s" },
-  { tone: "dim", delay: "-4.4s" },
-  { tone: "hot", delay: "-1.1s" },
-  { tone: "idle", delay: "-3.8s" },
-  { tone: "hot", delay: "-0.6s" },
-  { tone: "idle", delay: "-1.8s" },
-  { tone: "dim", delay: "-4.7s" },
-  { tone: "idle", delay: "-2.5s" },
-  { tone: "core", delay: "-3.3s" },
-  { tone: "hot", delay: "-0.4s" },
-  { tone: "idle", delay: "-2.9s" },
-  { tone: "hot", delay: "-1.9s" },
-  { tone: "idle", delay: "-4.2s" },
-  { tone: "core", delay: "-0.8s" },
-  { tone: "hot", delay: "-3.6s" },
-  { tone: "idle", delay: "-2.1s" },
-  { tone: "dim", delay: "-1.3s" },
-  { tone: "idle", delay: "-4.9s" },
-  { tone: "hot", delay: "-0.7s" },
-  { tone: "idle", delay: "-2.4s" },
-  { tone: "dim", delay: "-3.7s" },
-  { tone: "hot", delay: "-1.2s" },
-  { tone: "core", delay: "-4.6s" },
-  { tone: "hot", delay: "-0.3s" },
-  { tone: "idle", delay: "-2.8s" },
-  { tone: "idle", delay: "-3.5s" },
-  { tone: "dim", delay: "-1.6s" },
-  { tone: "dim", delay: "-4.1s" },
-  { tone: "idle", delay: "-0.5s" },
-  { tone: "hot", delay: "-2.7s" },
-  { tone: "idle", delay: "-3.9s" },
-  { tone: "core", delay: "-1.5s" },
-  { tone: "hot", delay: "-4.8s" },
-  { tone: "idle", delay: "-2.3s" },
-  { tone: "idle", delay: "-0.1s" },
-  { tone: "hot", delay: "-3.2s" },
-  { tone: "core", delay: "-1.7s" },
-  { tone: "idle", delay: "-4.5s" },
-  { tone: "dim", delay: "-0.8s" },
-  { tone: "idle", delay: "-2.0s" },
-  { tone: "hot", delay: "-3.4s" },
-  { tone: "dim", delay: "-1.0s" },
-  { tone: "idle", delay: "-4.3s" },
-  { tone: "idle", delay: "-2.6s" },
-  { tone: "hot", delay: "-0.9s" },
-  { tone: "dim", delay: "-3.0s" },
-  { tone: "idle", delay: "-4.0s" },
-  { tone: "hot", delay: "-1.4s" },
-  { tone: "core", delay: "-2.9s" },
-  { tone: "idle", delay: "-0.6s" },
-  { tone: "hot", delay: "-3.8s" },
-  { tone: "core", delay: "-1.1s" },
-  { tone: "idle", delay: "-2.2s" },
-  { tone: "hot", delay: "-4.4s" },
-  { tone: "idle", delay: "-0.7s" },
-  { tone: "dim", delay: "-3.6s" },
-  { tone: "idle", delay: "-1.8s" },
-  { tone: "hot", delay: "-2.5s" },
-  { tone: "dim", delay: "-4.9s" },
-];
+// Each cell owns a fixed threshold on the 0-100 load scale. `i * 37 % 100`
+// scatters them so lighting up in threshold order reads as a spreading
+// mosaic rather than a bar filling left-to-right, and being derived from the
+// index (not Math.random) keeps a cell's identity stable across re-renders.
+const CELL_COUNT = 64;
+const CELL_THRESHOLDS: number[] = Array.from({ length: CELL_COUNT }, (_, i) => ((i * 37) % 100) + 0.5);
+// Stable per-cell animation offset, so neighbouring cells never pulse in step.
+const CELL_DELAYS: string[] = Array.from({ length: CELL_COUNT }, (_, i) => `-${(((i * 17) % 50) / 10).toFixed(1)}s`);
 
-const READOUTS = [
-  { label: "Avg CPU", value: "64%" },
-  { label: "Cells", value: "64" },
-  { label: "Tempo", value: "2.8s" },
-];
+/** tone for one cell at the current load — above its threshold it is hot,
+    just below it is "warming" (core), well below it idles */
+function toneForCell(index: number, load: number): CellTone {
+  const threshold = CELL_THRESHOLDS[index];
+  if (load >= threshold) return "hot";
+  if (load >= threshold - 12) return "core";
+  return threshold > 82 ? "dim" : "idle";
+}
 
-const LOOM_ROWS: LoomData[] = [
-  { label: "API", value: 72, hot: true, duration: "3.2s", delay: "-0.8s" },
-  { label: "DB", value: 48, duration: "5.4s", delay: "-2s" },
-  { label: "Edge", value: 61, hot: true, duration: "4s", delay: "-1.4s" },
-];
+/** The caption has always promised "hot cells speed up as server pressure
+    rises" — this is what makes that literally true: 5.6s idle → 1.7s flat out. */
+function tempoSeconds(load: number): number {
+  const clamped = Math.min(100, Math.max(0, load));
+  return 5.6 - (clamped / 100) * 3.9;
+}
+
+const POLL_URL = "/api/system-stats";
+const POLL_MS = 60_000;
+
+type Load = {
+  cpu: number;
+  memory: number;
+  disk: number;
+  net: string;
+  ready: boolean;
+};
+
+function useLoad(): Load {
+  const { data } = usePolling<HostTelemetry>(POLL_URL, POLL_MS);
+  if (!data) return { cpu: 0, memory: 0, disk: 0, net: "—", ready: false };
+  // the fullest real drive is the honest "disk pressure" figure; an average
+  // across mounts would hide a single volume about to run out
+  const disk = data.drives.reduce((max, d) => Math.max(max, d.used_pct), 0);
+  return {
+    cpu: data.cpu.used_pct,
+    memory: data.memory.used_pct,
+    disk,
+    net: formatRate(data.network.rx_rate_bps + data.network.tx_rate_bps),
+    ready: true,
+  };
+}
+
+const pct = (n: number) => `${Math.round(n)}%`;
 
 const AMBIENT_DATA_STYLES = `
   .ambient-data-root {
@@ -249,7 +220,7 @@ const AMBIENT_DATA_STYLES = `
   }
 
   .ambient-data-cell {
-    animation: ambientDataCellIdle 5.6s steps(4) infinite;
+    animation: ambientDataCellIdle var(--ambient-tempo, 5.6s) steps(4) infinite;
     animation-delay: var(--ambient-delay);
     aspect-ratio: 1;
     background: var(--accent-cyan);
@@ -270,18 +241,18 @@ const AMBIENT_DATA_STYLES = `
   }
 
   .ambient-data-cell--hot {
-    animation-duration: 2.8s;
+    animation-duration: calc(var(--ambient-tempo, 5.6s) * 0.5);
     animation-name: ambientDataCellHot;
     background: var(--accent-orange);
   }
 
   .ambient-data-cell--dim {
-    animation-duration: 7.2s;
+    animation-duration: calc(var(--ambient-tempo, 5.6s) * 1.3);
     background: var(--text-muted-dim, var(--text-muted));
   }
 
   .ambient-data-cell--core {
-    animation-duration: 4.2s;
+    animation-duration: calc(var(--ambient-tempo, 5.6s) * 0.75);
     animation-name: ambientDataCellCore;
     background: var(--text-primary);
   }
@@ -527,29 +498,29 @@ function cellClassName(tone: CellTone): string {
   return tone === "idle" ? "ambient-data-cell" : `ambient-data-cell ambient-data-cell--${tone}`;
 }
 
-function HeaderRow() {
+function HeaderRow({ load }: { load: Load }) {
   return (
     <div className="ambient-data-topline">
       <div className="block-label ambient-data-title">ambient load mosaic</div>
-      <div className="ambient-data-badge">css signal</div>
+      <div className="ambient-data-badge">{load.ready ? `cpu ${pct(load.cpu)}` : "reading…"}</div>
     </div>
   );
 }
 
-function Mosaic({ count, columns, scan = false }: { count: number; columns: number; scan?: boolean }) {
+function Mosaic({ count, columns, load, scan = false }: { count: number; columns: number; load: number; scan?: boolean }) {
   const shellClassName = scan
     ? "ambient-data-mosaic-shell ambient-data-mosaic-shell--scan"
     : "ambient-data-mosaic-shell";
 
   return (
-    <section aria-label="animated load cells" className={shellClassName}>
+    <section aria-label={`load cells, ${Math.round(load)} percent`} className={shellClassName}>
       <div className="ambient-data-mosaic" style={{ "--ambient-columns": columns } as CSSVars}>
-        {MOSAIC_CELLS.slice(0, count).map((cell, index) => (
+        {Array.from({ length: count }, (_, index) => (
           <span
             aria-hidden="true"
-            className={cellClassName(cell.tone)}
-            key={`${cell.tone}-${cell.delay}-${index}`}
-            style={{ "--ambient-delay": cell.delay } as CSSVars}
+            className={cellClassName(toneForCell(index, load))}
+            key={index}
+            style={{ "--ambient-delay": CELL_DELAYS[index] } as CSSVars}
           />
         ))}
       </div>
@@ -557,10 +528,16 @@ function Mosaic({ count, columns, scan = false }: { count: number; columns: numb
   );
 }
 
-function Readouts() {
+function Readouts({ load }: { load: Load }) {
+  const readouts = [
+    { label: "CPU", value: load.ready ? pct(load.cpu) : "—" },
+    { label: "Memory", value: load.ready ? pct(load.memory) : "—" },
+    { label: "Network", value: load.net },
+  ];
+
   return (
     <section aria-label="load readouts" className="ambient-data-side-read">
-      {READOUTS.map((readout) => (
+      {readouts.map((readout) => (
         <div className="ambient-data-read-card" key={readout.label}>
           <div className="ambient-data-read-key">{readout.label}</div>
           <div className="block-value ambient-data-read-value">{readout.value}</div>
@@ -570,10 +547,22 @@ function Readouts() {
   );
 }
 
-function Loom() {
+function Loom({ load }: { load: Load }) {
+  // "hot" is a real pressure threshold now, not a hand-picked flag
+  const rows: LoomData[] = [
+    { label: "CPU", value: load.cpu },
+    { label: "Mem", value: load.memory },
+    { label: "Disk", value: load.disk },
+  ].map((row, i) => ({
+    ...row,
+    hot: row.value >= 80,
+    duration: `${(tempoSeconds(row.value) * 0.75).toFixed(1)}s`,
+    delay: `-${(i * 0.7).toFixed(1)}s`,
+  }));
+
   return (
     <section aria-label="signal source bars" className="ambient-data-loom">
-      {LOOM_ROWS.map((row) => (
+      {rows.map((row) => (
         <div
           className={row.hot ? "ambient-data-loom-row ambient-data-loom-row--hot" : "ambient-data-loom-row"}
           key={row.label}
@@ -586,12 +575,12 @@ function Loom() {
                 {
                   "--ambient-delay": row.delay,
                   "--ambient-duration": row.duration,
-                  "--ambient-width": `${row.value}%`,
+                  "--ambient-width": `${Math.min(100, Math.max(0, row.value))}%`,
                 } as CSSVars
               }
             />
           </span>
-          <span className="ambient-data-loom-value">{row.value}%</span>
+          <span className="ambient-data-loom-value">{load.ready ? pct(row.value) : "—"}</span>
         </div>
       ))}
     </section>
@@ -600,15 +589,19 @@ function Loom() {
 
 export function AmbientDataWidget() {
   const { size } = useWidget();
+  const load = useLoad();
+  // one variable drives every cell's pulse rate, so the whole mosaic speeds
+  // up together as the box gets busier
+  const tempo = { "--ambient-tempo": `${tempoSeconds(load.cpu).toFixed(2)}s` } as CSSVars;
 
   if (size === "S") {
     return (
-      <div className="ambient-data-root ambient-data-root--s">
+      <div className="ambient-data-root ambient-data-root--s" style={tempo}>
         <StyleBlock />
-        <Mosaic columns={4} count={16} />
+        <Mosaic columns={4} count={16} load={load.cpu} />
         <div className="ambient-data-s-stat">
-          <div className="block-value accent ambient-data-s-value">64%</div>
-          <div className="block-sub ambient-data-s-sub">avg load / 64 cells</div>
+          <div className="block-value accent ambient-data-s-value">{load.ready ? pct(load.cpu) : "—"}</div>
+          <div className="block-sub ambient-data-s-sub">cpu load / 16 cells</div>
         </div>
       </div>
     );
@@ -616,25 +609,25 @@ export function AmbientDataWidget() {
 
   if (size === "M") {
     return (
-      <div className="ambient-data-root ambient-data-root--m">
+      <div className="ambient-data-root ambient-data-root--m" style={tempo}>
         <StyleBlock />
-        <HeaderRow />
-        <Mosaic columns={8} count={32} scan />
-        <Readouts />
+        <HeaderRow load={load} />
+        <Mosaic columns={8} count={32} load={load.cpu} scan />
+        <Readouts load={load} />
       </div>
     );
   }
 
   return (
-    <div className="ambient-data-root ambient-data-root--l">
+    <div className="ambient-data-root ambient-data-root--l" style={tempo}>
       <StyleBlock />
-      <HeaderRow />
-      <Mosaic columns={8} count={64} scan />
-      <Readouts />
-      <Loom />
+      <HeaderRow load={load} />
+      <Mosaic columns={8} count={CELL_COUNT} load={load.cpu} scan />
+      <Readouts load={load} />
+      <Loom load={load} />
       <p className="block-sub ambient-data-caption">
-        Hot cells speed up as server pressure rises; cooler cells idle in longer stepped loops so
-        the tile feels alive without becoming noisy.
+        Live from this host. Each cell holds a fixed point on the 0-100 scale and lights up once CPU
+        load passes it, so the mosaic fills as pressure rises — and every cell pulses faster with it.
       </p>
     </div>
   );

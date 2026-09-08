@@ -10,6 +10,11 @@ import { join } from "path";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { lineSignalsLimit, type LimitReason } from "@/lib/widget-creator/limitDetection";
 
+import { modelArgs, DEFAULT_MODELS, type ModelDefaults } from "./models";
+import { readModelDefaults, saveUsage, resolveSession, saveSession } from "./runStore";
+import { EMPTY_USAGE, parseUsage, type UsageRun } from "./usage";
+import { requestSwitch } from "./switchApproval";
+
 const REPO_ROOT = process.cwd();
 
 export type SSEWriter = (data: string) => void;
@@ -33,7 +38,7 @@ function windowsPromptFileArg(sendablePrompt: string) {
 // back to the browser so the next refinement turn can use --resume instead
 // of re-sending the entire task prompt + authoring guide.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SESSION_KEYS = new Set(["session_id", "sessionId", "conversation_id", "conversationId"]);
+const SESSION_KEYS = new Set(["session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId"]);
 
 // Matches the normalized "[tool: Read] some/path" text every adapter's
 // parseChunk already produces for a Read/Glob/Grep call (case-insensitive —
@@ -68,8 +73,10 @@ function extractSessionIdFromLine(line: string): string | null {
   try { return findSessionId(JSON.parse(line)); } catch { return null; }
 }
 
-// --- Per-run options (only meaningful for the claude adapter) ---
+// --- Per-run model, stage and provider-specific session options ---
 export type HarnessOpts = {
+  models?: ModelDefaults;
+  stage?: UsageRun["stage"];
   /** Existing session ID — causes claude to use --resume instead of -p so
       the model continues from its prior context. */
   sessionId?: string;
@@ -108,7 +115,19 @@ export function runHarness(
       try { unlinkSync(path); } catch {}
     };
 
-    const isResume = adapter.id === "claude" && Boolean(opts?.sessionId);
+    const isResume = (adapter.id === "claude" || adapter.id === "codex") && Boolean(opts?.sessionId);
+    const choice = (opts?.models ?? DEFAULT_MODELS)[adapter.id];
+    const startedAt = new Date().toISOString();
+    let usage = { ...EMPTY_USAGE };
+    let actualModel = choice.model || "CLI default (not reported)";
+    let recorded = false;
+    const record = (status: UsageRun["status"]) => {
+      if (recorded) return;
+      recorded = true;
+      const run: UsageRun = { ...usage, id: randomUUID(), startedAt, durationMs: Date.now() - Date.parse(startedAt), harness: adapter.id, model: actualModel, stage: opts?.stage ?? "build", status };
+      sendEvent(write, "usage", run);
+      void saveUsage(run);
+    };
 
     // Resume turn → short instruction only (model already has full context
     // from turn 1, including the avn-widget-build skill it loaded then).
@@ -122,7 +141,7 @@ export function runHarness(
     sendEvent(write, "status", { type: "harness_start", harness: adapter.id });
 
     // Build args — claude gets dynamic session/system-prompt flags;
-    // codex/opencode use their static adapter.args unchanged.
+    // Codex also supports sessions and model flags; OpenCode retains its adapter args.
     let args: string[];
     if (adapter.id === "claude") {
       // Deny Read/Glob/Grep on every other widget's folder, allow only this
@@ -160,6 +179,10 @@ export function runHarness(
           ...toolScope,
         ];
       }
+    } else if (adapter.id === "codex") {
+      args = isResume
+        ? ["exec", "--sandbox", "workspace-write", "resume", "--json", ...modelArgs(adapter.id, choice), opts!.sessionId!, "-"]
+        : [...adapter.args, ...modelArgs(adapter.id, choice)];
     } else if (adapter.promptViaArg) {
       if (process.platform === "win32") {
         // Plain NutBot chat's opencode path has the same promptViaArg bug
@@ -181,6 +204,8 @@ export function runHarness(
       args = [...adapter.args];
     }
 
+    if (adapter.id === "claude") args.push(...modelArgs(adapter.id, choice));
+    if (signal.aborted) { record("aborted"); resolve({ status: "aborted" }); return; }
     const child = spawn(adapter.command, args, {
       cwd: REPO_ROOT,
       stdio: ["pipe", "pipe", "pipe"],
@@ -200,8 +225,11 @@ export function runHarness(
     let limitReason: LimitReason = null;
     let newSessionId: string | null = null;
     let buffer = "";
+    let stderrTail = "";
 
     function processLine(line: string) {
+      const reported = parseUsage(adapter.id, line);
+      if (reported) { usage = reported.usage; actualModel = reported.model ?? actualModel; }
       // Skip limit detection on frames carrying actual model/tool content —
       // generated code can legitimately mention "rate limit", "overloaded",
       // etc. as plain text, and checking the raw JSON-encoded line would fire
@@ -219,7 +247,7 @@ export function runHarness(
         if (reason) return;
         // Extract session ID from non-content frames (result/system frames)
         // so the browser can use --resume on the next refinement turn.
-        if (adapter.id === "claude" && !newSessionId) {
+        if ((adapter.id === "claude" || adapter.id === "codex") && !newSessionId) {
           const sid = extractSessionIdFromLine(line);
           if (sid) newSessionId = sid;
         }
@@ -261,6 +289,7 @@ export function runHarness(
 
     child.stderr.on("data", (data: Buffer) => {
       const text = data.toString();
+      stderrTail = (stderrTail + text).slice(-2000);
       const reason = lineSignalsLimit(text);
       if (reason && !limitReason) limitReason = reason;
     });
@@ -272,18 +301,23 @@ export function runHarness(
       // branch ran first, a user pressing stop would be treated as a harness
       // failure and spawn the next harness in the chain.
       if (signal.aborted) {
+        record("aborted");
         resolve({ status: "aborted" });
       } else if (limitReason) {
+        record("limit");
         resolve({ status: "limit", limitReason });
       } else if (code !== 0) {
+        record("error");
         // code === null means killed by an external signal (not our abort)
-        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}` });
+        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}${stderrTail.trim() ? `: ${stderrTail.trim()}` : ""}` });
       } else {
+        record("done");
         resolve({ status: "done", newSessionId: newSessionId ?? undefined });
       }
     });
 
     child.on("error", (err) => {
+      record("error");
       cleanupTempPrompt();
       const hint = (err as NodeJS.ErrnoException).code === "ENOENT"
         ? ` — is the "${adapter.command}" CLI installed and on PATH?`
@@ -292,9 +326,9 @@ export function runHarness(
       resolve({ status: "error" });
     });
 
-    signal.addEventListener("abort", () => {
-      child.kill("SIGTERM");
-    });
+    const abort = () => { child.kill("SIGTERM"); };
+    signal.addEventListener("abort", abort, { once: true });
+    child.once("close", () => signal.removeEventListener("abort", abort));
   });
 }
 
@@ -308,7 +342,7 @@ export function runHarness(
  *  continuation note so a fallback continues from the exact on-disk file state
  *  instead of re-discovering it with a burst of Read/find/grep/git calls.
  *
- *  Returns the claude session ID (if one was captured) so the browser can send
+ *  Returns the provider session ID (if captured) so the browser can send
  *  it back on the next refinement turn to use --resume. */
 export async function runHarnessChain(
   fullPrompt: string,
@@ -320,9 +354,10 @@ export async function runHarnessChain(
   opts?: HarnessOpts,
   /** widget slug this whole chain is scoped to — see runHarness's watchSlug */
   watchSlug?: string,
-): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string }> {
-  const startIdx = chain.indexOf(requestedHarness);
-  const orderedChain = startIdx >= 0 ? [...chain.slice(startIdx), ...chain.slice(0, startIdx)] : chain;
+): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string; harness?: HarnessId }> {
+  const models = opts?.models ?? await readModelDefaults();
+  const validSession = await resolveSession(opts?.sessionId, requestedHarness, models[requestedHarness]?.model ?? "");
+  const orderedChain = [requestedHarness, ...chain.filter((id) => id !== requestedHarness)].filter((id, i, ids) => Object.hasOwn(HARNESS_ADAPTERS, id) && ids.indexOf(id) === i);
 
   let continuationNote: string | undefined;
   let capturedSessionId: string | undefined;
@@ -338,13 +373,16 @@ export async function runHarnessChain(
 
     // opts (session resume) only apply to the first harness, and only until
     // the resume-retry below (if any) has consumed it once.
-    const harnessOpts = i === 0 && !resumeRetried ? opts : undefined;
+    const harnessOpts = { ...(i === 0 && !resumeRetried ? { ...opts, sessionId: validSession } : {}), models, stage: opts?.stage };
 
     const { status, limitReason, errorReason, newSessionId } = await runHarness(
       adapter, fullPrompt, write, signal, continuationNote, harnessOpts, watchSlug,
     );
 
-    if (newSessionId) capturedSessionId = newSessionId;
+    if (newSessionId) {
+      capturedSessionId = newSessionId;
+      await saveSession(newSessionId, harnessId, models[harnessId].model);
+    }
 
     // User stop — terminal. No switch/error events, and critically no
     // fallback: pressing stop must never spawn the next harness.
@@ -368,6 +406,13 @@ export async function runHarnessChain(
         const reason = status === "limit"
           ? (limitReason === "quota" ? "rate limit / quota reached" : limitReason === "overload" ? "upstream service overloaded (not your quota)" : "unknown")
           : errorReason ?? "failed to start";
+        const approved = await requestSwitch(signal, (id) => sendEvent(write, "switch_required", {
+          id, from: harnessId, to: nextId, reason, model: models[nextId].model || "CLI default",
+        }));
+        if (!approved || signal.aborted) {
+          sendEvent(write, "error", { message: "Provider switch cancelled or expired. Partial work is preserved; retry or choose a provider in model settings." });
+          return { outcome: "aborted" };
+        }
         sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
         if (status === "limit" || errorReason) {
           // The previous CLI actually ran (limit, or started-then-crashed) and
@@ -392,7 +437,7 @@ export async function runHarnessChain(
       }
       return { outcome: "failed" };
     }
-    return { outcome: "done", sessionId: capturedSessionId };
+    return { outcome: "done", sessionId: capturedSessionId, harness: harnessId };
   }
   return { outcome: "failed" };
 }

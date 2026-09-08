@@ -122,3 +122,104 @@
     align-items: flex-start;
   }
 }
+
+/* ─── about card ─────────────────────────────────────────────── */
+/* Keeps the .namecard shell classes above: globals.css hooks a dozen
+   behaviours off .namecard (focus mode, hover-expand, editing ring, drag
+   preview, scrollbars), so the structural class stays and the About-specific
+   content is layered on top. */
+
+.about-card {
+  align-items: flex-start;
+}
+
+.about-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.about-text {
+  margin: 0;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  max-width: 46ch;
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.about-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.about-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(130px, 100%), 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.about-stat {
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-nested);
+  box-shadow: 2px 2px 0 var(--shadow);
+}
+
+.about-stat-key {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.about-stat-value {
+  margin-top: 4px;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 1.35rem;
+  line-height: 1;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.about-stat-denom {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.about-stat-sub {
+  margin-top: 4px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.6rem;
+  line-height: 1.3;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+@container widget (max-width: 420px) {
+  .about-stats {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,18 +7,23 @@ export type HubDialogConfig = {
   body: string;
   confirmLabel?: string;
   onConfirm: () => void;
+  onCancel?: () => void;
 };
 
 let _config: HubDialogConfig | null = null;
 let _listeners: (() => void)[] = [];
 
 export function showHubDialog(config: HubDialogConfig) {
+  const previous = _config;
   _config = config;
+  previous?.onCancel?.();
   _listeners.forEach((fn) => fn());
 }
 
-export function dismissHubDialog() {
+export function dismissHubDialog(confirmed = false) {
+  const previous = _config;
   _config = null;
+  if (!confirmed) previous?.onCancel?.();
   _listeners.forEach((fn) => fn());
 }
 

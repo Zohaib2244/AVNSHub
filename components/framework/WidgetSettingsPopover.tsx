@@ -34,6 +34,25 @@ function SchemaField({
           <input type="checkbox" checked={value === true} onChange={(e) => onChange(e.target.checked)} />
         </label>
       );
+    case "segment":
+      return (
+        <div className="wset-row">
+          <span>{field.label}</span>
+          <div className="seg-row">
+            {field.options.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                className={`seg-btn${String(value) === o.value ? " active" : ""}`}
+                aria-pressed={String(value) === o.value}
+                onClick={() => onChange(o.value)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
     case "select":
       return (
         <label className="wset-row">
@@ -101,6 +120,14 @@ export function WidgetSettingsPopover({
   const { updateInstance } = useLayout();
   const panelRef = useRef<HTMLDivElement>(null);
 
+  // A customHeader widget draws its own header, so the shell never renders the
+  // name/icon at all and the headerStyle control would do nothing — drop it
+  // rather than offer a dead three-way toggle. plainChrome widgets (the
+  // namecard) still get it: they skip the card chrome but not the header.
+  const frameworkFields = manifest.flags?.customHeader
+    ? FRAMEWORK_SETTINGS.filter((f) => f.key !== "headerStyle")
+    : FRAMEWORK_SETTINGS;
+
   function updateSettings(settings: SettingsValues) {
     if (onUpdateSettings) onUpdateSettings(settings);
     else updateInstance(instance.id, { settings });
@@ -142,7 +169,7 @@ export function WidgetSettingsPopover({
 
 
       <div className="wset-section">interaction</div>
-      {FRAMEWORK_SETTINGS.map((field) => (
+      {frameworkFields.map((field) => (
         <SchemaField
           key={field.key}
           field={field}

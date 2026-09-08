@@ -10,6 +10,8 @@ import { buildWidgetCatalogSection } from "@/lib/widget-creator/widgetCatalog";
 
 export const dynamic = "force-dynamic";
 
+import { readModelDefaults, resolveSession } from "@/lib/widget-creator/runStore";
+
 const REPO_ROOT = process.cwd();
 
 // Product/layout context for the brainstorming step (Slot Layout regions,
@@ -96,10 +98,15 @@ export async function POST(req: Request) {
     );
   }
 
+  if (!["claude", "codex", "opencode"].includes(harness)) return Response.json({ error: "Invalid provider" }, { status: 400 });
+  const modelChoice = (await readModelDefaults())[harness];
+  const validSession = await resolveSession(sessionId, harness, modelChoice.model);
   const stream = streamHarnessChat({
+    modelChoice,
+    stage: "plan",
     harness,
     message,
-    sessionId,
+    sessionId: validSession,
     persona: buildPlanPersona(harness),
     history,
   });

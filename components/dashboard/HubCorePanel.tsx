@@ -13,7 +13,9 @@ import {
   ChevronDown,
   Download,
   Droplets,
+  EyeOff,
   Ghost,
+  IdCard,
   ImageOff,
   ImagePlus,
   LayoutGrid,
@@ -28,10 +30,13 @@ import {
   Square,
   Sun,
   SunMoon,
+  Tag,
   Trash2,
   Upload,
   Wrench,
 } from "lucide-react";
+import { getHeaderStyle, getServerHeaderStyle, setHeaderStyle, subscribeHeaderStyle } from "@/lib/headerStyle";
+import { type HeaderStyle } from "@/config/widgets";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { CanvasGlyph, CanvasSwitcher } from "@/components/dashboard/CanvasSwitcher";
 import { CanvasIconPicker } from "@/components/dashboard/CanvasIconPicker";
@@ -368,6 +373,38 @@ function BackdropModeRow({
   );
 }
 
+const HEADER_STYLE_OPTIONS: { style: HeaderStyle; Icon: typeof Square; label: string }[] = [
+  { style: "ghost", Icon: EyeOff, label: "ghost" },
+  { style: "stamp", Icon: Tag, label: "stamp" },
+  { style: "crest", Icon: IdCard, label: "crest" },
+];
+
+/** canvas-wide default for widget name & icon — the value every widget left on
+    "auto" inherits (each can still override it in its own gear popover) */
+function HeaderStyleRow({ canvasId }: { canvasId: string }) {
+  const style = useSyncExternalStore(
+    subscribeHeaderStyle,
+    () => getHeaderStyle(canvasId),
+    getServerHeaderStyle,
+  );
+  return (
+    <div className="seg-row hub-theme-row">
+      {HEADER_STYLE_OPTIONS.map(({ style: s, Icon, label }) => (
+        <button
+          key={s}
+          type="button"
+          className={`seg-btn${style === s ? " active" : ""}`}
+          onClick={() => setHeaderStyle(canvasId, s)}
+          aria-pressed={style === s}
+        >
+          <Icon size={12} strokeWidth={1.75} />
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function WallpaperPicker({ canvasId }: { canvasId: string }) {
   const url = useSyncExternalStore(subscribeWallpaper, () => getWallpaperUrl(canvasId), getServerWallpaperUrl);
   const kind = useSyncExternalStore(subscribeWallpaper, () => getWallpaperKind(canvasId), getServerWallpaperKind);
@@ -471,6 +508,10 @@ function AppearanceSettings() {
           getServerMode={getServerWidgetBackdropMode}
           setMode={(mode) => setWidgetBackdropMode(activeId, mode)}
         />
+      </div>
+      <div className="hub-setting-stack">
+        <span className="hub-setting-label">widget name &amp; icon</span>
+        <HeaderStyleRow canvasId={activeId} />
       </div>
     </div>
   );
@@ -586,6 +627,14 @@ function GeneralSettings() {
           type="checkbox"
           checked={prefs.bootSequence}
           onChange={(e) => setPrefs({ bootSequence: e.target.checked })}
+        />
+      </label>
+      <label className="wset-row">
+        <span>boot chime</span>
+        <input
+          type="checkbox"
+          checked={prefs.bootChime}
+          onChange={(e) => setPrefs({ bootChime: e.target.checked })}
         />
       </label>
       <button type="button" className="wset-hide-btn hub-reset" onClick={resetAll}>

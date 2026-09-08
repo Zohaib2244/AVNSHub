@@ -7,10 +7,10 @@ import "./chat/NutBotChat.css";
 // Visited tabs stay mounted (display:none when inactive) so ptys and streams survive tab switches.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
-import { NutBotModelPicker } from "@/components/widgets/default/nutbot/NutBotModelPicker";
+import { ModelSettings } from "@/components/widgets/default/nutbot/ModelSettings";
 import { ShellsScreen } from "@/components/widgets/default/nutbot/ShellsScreen";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
@@ -25,7 +25,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.3 ready",
+  "[info] nutbot v2.4 ready",
 ];
 
 type MainTab = "log" | "chat" | "shells" | "creator";
@@ -59,7 +59,7 @@ export function NutBotTerminal() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isFocusMode) exitFocusMode();
+      if (e.key === "Escape" && isFocusMode && !document.querySelector("dialog[open]")) exitFocusMode();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -82,6 +82,12 @@ export function NutBotTerminal() {
   }, []);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
+  // `activeTab` is what the user clicked (drives the tab bar's highlight, so it
+  // reacts instantly); `displayedTab` is what the body is actually showing.
+  // They diverge only for the ~110ms fade-out below.
+  const [displayedTab, setDisplayedTab] = useState<MainTab>("log");
+  const [tabPhase, setTabPhase] = useState<"idle" | "out">("idle");
+  const reduceMotion = useReducedMotion();
   const [mountedTabs, setMountedTabs] = useState<Set<MainTab>>(() => new Set(["log"]));
   const skipTabWrite = useRef(true);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -93,7 +99,9 @@ export function NutBotTerminal() {
       const tab = sanitizeTab(stored);
       t = window.setTimeout(() => {
         skipTabWrite.current = false;
+        // restore straight to the stored tab — no fade from "log" on load
         setActiveTab(tab);
+        setDisplayedTab(tab);
       }, 0);
     } catch {
       skipTabWrite.current = false;
@@ -106,14 +114,47 @@ export function NutBotTerminal() {
     try { sessionStorage.setItem(NUTBOT_TAB_KEY, activeTab); } catch {}
   }, [activeTab]);
 
-  useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [logLines, activeTab]);
+  // Tab switches run fade-out -> swap -> fade-in, NOT a crossfade. The body
+  // restyles per tab (block vs flex, 7px/8px/0 padding, overflow auto vs
+  // hidden), so any moment with two panels visible re-lays-out the outgoing
+  // one under the incoming tab's container rules — that snap was the jank.
+  // Swapping while everything is at opacity 0 hides the restyle completely,
+  // and means exactly one panel is ever in flow.
+  function selectTab(tab: MainTab) {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    // clicking back to the panel that's still on screen mid-fade cancels the
+    // fade-out instead of completing it and blinking the same tab back in
+    setTabPhase(tab === displayedTab ? "idle" : "out");
+  }
 
-  const isShells   = activeTab === "shells";
-  const isCreator  = activeTab === "creator";
-  const isChat     = activeTab === "chat";
-  const activeTabIndex = TAB_ORDER.indexOf(activeTab);
+  // Failsafe: onAnimationComplete is the normal way out of the "out" phase,
+  // but it never fires if the element is hidden mid-flight (widget resized to
+  // S, canvas switched). Without this the body would stay blank.
+  useEffect(() => {
+    if (tabPhase !== "out") return;
+    const t = window.setTimeout(() => {
+      setDisplayedTab(activeTab);
+      setTabPhase("idle");
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [tabPhase, activeTab]);
+
+  // Only the log tab is a scrolling feed that should pin to the bottom. Firing
+  // this for every tab yanked chat/creator/shells to the bottom on each switch.
+  useEffect(() => {
+    if (displayedTab !== "log") return;
+    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
+  }, [logLines, displayedTab]);
+
+  // deliberately keyed to displayedTab, not activeTab — see the fade-out effect
+  const isShells   = displayedTab === "shells";
+  const isCreator  = displayedTab === "creator";
+  const isChat     = displayedTab === "chat";
+  // which way the new tab lies relative to the old one, so the fade carries a
+  // small directional nudge instead of blinking in place
+  const switchDir =
+    Math.sign(TAB_ORDER.indexOf(activeTab) - TAB_ORDER.indexOf(displayedTab)) || 1;
 
   if (!mountedTabs.has(activeTab)) {
     const next = new Set(mountedTabs);
@@ -121,64 +162,37 @@ export function NutBotTerminal() {
     setMountedTabs(next);
   }
 
-  function panelAnimate(tab: MainTab) {
-    if (tab === activeTab) return { opacity: 1, x: 0, display: "flex" };
-    return {
-      opacity: 0,
-      x: 10 * Math.sign(TAB_ORDER.indexOf(tab) - activeTabIndex),
-      transitionEnd: { display: "none" },
-    };
-  }
-
   return (
     <div className="nutbot-terminal">
-      {/* ── single combined row: title + tabs + controls ── */}
-      <div className="term-row">
-        <span className="term-title">NUTBOT V2.3</span>
-
-        <div className="term-tabs">
-          {(["log", "chat", "shells", "creator"] as MainTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={`term-tab${activeTab === tab ? " active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {/* sliding background pill — layoutId makes Framer animate it between tabs */}
-              {activeTab === tab && (
-                <motion.div
-                  layoutId="term-tab-bg"
-                  className="term-tab-bg"
-                  transition={{ type: "spring", stiffness: 500, damping: 32, mass: 0.6 }}
-                />
-              )}
-              <span className="term-tab-content">
-                {tab === "log"     && <span className="term-tab-icon">◈</span>}
-                {tab === "chat"    && <span className="term-tab-icon">◎</span>}
-                {tab === "shells"  && <span className="term-tab-icon">⌨</span>}
-                {tab === "creator" && <span className="term-tab-icon">✦</span>}
-                {tab}
-              </span>
+      <header className="term-header">
+        <div className="term-toolbar">
+          <div className="term-identity">
+            <div className="nutbot-v2-scale nutbot-v2-scale-nano" aria-hidden="true"><NutBotFaceV2 compact /></div>
+            <span className="term-title">NUTBOT <span className="term-version">v2.4</span></span>
+          </div>
+          <div className="term-actions">
+            <ModelSettings />
+            <button type="button" className={`term-focus-btn${isFocusMode ? " active" : ""}`}
+              onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
+              aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
+              title={isFocusMode ? "exit focus mode (Esc)" : "expand NutBot"}>
+              {isFocusMode ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
             </button>
-          ))}
-        </div>
-
-        <div className="term-row-right">
-          <NutBotModelPicker />
-          <button
-            type="button"
-            className={`term-focus-btn${isFocusMode ? " active" : ""}`}
-            onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
-            aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
-            title={isFocusMode ? "exit focus mode (Esc)" : "focus mode"}
-          >
-            {isFocusMode ? <Minimize2 size={11} strokeWidth={2} /> : <Maximize2 size={11} strokeWidth={2} />}
-          </button>
-          <div className="nutbot-v2-scale nutbot-v2-scale-nano">
-            <NutBotFaceV2 compact />
           </div>
         </div>
-      </div>
+        <nav className="term-tabs" aria-label="NutBot views">
+          {TAB_ORDER.map((tab) => <button key={tab} type="button"
+            className={`term-tab${activeTab === tab ? " active" : ""}`}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onClick={() => selectTab(tab)}>
+            <span className="term-tab-bg" aria-hidden="true" />
+            <span className="term-tab-content">
+              <span className="term-tab-icon" aria-hidden="true">{{ log: "◈", chat: "◎", shells: "⌨", creator: "✦" }[tab]}</span>
+              {tab}
+            </span>
+          </button>)}
+        </nav>
+      </header>
 
       {/* ── body ── */}
       <div
@@ -194,9 +208,28 @@ export function NutBotTerminal() {
           <motion.div
             key={tab}
             className="term-tab-panel"
+            /* `display` is plain style, never animated. The old code drove it
+               through framer's transitionEnd, which raced on fast switching and
+               left panels stacked in normal flow. */
+            style={tab === displayedTab ? undefined : { display: "none" }}
+            aria-hidden={tab === displayedTab ? undefined : true}
             initial={false}
-            animate={panelAnimate(tab)}
-            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            animate={
+              tab === displayedTab
+                ? (tabPhase === "idle"
+                    ? { opacity: 1, x: 0 }
+                    : { opacity: 0, x: -6 * switchDir })
+                : { opacity: 0, x: 6 * switchDir }
+            }
+            transition={{
+              duration: reduceMotion ? 0 : tabPhase === "out" ? 0.11 : 0.17,
+              ease: tabPhase === "out" ? [0.4, 0, 1, 1] : [0, 0, 0.2, 1],
+            }}
+            onAnimationComplete={() => {
+              if (tab !== displayedTab || tabPhase !== "out") return;
+              setDisplayedTab(activeTab);
+              setTabPhase("idle");
+            }}
           >
             {tab === "log" && (
               <>

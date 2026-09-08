@@ -1,0 +1,37 @@
+[Unit]
+Description=AVN Hub — avns2 homepage dashboard (Next.js dev-server runtime)
+Documentation=file:///home/nutmag2469/avnhub/docs/SETUP.md
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=nutmag2469
+Group=nutmag2469
+WorkingDirectory=/home/nutmag2469/avnhub
+
+# AVN Hub deliberately runs `next dev` as its real runtime: the NutBot widget
+# creator writes .tsx into the source tree and relies on HMR + tsc.
+# See docs/SETUP.md > Runtime Model.
+Environment=NODE_ENV=development
+Environment=HOME=/home/nutmag2469
+# The widget creator and NutBot chat shell out to these CLI harnesses, so their
+# install dirs must be on the unit's PATH (systemd does not read .bashrc).
+Environment=PATH=/home/nutmag2469/.local/bin:/home/nutmag2469/.opencode/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+ExecStart=/usr/bin/npm run dev -- -H 0.0.0.0 -p 2469
+
+Restart=on-failure
+RestartSec=10
+# `predev` runs prisma generate + migrate deploy before the server starts; give
+# it room on a cold boot before systemd calls the start a failure.
+TimeoutStartSec=180
+KillMode=mixed
+KillSignal=SIGINT
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=avn-hub
+
+[Install]
+WantedBy=multi-user.target

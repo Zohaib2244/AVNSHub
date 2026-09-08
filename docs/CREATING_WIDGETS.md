@@ -891,3 +891,8 @@ doesn't read) to both see it. That's exactly why `avn-widget-build` and
 A harness only pays for a skill's full body once it actually loads it —
 until then it only sees the `name` + `description`, so keep the description
 specific enough that a harness can tell when it applies without guessing.
+
+
+## NutBot v2.4 generation controls
+
+The Models menu saves Claude/Codex model defaults and shows usage by generation stage. Provider fallback requires confirmation. Claude and Codex build sessions survive compiler failures; outstanding diagnostics accompany the next repair request. See [NutBot models and usage](NUTBOT_MODELS.md) for session and subscription accounting details.

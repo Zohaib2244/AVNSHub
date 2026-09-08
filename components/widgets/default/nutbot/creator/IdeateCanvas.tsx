@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmProviderSwitch } from "@/lib/widget-creator/confirmSwitch";
+
 import { useEffect, useRef, useState } from "react";
 import { Send, Square, RefreshCw, Hammer, Plus, Minus, Map, Maximize2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -111,6 +113,8 @@ async function streamIdeate(
         } else if (type === "done") {
           result = { ok: true, variations: payload.variations as string[] };
         }
+      } else if (event === "switch_required") {
+        confirmProviderSwitch(payload, signal);
       } else if (event === "switch") {
         onSwitch(payload.from as HarnessId, payload.to as HarnessId, payload.reason as string);
       } else if (event === "error") {

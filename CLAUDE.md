@@ -129,66 +129,6 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 
 ---
 
-## Project Structure
-```
-/
-â”œâ”€â”€ app/
-â”‚   â”œâ”€â”€ page.tsx              # BootSequence + GlyphStrip + LayoutProvider/Dashboard
-â”‚   â”œâ”€â”€ layout.tsx            # Root layout, fonts, pre-paint theme/palette script
-â”‚   â””â”€â”€ api/                  # Proxy routes (hide all API keys)
-â”‚       â”œâ”€â”€ now-playing/  currently-playing/  steam-library/  spotify-control/
-â”‚       â”œâ”€â”€ homelab/  homelab-v2/  system-stats/  uptime/
-â”‚       â”œâ”€â”€ github-activity/  github-repos/
-â”‚       â””â”€â”€ widget-creator/   # generate/edit/delete/export/import/harnesses
-â”œâ”€â”€ components/
-â”‚   â”œâ”€â”€ framework/            # THE widget framework â€” touch with care
-â”‚   â”‚   â”œâ”€â”€ WidgetShell.tsx   # card chrome + label + detail-at-L (no expansion)
-â”‚   â”‚   â”œâ”€â”€ WidgetContext.tsx # useWidget() â€” { id, size, orientation, settings }
-â”‚   â”‚   â””â”€â”€ WidgetSettingsPopover.tsx  # gear popover (placement + schema form)
-â”‚   â”œâ”€â”€ widgets/default/      # built-in widgets, one subfolder per module
-â”‚   â”‚   â””â”€â”€ ambient/AmbientSoundWidget.tsx
-â”‚   â”œâ”€â”€ dashboard/
-â”‚   â”‚   â”œâ”€â”€ SlotDashboard.tsx     # Slot Layout grid + dnd-kit + edit mode
-â”‚   â”‚   â”œâ”€â”€ LayoutProvider.tsx    # layout store context (instances, editMode)
-â”‚   â”‚   â”œâ”€â”€ HubCorePanel.tsx      # settings/widget-manager edge tabs
-â”‚   â”‚   â”œâ”€â”€ CanvasSwitcher.tsx    # AVN Hub Canvases edge pill stack
-â”‚   â”‚   â””â”€â”€ WallpaperLayer.tsx    # BG image/video layer + mouse parallax
-â”‚   â”œâ”€â”€ NutBotTerminal.tsx    # tabs (log/real shells/creator)/xterm â€” rendered by nutbot at L
-â”‚   â””â”€â”€ *.tsx                 # widget content components (no shell markup)
-â”œâ”€â”€ config/
-â”‚   â”œâ”€â”€ widgets.tsx           # WIDGETS manifest registry + SPAN_MAP + DEFAULT_ORDER
-â”‚   â”œâ”€â”€ themes.ts             # theme pack metadata (tokens live in globals.css)
-â”‚   â””â”€â”€ canvasIcons.ts        # curated Lucide set for canvas pill icons
-â”œâ”€â”€ lib/
-â”‚   â”œâ”€â”€ layout.ts             # layout store v2 (instances, sanitize, v1 migration)
-â”‚   â”œâ”€â”€ slotLayout.ts         # Slot Layout region/placement store
-â”‚   â”œâ”€â”€ canvases.ts           # AVN Hub Canvases store + canvasScopedKey()
-â”‚   â”œâ”€â”€ theme.ts              # mode (light/auto/dark) + palette stores, per-canvas
-â”‚   â”œâ”€â”€ wallpaper.ts          # BG image/video + canvas/widget backdrop modes + parallax, per-canvas
-â”‚   â”œâ”€â”€ idb.ts                # generic IndexedDB key/value blob store (wallpaper, ambient tracks, future)
-â”‚   â”œâ”€â”€ ambient.ts            # Ambient Sound presets (Web Audio synthesis) + custom track storage
-â”‚   â”œâ”€â”€ systemStats.ts        # real host CPU/mem/disk/network via `systeminformation`
-â”‚   â”œâ”€â”€ prefs.ts              # global prefs store (polling, boot sequence)
-â”‚   â”œâ”€â”€ usePolling.ts         # shared per-URL polling cache
-â”‚   â”œâ”€â”€ useGridColumns.ts     # breakpoint â†’ grid column count
-â”‚   â”œâ”€â”€ format.ts             # timeAgo / formatDuration / formatMins
-â”‚   â”œâ”€â”€ sessions.ts           # session tracker store
-â”‚   â””â”€â”€ spotify.ts  steam.ts  github.ts  homelab.ts   # server-side API clients
-â”œâ”€â”€ styles/
-â”‚   â””â”€â”€ globals.css           # tokens (+ theme packs), grid, card/per-size CSS, backdrop modes
-â”œâ”€â”€ docs/
-â”‚   â”œâ”€â”€ README.md             # Documentation map / table of contents
-â”‚   â”œâ”€â”€ SETUP.md              # Install, env vars, Docker, Tailscale, runtime model
-â”‚   â”œâ”€â”€ FEATURES.md           # Product tour and screenshots
-â”‚   â”œâ”€â”€ CREATING_WIDGETS.md   # widget authoring guide (humans + LLMs)
-â”‚   â”œâ”€â”€ NUTBOT_CHAT_SETUP.md  # optional Bonfire/local LLM + CLI chat fallback setup
-â”‚   â””â”€â”€ AVN_HUB.md            # Hub Core / layout / theme / persistence reference
-â”œâ”€â”€ CLAUDE.md                 # This file
-â””â”€â”€ .env.local                # All API keys â€” never commit this
-```
-
----
-
 ## API Routes â€” always proxy, never expose keys client-side
 
 All external API calls go through `/app/api/` routes. The client only ever calls internal Next.js endpoints. Never put API keys in client components.
@@ -213,7 +153,7 @@ Polling interval: 30s for Now Playing, 60s for everything else.
 > - Per-widget config (size, shape, hide, schema-driven settings) editable from the site, persisted to localStorage (v1 layouts migrate automatically)
 
 > **Expansion removed â†’ safe visual HOE model** (âœ… shipped)
-> - Ripped out all widget expansion (hover/grow/overlay): deleted `gridCascade.ts`, `WidgetFlyout`/`WidgetOverlay`/`MicroView`, the cascade/override/view-transition machinery, and the `expand`/`expandDirection`/`expandModes`/`expandedComponent` fields. (The hover system caused a reflow-oscillation loop.)
+> - Ripped out all widget expansion (hover/grow/overlay): deleted `gridCascade.ts`, `WidgetFlyout`/`WidgetOverlay`/`MicroView`, the cascade/override/view-transition machinery, and the `expand`/`expandDirection`/`expandModes`/`expandedComponent` fields.
 > - Widgets are **resize + rearrange** at the layout level; "more when bigger" is per-size markup (`useWidget().size`) or a manifest `detail` component rendered at L
 > - Slot Layout has an opt-in visual-only **Hover On Expand** preview driven by `lib/grid/hoverExpand.ts`, `SlotRegion`, and `SlotWidgetCell`: real transient preview boxes, no persisted hover mutation, no overlays, no neighbor cascade
 > - Widget add/remove moved into the Hub Core Widget Manager tab; NutBot renders its terminal at L; canvas appearance/prefs/reset controls live in Hub Core settings

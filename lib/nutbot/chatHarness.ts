@@ -2,7 +2,13 @@ import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { randomUUID } from "crypto";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 
+import { modelArgs, type ModelChoice } from "@/lib/widget-creator/models";
+import { saveUsage, saveSession } from "@/lib/widget-creator/runStore";
+import { EMPTY_USAGE, parseUsage, type UsageRun } from "@/lib/widget-creator/usage";
+
 type StreamHarnessChatOptions = {
+  modelChoice?: ModelChoice;
+  stage?: "chat" | "plan";
   harness: HarnessId;
   message: string;
   sessionId?: string | null;
@@ -56,7 +62,6 @@ function buildInvocation(
       "--verbose",
       "--tools",
       "",
-      "--bare",
     ];
 
     // --system-prompt only on the first turn — a --resume turn already has it
@@ -72,7 +77,7 @@ function buildInvocation(
 
     return {
       args,
-      prompt: message,
+      prompt: sessionId ? message : chatPrompt("", message, history),
       initialConversationId: conversationId,
     };
   }
@@ -82,7 +87,7 @@ function buildInvocation(
     const args = sessionId ? [...baseArgs, "resume", sessionId, "-"] : [...baseArgs, "-"];
     return {
       args,
-      prompt: chatPrompt(persona, message, sessionId ? [] : history),
+      prompt: sessionId ? message : chatPrompt(persona, message, history),
     };
   }
 
@@ -144,6 +149,20 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
     options.history,
   );
   const encoder = new TextEncoder();
+  const choice = options.modelChoice ?? { model: "", effort: "default" };
+  if (options.harness !== "opencode") {
+    const insertAt = options.harness === "claude" ? invocation.args.length : 1;
+    invocation.args.splice(insertAt, 0, ...modelArgs(options.harness, choice));
+  }
+  const startedAt = new Date().toISOString();
+  let usage = { ...EMPTY_USAGE };
+  let actualModel = choice.model || "CLI default (not reported)";
+  let recorded = false;
+  const record = (status: UsageRun["status"]) => {
+    if (recorded) return;
+    recorded = true;
+    void saveUsage({ ...usage, id: randomUUID(), startedAt, durationMs: Date.now() - Date.parse(startedAt), harness: options.harness, model: actualModel, stage: options.stage ?? "chat", status });
+  };
   let child: ChildProcessWithoutNullStreams | null = null;
   let finished = false;
 
@@ -152,6 +171,7 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
       let stdoutBuffer = "";
       let stderr = "";
       let conversationId = invocation.initialConversationId;
+      if (conversationId) void saveSession(conversationId, options.harness, choice.model);
       let sawToken = false;
 
       const emit = (type: string, data: unknown) => {
@@ -171,9 +191,14 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
       };
 
       const processLine = (line: string) => {
+        const reported = parseUsage(options.harness, line);
+        if (reported) { usage = reported.usage; actualModel = reported.model ?? actualModel; }
         if (!line.trim()) return;
         const sessionFromFrame = extractSessionId(line);
-        if (sessionFromFrame) conversationId = sessionFromFrame;
+        if (sessionFromFrame) {
+          conversationId = sessionFromFrame;
+          void saveSession(sessionFromFrame, options.harness, choice.model);
+        }
 
         const text = adapter.parseChunk(line);
         if (!text || text.trim().startsWith("[tool:")) return;
@@ -210,6 +235,7 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
 
       child.on("close", (code) => {
         if (stdoutBuffer) processLine(stdoutBuffer);
+        record(code === 0 ? "done" : "error");
 
         if (code !== 0) {
           const detail = stderrSummary(stderr);
@@ -227,6 +253,7 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
       });
 
       child.on("error", (error) => {
+        record("error");
         const hint = (error as NodeJS.ErrnoException).code === "ENOENT"
           ? ` Is the "${adapter.command}" CLI installed and on PATH?`
           : "";
@@ -235,6 +262,7 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
       });
     },
     cancel() {
+      record("aborted");
       finished = true;
       child?.kill("SIGTERM");
     },

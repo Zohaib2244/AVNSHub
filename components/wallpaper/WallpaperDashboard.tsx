@@ -13,7 +13,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 import { ClockWidget } from "@/components/widgets/default/identity/ClockWidget";
-import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
+import { AboutCard } from "@/components/widgets/default/identity/AboutCard";
 import { AudioPulse } from "@/components/widgets/default/audio/AudioPulse";
 import { AudioVisualizer } from "@/components/widgets/default/audio/AudioVisualizer";
 import { MediaNowPlaying } from "@/components/widgets/default/audio/MediaNowPlaying";
@@ -117,7 +117,7 @@ export function WallpaperDashboard() {
         }}
       >
         <Card id="identity" size="M" span="span 2">
-          <IdentityBlock />
+          <AboutCard />
         </Card>
         <Card id="clock" size="M" span="span 2">
           <ClockWidget />

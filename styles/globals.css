@@ -522,11 +522,13 @@ html[data-backdrop="glass"] .frame {
     width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
 }
 
-/* only hint the compositor while a hover-expand is actually in flight —
-   leaving will-change on every idle cell wastes memory for no benefit */
+/* No will-change here on purpose. It only promotes to a compositor layer for
+   transform/opacity/filter; on layout properties like left/top/width/height it
+   buys nothing and just holds layer memory. The transition above genuinely
+   relayouts each frame, so the win comes from *scoping* that work (see the
+   `contain` rules on .slot-cell .block below), not from a compositor hint. */
 .slot-region.hover-expanding .slot-cell {
   pointer-events: auto;
-  will-change: left, top, width, height;
 }
 
 .slot-cell.hover-expanded {
@@ -872,6 +874,13 @@ html[data-backdrop="glass"] .frame {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
+  /* The cell animates left/top/width/height for 400ms on hover-expand, and
+     every frame of that is a real layout pass. `contain` walls that pass off
+     at the card boundary, so a widget's subtree can't push work back out into
+     the region/frame/page. `paint` is safe here because the card already
+     clips via overflow-y; `size` is deliberately NOT included, since these
+     cards must still take their height from the cell. */
+  contain: layout paint style;
 }
 
 .slot-cell .block:hover,
@@ -898,7 +907,6 @@ html[data-backdrop="glass"] .frame {
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   .slot-cell {
     transition: none;
-    will-change: auto;
   }
 
   .size-l-more-hoe {
@@ -1096,6 +1104,79 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   text-transform: uppercase;
   color: var(--text-muted);
   margin-bottom: 8px;
+}
+
+/* "crest" header style — the namecard's boxed identity mark + large DotGothic
+   title, reused as a widget header (see WidgetShell's headerStyle). Deliberately
+   mirrors .namecard-mark / .namecard-logo in IdentityBlock.css, scaled down to
+   sit inside a normal widget card rather than the full-width namecard. */
+.block-crest {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.block-crest-mark {
+  flex: none;
+  width: 36px;
+  min-height: 36px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-nested);
+  box-shadow: 2px 2px 0 var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--accent-orange);
+}
+
+.block-crest-mark span {
+  max-width: 100%;
+  padding: 0 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-cyan);
+}
+
+.block-crest-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 1.15rem;
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* narrow cards: drop the mark's initials and shrink the title so the crest
+   still fits a single S-size column instead of pushing content out */
+@container widget (max-width: 190px) {
+  .block-crest {
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+
+  .block-crest-mark {
+    width: 28px;
+    min-height: 28px;
+    border-radius: 7px;
+  }
+
+  .block-crest-mark span {
+    display: none;
+  }
+
+  .block-crest-title {
+    font-size: 0.95rem;
+  }
 }
 
 .block-value {
@@ -1428,7 +1509,8 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
     padding: 10px 8px;
   }
 
-  .capsule[data-size="S"] .block-label {
+  .capsule[data-size="S"] .block-label,
+  .capsule[data-size="S"] .block-crest {
     display: none;
   }
 

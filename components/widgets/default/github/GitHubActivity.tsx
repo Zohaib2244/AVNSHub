@@ -72,7 +72,7 @@ export function GitHubActivityMore() {
   const config = githubConfigFrom(settings);
   const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS, config);
   const [repos, setRepos] = useState<GitHubRepos>(null);
-  const [tab, setTab] = useState<Tab>("commits");
+  const [tab, setTab] = useState<Tab>("repos");
   const [copiedRepo, setCopiedRepo] = useState<string | null>(null);
 
   // only mounts at L size (the detail area), so this lazy-loads on first reveal.
@@ -100,17 +100,17 @@ export function GitHubActivityMore() {
       <div className="github-tabs">
         <button
           type="button"
-          className={`github-tab${tab === "commits" ? " active" : ""}`}
-          onClick={() => setTab("commits")}
-        >
-          commits
-        </button>
-        <button
-          type="button"
           className={`github-tab${tab === "repos" ? " active" : ""}`}
           onClick={() => setTab("repos")}
         >
           repos
+        </button>
+        <button
+          type="button"
+          className={`github-tab${tab === "commits" ? " active" : ""}`}
+          onClick={() => setTab("commits")}
+        >
+          commits
         </button>
       </div>
 

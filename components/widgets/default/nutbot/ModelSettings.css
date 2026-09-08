@@ -1,0 +1,52 @@
+.model-settings-trigger { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--bg-nested); color: var(--text-primary); font: inherit; font-size: 10px; cursor: pointer; }
+.model-settings-dialog { width: min(760px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); padding: 20px; border: 1.5px solid var(--border); border-radius: 14px; background: var(--bg-card); color: var(--text-primary); box-shadow: 5px 5px 0 var(--shadow); overflow: auto; margin: auto; font-family: var(--font-jetbrains-mono), monospace; font-size: 12px; }
+.model-settings-dialog::backdrop { background: var(--shadow); opacity: .75; }
+.model-settings-head, .model-settings-actions { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.model-settings-dialog h2, .model-settings-dialog h3, .model-settings-dialog legend { font-family: var(--font-dot-gothic), monospace; }
+.model-settings-dialog h2 { margin: 0; font-size: 20px; }
+.model-settings-dialog h3 { margin-top: 24px; }
+.model-settings-dialog p { color: var(--text-muted); line-height: 1.6; margin: 10px 0; }
+.model-settings-providers { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); gap: 12px; margin: 16px 0; }
+.model-settings-dialog fieldset { min-width: 0; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px; }
+.model-settings-field { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; }
+.model-settings-dialog select, .model-settings-dialog input, .model-settings-dialog button { min-width: 0; max-width: 100%; border: 1.5px solid var(--border); border-radius: 6px; padding: 8px; background: var(--bg-nested); color: var(--text-primary); font: inherit; }
+.model-settings-dialog button { cursor: pointer; }
+.model-settings-dialog :disabled { opacity: .5; cursor: default; }
+.model-settings-dialog :focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 2px; }
+.model-settings-table { overflow-x: auto; max-height: 300px; }
+.model-settings-dialog table { border-collapse: collapse; width: 100%; font-size: 11px; }
+.model-settings-dialog th, .model-settings-dialog td { text-align: left; padding: 8px; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; min-width: 70px; }
+.model-settings-dialog [role=alert] { color: var(--accent-orange); }
+
+.model-usage-filter { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.model-settings-dialog .model-usage-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); transition: border-color .2s ease, color .2s ease, transform .2s ease; }
+.model-settings-dialog .model-usage-chip:hover { transform: translateY(-1px); border-color: var(--accent-orange); }
+.model-settings-dialog .model-usage-chip.selected { border-color: var(--accent-orange); color: var(--accent-orange); }
+.model-usage-count { padding: 1px 6px; border-radius: 999px; background: var(--bg-card); border: 1px solid var(--border); font-size: 9px; }
+.model-usage-scope { font-family: var(--font-jetbrains-mono), monospace; font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .08em; }
+
+.model-settings-trigger { transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; }
+.model-settings-trigger svg { transition: transform .35s cubic-bezier(.2,.8,.2,1); }
+.model-settings-trigger:hover { transform: translateY(-2px); box-shadow: 2px 3px 0 var(--shadow); border-color: var(--accent-orange); }
+.model-settings-trigger:hover svg { transform: rotate(18deg); }
+.model-settings-trigger:active { transform: translateY(0); box-shadow: none; }
+.model-settings-dialog[open] { animation: model-menu-enter .32s cubic-bezier(.16,1,.3,1) both; }
+.model-settings-dialog[open]::backdrop { animation: model-backdrop-enter .22s ease both; }
+.model-settings-dialog.closing { animation: model-menu-exit .22s cubic-bezier(.4,0,1,1) both; pointer-events: none; }
+.model-settings-dialog.closing::backdrop { animation: model-backdrop-exit .22s ease both; }
+.model-settings-providers fieldset { animation: model-card-enter .38s cubic-bezier(.16,1,.3,1) both; animation-delay: .045s; transition: border-color .2s ease; }
+.model-settings-providers fieldset:nth-child(2) { animation-delay: .09s; }
+.model-settings-providers fieldset:focus-within { border-color: var(--accent-orange); }
+.model-version { font-size: 10px; color: var(--accent-orange); padding: 3px 6px; border: 1px solid var(--border); border-radius: 5px; vertical-align: middle; }
+.model-save { display: inline-flex; align-items: center; gap: 6px; transition: background .2s ease, transform .2s ease; }
+.model-settings-dialog .model-save.saved { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+.model-save.saved svg { animation: model-saved .3s ease both; }
+.model-saving-icon { animation: model-spin 1s linear infinite; }
+@keyframes model-menu-enter { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes model-menu-exit { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(10px) scale(.98); } }
+@keyframes model-card-enter { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes model-backdrop-enter { from { opacity: 0; } to { opacity: .75; } }
+@keyframes model-backdrop-exit { from { opacity: .75; } to { opacity: 0; } }
+@keyframes model-saved { from { transform: scale(.4) rotate(-25deg); } to { transform: scale(1) rotate(0); } }
+@keyframes model-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .model-settings-dialog, .model-settings-dialog::backdrop, .model-settings-providers fieldset, .model-save svg { animation: none !important; } .model-settings-trigger, .model-settings-trigger svg, .model-save, .model-settings-providers fieldset, .model-settings-dialog .model-usage-chip { transition: none; } .model-settings-dialog .model-usage-chip:hover { transform: none; } .model-settings-trigger:hover, .model-settings-trigger:hover svg { transform: none; } }

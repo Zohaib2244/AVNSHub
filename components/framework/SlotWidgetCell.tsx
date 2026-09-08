@@ -170,8 +170,24 @@ export function SlotWidgetCell({
   const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
 
   const regionDims = getSlotLayout().regionDims[instance.region];
+  // Footprint the widget's *content* is sized against — deliberately NOT the
+  // hover-expand visual rect.
+  //
+  // Hover On Expand is a transient preview: the cell's box grows, but the
+  // widget inside must keep rendering the same markup throughout. Feeding
+  // `visualRect` in here meant an expand that crossed into "L" swapped the
+  // per-size layout on the animation's very first frame — and because the two
+  // detail branches in WidgetShell are gated on `size === "L"` / `size !== "L"`,
+  // it also unmounted the always-mounted HOE panel and mounted a fresh
+  // <Detail /> in its place. That is the exact mount/unmount pop the HOE panel
+  // exists to avoid, and it landed a full subtree mount (for NutBot, the whole
+  // terminal) on the frame where smoothness matters most.
+  //
+  // A drag-resize still feeds it: that gesture really is changing the
+  // footprint, so re-laying-out as the user drags is the correct feedback.
+  const contentRect: Rect = previewRect ?? persistedRect;
   const { size, orientation } = sizeClassForFootprint(
-    { colSpan: rect.colSpan, rowSpan: rect.rowSpan },
+    { colSpan: contentRect.colSpan, rowSpan: contentRect.rowSpan },
     regionDims,
     manifest.sizes,
     manifest.orientations,

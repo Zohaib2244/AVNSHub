@@ -6,7 +6,7 @@ import {
   Cpu,
   GitCommitHorizontal,
   HardDrive,
-  IdCard,
+  Info,
   Music,
   Network,
   Server,
@@ -20,7 +20,7 @@ import { ServerStats, ServerStatsMore } from "@/components/widgets/default/homel
 import { DiskStorage, DiskStorageMore } from "@/components/widgets/default/homelab/DiskStorage";
 import { NetworkStats, NetworkStatsMore } from "@/components/widgets/default/homelab/NetworkStats";
 import { NutBotFaceWidget } from "@/components/widgets/default/nutbot/NutBotFaceWidget";
-import { IdentityBlock } from "@/components/widgets/default/identity/IdentityBlock";
+import { AboutCard } from "@/components/widgets/default/identity/AboutCard";
 import { NowPlaying } from "@/components/widgets/default/media/NowPlaying";
 import { GitHubActivity, GitHubActivityMore } from "@/components/widgets/default/github/GitHubActivity";
 import { NotesWidget } from "@/components/widgets/default/notes/NotesWidget";
@@ -48,6 +48,11 @@ export type Orientation = "h" | "v";
 export type SettingsField =
   | { key: string; label: string; type: "toggle"; default: boolean }
   | { key: string; label: string; type: "select"; default: string; options: { value: string; label: string }[] }
+  // "segment" is a string value with a small fixed set of choices, rendered as
+  // an inline segmented control instead of a dropdown. Use it when there are
+  // ~2-4 options worth showing at a glance; "select" stays right for longer
+  // lists. Validated exactly like "select".
+  | { key: string; label: string; type: "segment"; default: string; options: { value: string; label: string }[] }
   | { key: string; label: string; type: "text"; default: string; placeholder?: string }
   // "password" is a text value rendered with a masked input — use it for API
   // keys/tokens/secrets entered in widget settings (stored client-side in the
@@ -56,6 +61,28 @@ export type SettingsField =
   | { key: string; label: string; type: "number"; default: number; min?: number; max?: number };
 
 export type SettingsValues = Record<string, string | number | boolean>;
+
+/** how a widget renders its own name + icon at the top of the card:
+    ghost = nothing at all, stamp = the small uppercase label bar, crest =
+    the boxed identity mark + large title borrowed from the namecard */
+export type HeaderStyle = "ghost" | "stamp" | "crest";
+
+/** what a widget left on "auto" resolves to when the canvas has no stored
+    global default — also the value the server snapshot renders */
+export const DEFAULT_HEADER_STYLE: HeaderStyle = "stamp";
+
+export function isHeaderStyle(value: unknown): value is HeaderStyle {
+  return value === "ghost" || value === "stamp" || value === "crest";
+}
+
+/** derive namecard-style initials from a widget title ("system stats" -> "SS").
+    Falls back to the first two characters for single-word titles. */
+export function headerInitials(title: string): string {
+  const words = title.trim().split(/[\s_-]+/).filter(Boolean);
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+  return words.slice(0, 3).map((w) => w[0]).join("").toUpperCase();
+}
 
 export const FRAMEWORK_SETTINGS: SettingsField[] = [
   { key: "hoverExpand", label: "slot hover expand", type: "toggle", default: false },
@@ -83,7 +110,20 @@ export const FRAMEWORK_SETTINGS: SettingsField[] = [
       { value: "glass", label: "glass" },
     ],
   },
-  { key: "showHeader", label: "show name & icon", type: "toggle", default: true },
+  {
+    key: "headerStyle",
+    label: "name & icon",
+    type: "segment",
+    // "auto" inherits the canvas-wide default set in Hub Core > Appearance
+    // (lib/headerStyle.ts), exactly like cardBackdrop's "auto"
+    default: "auto",
+    options: [
+      { value: "auto", label: "auto" },
+      { value: "ghost", label: "ghost" },
+      { value: "stamp", label: "stamp" },
+      { value: "crest", label: "crest" },
+    ],
+  },
 ];
 
 export type WidgetManifest = {
@@ -120,15 +160,33 @@ export type WidgetManifest = {
   };
 };
 
+/** The three-way `headerStyle` replaced a boolean `showHeader`. Layouts saved
+    before that still carry the boolean, and it would fail resolveSettings'
+    typeof check and silently fall back to "stamp" — switching headers back ON
+    for every widget the user had deliberately stripped bare (and for the four
+    slot-layout defaults that ship headerless). Map it once here: this is the
+    single funnel both layout stores and the settings popover go through. */
+function migrateLegacySettings(stored?: SettingsValues): SettingsValues | undefined {
+  if (!stored || "headerStyle" in stored) return stored;
+  if (typeof stored.showHeader !== "boolean") return stored;
+  // true -> "auto", not "stamp": the global default IS "stamp", so the look is
+  // unchanged, but the widget now tracks the canvas dial instead of being
+  // pinned — otherwise every pre-existing widget would ignore the new global.
+  // false stays an explicit "ghost"; that was a deliberate opt-out.
+  return { ...stored, headerStyle: stored.showHeader ? "auto" : "ghost" };
+}
+
 /** manifest settings schema → default values, overlaid with stored values
-    (wrong types / unknown select options fall back to the field default) */
+    (wrong types / unknown select|segment options fall back to the field default) */
 export function resolveSettings(manifest: WidgetManifest, stored?: SettingsValues): SettingsValues {
   const values: SettingsValues = {};
+  const source = migrateLegacySettings(stored);
   for (const field of [...FRAMEWORK_SETTINGS, ...(manifest.settings ?? [])]) {
-    const saved = stored?.[field.key];
+    const saved = source?.[field.key];
     const valid =
       typeof saved === typeof field.default &&
-      (field.type !== "select" || field.options.some((o) => o.value === saved));
+      ((field.type !== "select" && field.type !== "segment") ||
+        field.options.some((o) => o.value === saved));
     values[field.key] = valid ? (saved as string | number | boolean) : field.default;
   }
   return values;
@@ -216,7 +274,7 @@ export const WIDGETS = {
   },
   nutbot: {
     id: "nutbot",
-    title: "nutbot v2.3",
+    title: "nutbot v2.4",
     icon: SquareTerminal,
     component: NutBotFaceWidget,
     sizes: ["S", "M", "L"],
@@ -224,11 +282,13 @@ export const WIDGETS = {
     defaults: { size: "S", orientation: "h" },
     flags: { className: "nutbot-block" },
   },
+  // id stays "identity" — it is the persistence key every saved layout and
+  // canvas already references; only the presentation is the About card.
   identity: {
     id: "identity",
-    title: "identity",
-    icon: IdCard,
-    component: IdentityBlock,
+    title: "about",
+    icon: Info,
+    component: AboutCard,
     sizes: ["M", "L"],
     orientations: ["h"],
     defaults: { size: "M", orientation: "h" },
@@ -236,6 +296,8 @@ export const WIDGETS = {
       { key: "displayName", label: "display name", type: "text", default: "AVN Hub", placeholder: "Name to show" },
       { key: "tagline", label: "tagline", type: "text", default: "front page to your life", placeholder: "Short tagline" },
       { key: "initials", label: "initials", type: "text", default: "AVN", placeholder: "AVN" },
+      { key: "aboutText", label: "about text", type: "text", default: "", placeholder: "Shown at L size" },
+      { key: "repoUrl", label: "source repo url", type: "text", default: "", placeholder: "https://github.com/…" },
     ],
     flags: { plainChrome: true },
   },

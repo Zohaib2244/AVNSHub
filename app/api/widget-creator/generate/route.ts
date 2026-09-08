@@ -1,4 +1,4 @@
-﻿import { spawn } from "child_process";
+import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
@@ -296,6 +296,8 @@ export async function POST(req: Request) {
         the model continues from its existing context instead of re-reading the
         full authoring guide + widget spec. Absent on the first turn. */
     sessionId?: string;
+    sessionHarness?: HarnessId;
+    repairErrors?: string[];
     /** carried over from the project's Plan-mode brief, if any — folded into
         the widget's SPEC.md so intent survives independent of the harness
         session or the browser's localStorage */
@@ -355,7 +357,8 @@ export async function POST(req: Request) {
     ...(settings.mImageRef ? [{ label: "M size visual reference", dataUrl: settings.mImageRef }] : []),
     ...(settings.lImageRef ? [{ label: "L size visual reference", dataUrl: settings.lImageRef }] : []),
   ]);
-  const promptWithImages = effectivePrompt + imageSection;
+  const repairErrors = Array.isArray(body.repairErrors) ? body.repairErrors.filter((e): e is string => typeof e === "string").slice(0, 20).map((e) => e.slice(0, 1000)) : [];
+  const promptWithImages = effectivePrompt + imageSection + (repairErrors.length ? "\n\nCompiler diagnostics from the previous attempt:\n" + repairErrors.join("\n") : "");
 
   const corePrompt = buildCorePrompt(settings, promptWithImages);
 
@@ -424,10 +427,12 @@ export async function POST(req: Request) {
         ? promptWithImages
         : undefined;
 
-      const { outcome, sessionId: outSessionId } = await runHarnessChain(
+      const { outcome, sessionId: outSessionId, harness: completedHarness } = await runHarnessChain(
         corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { sessionId: incomingSessionId, resumePrompt }, targetId || undefined,
+        { sessionId: (body.sessionHarness ?? "claude") === requestedHarness ? incomingSessionId : undefined, resumePrompt, stage: repairErrors.length ? "fix" : "build" }, targetId || undefined,
       );
+
+      if (outSessionId) sendEvent(write, "session", { sessionId: outSessionId, harness: completedHarness, slug: targetId });
 
       // Audit what the harness actually touched — the prompt tells it to stay
       // inside the widget's own folders, but bypassPermissions enforces
@@ -534,6 +539,7 @@ export async function POST(req: Request) {
               slug: doneSlug,
               registered: existedBeforeThisRun,
               sessionId: outSessionId,
+              harness: completedHarness,
             });
           }
         }
@@ -596,6 +602,6 @@ async function runTscCheck(targetId?: string): Promise<{ errors: string[] }> {
       }
     });
 
-    child.on("error", () => resolve({ errors: [] }));
+    child.on("error", () => resolve({ errors: ["TypeScript validation could not start. Check that the TypeScript toolchain is installed."] }));
   });
 }

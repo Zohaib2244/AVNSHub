@@ -9,6 +9,7 @@ export type Signal =
   | { type: "working" }
   | { type: "speaking" }
   | { type: "browsing" }
+  | { type: "boot_complete" }
   | null;
 
 let signal: Signal = null;
@@ -35,6 +36,7 @@ export function emitWorking()                 { emit({ type: "working" }, 120_00
 // Chat-specific signals — caller clears explicitly when the reply finishes
 export function emitSpeaking()                { emit({ type: "speaking" }, 120_000); }
 export function emitBrowsing()                { emit({ type: "browsing" }, 30_000); }
+export function emitBootComplete()            { emit({ type: "boot_complete" }, 3000); }
 
 export function clearSignal() {
   signal = null;
