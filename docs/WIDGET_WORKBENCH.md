@@ -76,11 +76,14 @@ content hashes instead of `git status`.
      live repo can't resume here).
    - Workbench exists → refresh every *non-owned* file from live (framework
      changes propagate). Owned files:
-     - draft == base (nothing pending) → take live's version, `base` = live.
-     - draft != base, live == base → keep the draft (a fix turn continues it).
-     - draft != base, live != base → the widget changed outside the creator
-       while a failed draft was pending: discard the draft, take live, and
-       tell the user.
+     compared per file against `base`:
+     - unchanged in the draft → take live's version (e.g. an `update-meta`
+       rename that happened between turns).
+     - changed in the draft, unchanged live → keep the draft (a fix turn
+       continues it).
+     - changed in both, differently → the widget was edited outside the creator
+       while a failed draft was pending: discard the whole draft, take live,
+       and tell the user.
 2. **snapshot** every workbench file's hash.
 3. **run** the harness chain with `cwd` = workbench tree.
 4. **diff** against the snapshot. Changes outside the owned paths are reverted
