@@ -1,6 +1,5 @@
-import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -11,19 +10,32 @@ import {
   findComponentModule,
   sanitizeComponentMap,
   registerCustomWidget,
+  syncComponentMapEntry,
   isValidCustomWidgetId,
 } from "@/lib/widget-creator/customRegistry";
 import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
-import { startComponentKeepAlive } from "@/lib/widget-creator/componentKeepAlive";
 import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
 import { snapshotGitStatus, unexpectedChanges } from "@/lib/widget-creator/gitAudit";
 import { readProjectSpec, writeProjectSpec, buildProjectSpecMarkdown, type ProjectSpecMeta } from "@/lib/widget-creator/projectSpec";
+import {
+  applyDeletes,
+  applyWrites,
+  commitBase,
+  planApply,
+  prepareWorkbench,
+  revertOutsideChanges,
+  runWorkbenchTsc,
+  snapshotTree,
+  workbenchCustomDir,
+} from "@/lib/widget-creator/workbench";
 
 const REPO_ROOT = process.cwd();
 
-function readExistingWidget(slug: string): string {
+/** the widget's .tsx sources as one annotated block — read from the widget's
+    workbench (its draft), not the live tree */
+function readExistingWidget(slug: string, customDir: string): string {
   try {
-    const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+    const dir = join(customDir, slug);
     const files = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
     return files.map((f) => `// ${f}\n${readFileSync(join(dir, f), "utf-8")}`).join("\n\n");
   } catch {
@@ -31,49 +43,12 @@ function readExistingWidget(slug: string): string {
   }
 }
 
-// --- Edit-mode file safety: backup before run, restore if .tsx goes missing --
-// The harness may delete a .tsx to "rewrite from scratch" and then get cut off
-// before writing the replacement (rate limit, error). The backup lets us put
-// the working file back so the site never reaches a "module not found" state.
-
-function backupWidgetFiles(slug: string): void {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx"))) {
-      copyFileSync(join(dir, f), join(dir, f + ".bak"));
-    }
-  } catch {}
-}
-
-// Restores a .tsx.bak → .tsx only when the .tsx is missing (file was deleted
-// by the harness but never replaced). If the .tsx still exists — even broken —
-// it's left alone so the next "fix" turn can repair it. Returns true if any
-// file was restored.
-function restoreMissingWidgetFiles(slug: string): boolean {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  let restored = false;
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
-      const tsx = join(dir, f.slice(0, -4)); // strip ".bak"
-      const bak = join(dir, f);
-      if (!existsSync(tsx)) {
-        copyFileSync(bak, tsx);
-        restored = true;
-      }
-      unlinkSync(bak);
-    }
-  } catch {}
-  return restored;
-}
-
-function deleteWidgetBackups(slug: string): void {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
-      unlinkSync(join(dir, f));
-    }
-  } catch {}
-}
+// All harness writes happen in the widget's workbench (lib/widget-creator/
+// workbench.ts, docs/WIDGET_WORKBENCH.md): a private mirror of the project
+// outside the repo. The live tree changes only when a finished draft passes
+// the TypeScript gate, so a half-written or deleted-then-re-added file can
+// never reach the dev server. This replaced the old .tsx.bak backups and the
+// componentKeepAlive watcher that raced Turbopack to undo deletions.
 
 // --- Attached image delivery -------------------------------------------
 // Data-URL images (chat attachments + the per-size visual refs) are written
@@ -120,14 +95,14 @@ function cleanupImageTempFiles(paths: string[]): void {
 // and opencode all discover and load project-local skills in their headless
 // invocation modes (verified directly against each CLI), so there's no need
 // to pass ~6K tokens of guide text on every single turn.
-function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string {
+function buildCorePrompt(settings: GenerateSettings, userPrompt: string, customDir: string): string {
   const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
   const slug = settings.editSlug ?? settings.slug ?? "";
   const comp = slug ? componentName(slug) : "<Pascal>Widget";
-  const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
-  const existingSpec = isEdit ? readProjectSpec(settings.editSlug!) : null;
+  const existingCode = isEdit ? readExistingWidget(settings.editSlug!, customDir) : "";
+  const existingSpec = isEdit ? readProjectSpec(settings.editSlug!, customDir) : null;
 
   // In edit mode the only settings that still apply are slug + the freeform
   // description/data fields actually describing this edit — name/icon/sizes/
@@ -236,7 +211,7 @@ ${userPrompt}
 ${isEdit ? `
 4. Overwrite \`components/widgets/custom/${settings.editSlug}/SPEC.md\` so it stays an accurate description of the widget after this edit (see the note about this above).
 ` : ""}
-Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work — a dev server for this project is very likely already running, and a competing build process can corrupt its \`.next\` cache or fight over the port. Verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Just write the files and stop — do not attempt to compile or run anything to check your own work.
+Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work. You are working in a private copy of the project; verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Only after that passes are your files copied into the live dashboard. Just write the files (using relative paths) and stop — do not attempt to compile or run anything to check your own work.
 
 Design rules to follow:
 - Use CSS variables for all colors: \`--text-primary\`, \`--text-muted\`, \`--accent-orange\`, \`--accent-cyan\`, \`--border\`, \`--bg-card\`, \`--bg-nested\`, \`--shadow\`
@@ -335,7 +310,10 @@ export async function POST(req: Request) {
   // registration branch below and could re-register over an already-working
   // widget's entry. Determined from registry state, not the client's flags.
   const targetId = settings.editSlug ?? settings.slug;
-  const existedBeforeThisRun = Boolean(targetId && readRegistry()[targetId]);
+  if (!targetId) {
+    return sseError("pick a widget name or slug before generating — the widget's workbench is keyed by it");
+  }
+  const existedBeforeThisRun = Boolean(readRegistry()[targetId]);
   if (!settings.editSlug && settings.slug && existedBeforeThisRun) {
     return sseError(`A widget with id "${settings.slug}" already exists. Switch to edit mode to modify it instead of creating a new one.`);
   }
@@ -360,8 +338,6 @@ export async function POST(req: Request) {
   ]);
   const repairErrors = Array.isArray(body.repairErrors) ? body.repairErrors.filter((e): e is string => typeof e === "string").slice(0, 20).map((e) => e.slice(0, 1000)) : [];
   const promptWithImages = effectivePrompt + imageSection + (repairErrors.length ? "\n\nCompiler diagnostics from the previous attempt:\n" + repairErrors.join("\n") : "");
-
-  const corePrompt = buildCorePrompt(settings, promptWithImages);
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
@@ -402,171 +378,143 @@ export async function POST(req: Request) {
         }
       };
 
-      // declared out here so the finally below can stop it
-      let stopKeepAlive: () => void = () => {};
-
       try {
 
-      // For edits: snapshot the existing .tsx files before spawning the harness.
-      // If the harness deletes the file to "rewrite from scratch" and then gets
-      // cut off (rate limit, error), restoreMissingWidgetFiles() puts the last
-      // working version back so the site never reaches "module not found".
-      if (existedBeforeThisRun && targetId) backupWidgetFiles(targetId);
+      // Prepare (or refresh) this widget's workbench under the lock, then build
+      // the prompt from its draft — on a fix turn that's the harness's own
+      // previous attempt, not the live version.
+      const ws = await prepareWorkbench(targetId);
+      const wbCustomDir = workbenchCustomDir(ws);
+      if (ws.discardedDraft) {
+        sendEvent(write, "chunk", {
+          text: `[workbench] "${targetId}" changed outside the creator while an unfinished draft was pending — the draft was discarded and this turn starts from the live version.\n`,
+        });
+      }
+      const corePrompt = buildCorePrompt(settings, promptWithImages, wbCustomDir);
 
-      // Backups alone only helped *after* the run — by which point a deleted
-      // .tsx had already 500'd the page, and the resulting disconnect had
-      // aborted the run mid-patch so the replacement never landed. Watch for
-      // the deletion instead and undo it within the same inotify tick, so the
-      // static import in customComponentMap.tsx never sees a missing file.
-      stopKeepAlive = existedBeforeThisRun && targetId
-        ? startComponentKeepAlive(
-            join(REPO_ROOT, "components/widgets/custom", targetId),
-            (file) => sendEvent(write, "chunk", {
-              text: `[guard] ${file} was deleted mid-run and has been restored from backup — rewrite files in place instead of deleting and re-adding them.\n`,
-            }),
-          )
-        : () => {};
-
-      // Write-audit snapshot — taken after sanitizeComponentMap() and the
-      // backups above so this run's own bookkeeping never shows up in the diff.
+      // Write-audit snapshot of the LIVE tree — the harness now works in the
+      // workbench, so any change here during the run is an absolute-path write
+      // that escaped it.
       const gitBefore = await snapshotGitStatus();
+      const treeBefore = snapshotTree(ws.tree);
 
-      // On a mid-run harness switch, hand the fallback whatever this widget's
-      // files currently hold on disk (empty until something is written) so it
-      // resumes from that exact state instead of re-discovering it with a burst
-      // of Read/find/grep/git calls.
-      const partialWork = targetId ? () => readExistingWidget(targetId) : undefined;
+      // On a mid-run harness switch, hand the fallback whatever the draft
+      // currently holds so it resumes from that exact state.
+      const partialWork = () => readExistingWidget(targetId, wbCustomDir);
 
-      // resumePrompt: for claude --resume turns the model already has full
-      // context, so just send the bare user instruction (plus any attached
-      // image pointers). Full prompt is still used for fallback harnesses
-      // that don't share the claude session.
-      const resumePrompt = incomingSessionId
-        ? promptWithImages
-        : undefined;
+      // Claude stores sessions per working directory, so a session started
+      // before this workbench existed (e.g. in the repo root) can't resume
+      // here — start fresh with the full prompt instead of failing the resume.
+      const sessionId = ws.created ? undefined : incomingSessionId;
+      const resumePrompt = sessionId ? promptWithImages : undefined;
 
       const { outcome, sessionId: outSessionId, harness: completedHarness } = await runHarnessChain(
         corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { sessionId: (body.sessionHarness ?? "claude") === requestedHarness ? incomingSessionId : undefined, resumePrompt, stage: repairErrors.length ? "fix" : "build" }, targetId || undefined,
+        { sessionId: (body.sessionHarness ?? "claude") === requestedHarness ? sessionId : undefined, resumePrompt, stage: repairErrors.length ? "fix" : "build", cwd: ws.tree }, targetId,
       );
 
       if (outSessionId) sendEvent(write, "session", { sessionId: outSessionId, harness: completedHarness, slug: targetId });
 
-      // Audit what the harness actually touched — the prompt tells it to stay
-      // inside the widget's own folders, but bypassPermissions enforces
-      // nothing. Runs before registration/SPEC writes so those never appear.
-      // A user abort skips it (a killed run's partial writes aren't a policy
-      // violation worth alarming about).
+      // Keep the mirror faithful: anything written outside the widget's own
+      // folders is put back and reported, never applied.
+      const outsideWorkbench = revertOutsideChanges(ws, treeBefore);
       if (outcome !== "aborted") {
         const gitAfter = await snapshotGitStatus();
-        const unexpected = unexpectedChanges(gitBefore, gitAfter, [
-          ...(targetId ? [`components/widgets/custom/${targetId}/`, `app/api/${targetId}/`] : []),
-          "config/customRegistry.json",
-          "config/customComponentMap.tsx",
-          ".nutbot-ideate/",
-        ]);
-        if (unexpected.length > 0) {
-          sendEvent(write, "audit", { unexpectedFiles: unexpected });
-        }
-      }
-
-      if (outcome !== "done") {
-        // Harness chain failed (or was stopped) — restore the backup so a
-        // previously working edit stays working rather than disappearing.
-        if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
+        const escaped = unexpectedChanges(gitBefore, gitAfter, [".nutbot-ideate/"]);
+        const unexpected = [...new Set([...outsideWorkbench, ...escaped])].sort();
+        if (unexpected.length > 0) sendEvent(write, "audit", { unexpectedFiles: unexpected });
       }
 
       if (outcome === "done") {
-        // done cleanly — the harness wrote the component + manifest.json.
-        // Whether to wire it into the registry now is driven by
-        // `existedBeforeThisRun` (actual prior registry state captured before
-        // any mutation), NOT `settings.editSlug` — a desynced/stale client
-        // flag must never be trusted here.
-        //
-        // - Already-committed widget (a real edit): re-register immediately.
-        //   This only rewrites customRegistry.json (JSON data), which Fast
-        //   Refresh hot-updates without a full reload, so it's safe to apply
-        //   mid-chat exactly like before.
-        // - Brand-new widget: do NOT register here. Wiring a new id into
-        //   customComponentMap.tsx is the one write Fast Refresh can't
-        //   hot-swap (full reload), which would tear down this SSE stream
-        //   before the "done" event below ever reaches the client — the
-        //   actual bug this split fixes. Registration for a new widget is
-        //   deferred to POST /api/widget-creator/register, fired by the
-        //   client's explicit "add to layout" click, so any number of
-        //   refinement turns in this chat can run reload-free first.
         let ok = true;
-        if (existedBeforeThisRun) {
-          const wired = registerCustomWidget({
-            id: targetId!,
-            name: settings.name,
-            icon: settings.icon,
-            sizes: settings.sizes,
-            orientations: settings.orientations,
-          });
-          if (!wired.ok) {
-            sendEvent(write, "error", { message: `widget generated but registration failed: ${wired.error}` });
-            ok = false;
-          }
-        } else if (!findComponentModule(targetId!)) {
-          sendEvent(write, "error", { message: `widget generated but no component .tsx file was created in components/widgets/custom/${targetId}/` });
+        if (!findComponentModule(targetId, wbCustomDir)) {
+          sendEvent(write, "error", { message: `no component .tsx file was written in components/widgets/custom/${targetId}/ — nothing was applied` });
           ok = false;
-        }
-
-        if (!ok && existedBeforeThisRun && targetId) {
-          // Registration failed or component file missing after a claimed-done run.
-          // Restore the backup so the site stays in a working state.
-          restoreMissingWidgetFiles(targetId);
         }
 
         if (ok) {
           sendEvent(write, "status", { type: "tsc_check" });
-          const tscResult = await runTscCheck(targetId);
+          const tscResult = await runWorkbenchTsc(ws);
           if (tscResult.errors.length > 0) {
+            // The draft stays in the workbench for the next fix turn; the live
+            // widget is untouched and keeps working.
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
-            // Restore the backup if the harness left the .tsx missing (deleted
-            // to rewrite but never finished). If the .tsx exists but is broken
-            // TypeScript, leave it on disk so the next "fix" turn can repair it.
-            if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
             sendEvent(write, "error", {
               message: existedBeforeThisRun
-                ? "TypeScript errors in edited code — check the errors above and re-submit to fix."
-                : "TypeScript errors in generated code — fix the errors above, then re-submit to try again.",
+                ? "TypeScript errors in the edited draft — nothing was applied, your widget is unchanged. Re-submit to fix."
+                : "TypeScript errors in the generated draft — fix the errors above, then re-submit to try again.",
             });
-          } else {
-            // tsc clean — safe to drop the safety backup
-            if (existedBeforeThisRun && targetId) deleteWidgetBackups(targetId);
-            const doneSlug = settings.editSlug ?? settings.slug ?? null;
-            // Write SPEC.md fresh only on the initial create — `settings` is
-            // accurate at that point. On an edit turn, `settings` still holds
-            // whatever per-size descriptions/notes were set back at Plan/Ideate
-            // time (never kept in sync with chat-only edits since), so
-            // regenerating SPEC.md from it here would re-bake stale text as
-            // "authoritative" on every turn. The edit-mode prompt instead asks
-            // the harness to update SPEC.md itself as part of its own output,
-            // so it stays in sync with what actually changed — if it doesn't,
-            // leaving the last-known-good SPEC.md alone is still safer than
-            // overwriting it with stale settings.
-            if (doneSlug && !existedBeforeThisRun) {
-              writeProjectSpec(doneSlug, buildProjectSpecMarkdown(doneSlug, settings, projectMeta));
-            }
-            // Include sessionId so ChatCanvas can --resume on the next
-            // refinement turn instead of re-sending the full ~6K-token prompt.
-            sendEvent(write, "status", {
-              type: "done",
-              slug: doneSlug,
-              registered: existedBeforeThisRun,
-              sessionId: outSessionId,
-              harness: completedHarness,
-            });
+            ok = false;
           }
+        }
+
+        if (ok) {
+          // Write SPEC.md fresh only on the initial create — `settings` is
+          // accurate at that point. On an edit turn, `settings` still holds
+          // whatever per-size descriptions/notes were set back at Plan/Ideate
+          // time (never kept in sync with chat-only edits since), so
+          // regenerating SPEC.md from it would re-bake stale text as
+          // "authoritative" on every turn; the edit prompt asks the harness to
+          // update SPEC.md itself instead. Written into the draft so it applies
+          // together with the component.
+          if (!existedBeforeThisRun) {
+            writeProjectSpec(targetId, buildProjectSpecMarkdown(targetId, settings, projectMeta), wbCustomDir);
+          }
+
+          const applied = planApply(ws);
+          if (!applied.ok) {
+            sendEvent(write, "error", {
+              message: `"${targetId}" was changed outside the creator during this run (${applied.conflicts.join(", ")}) — nothing was applied. Re-submit to rebuild on top of the current version.`,
+            });
+            ok = false;
+          } else {
+            // New and changed files land first (atomic per file), then an
+            // already-registered widget's registry entry and map line are
+            // refreshed, and only then are removed files deleted — so the
+            // component map never points at a file that isn't there.
+            applyWrites(ws, applied.plan);
+            if (existedBeforeThisRun) {
+              // - Already-committed widget (a real edit): re-register now. This
+              //   rewrites customRegistry.json (JSON Fast Refresh hot-updates)
+              //   and repoints the map line only if the component file changed.
+              // - Brand-new widget: registration is deferred to POST
+              //   /api/widget-creator/register ("add to layout"), because
+              //   wiring a new id into customComponentMap.tsx forces a full
+              //   reload that would tear down this SSE stream.
+              const wired = registerCustomWidget({
+                id: targetId,
+                name: settings.name,
+                icon: settings.icon,
+                sizes: settings.sizes,
+                orientations: settings.orientations,
+              });
+              if (!wired.ok) {
+                sendEvent(write, "error", { message: `widget applied but registration failed: ${wired.error}` });
+                ok = false;
+              }
+              syncComponentMapEntry(targetId);
+            }
+            applyDeletes(applied.plan);
+            commitBase(ws);
+          }
+        }
+
+        if (ok) {
+          // Include sessionId so ChatCanvas can --resume on the next
+          // refinement turn instead of re-sending the full ~6K-token prompt.
+          sendEvent(write, "status", {
+            type: "done",
+            slug: targetId,
+            registered: existedBeforeThisRun,
+            sessionId: outSessionId,
+            harness: completedHarness,
+          });
         }
       }
 
+      } catch (err) {
+        sendEvent(write, "error", { message: `widget creator failed: ${err instanceof Error ? err.message : String(err)}` });
       } finally {
-        // Stop the watcher before the post-run restore/cleanup touches the
-        // .bak files it reads from.
-        stopKeepAlive();
         // Always release — a client abort flows cancel() → abort → the chain
         // resolves ("aborted") → here, so the lock can't leak on disconnect.
         releaseGenerationLock();
@@ -586,43 +534,5 @@ export async function POST(req: Request) {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     },
-  });
-}
-
-async function runTscCheck(targetId?: string): Promise<{ errors: string[] }> {
-  return new Promise((resolve) => {
-    const child = spawn("npx", ["tsc", "--noEmit", "--pretty", "false"], {
-      cwd: REPO_ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      // npx is npx.cmd on Windows — needs the shell to resolve (ENOENT otherwise)
-      shell: process.platform === "win32",
-    });
-
-    let output = "";
-    child.stdout.on("data", (d: Buffer) => (output += d.toString()));
-    child.stderr.on("data", (d: Buffer) => (output += d.toString()));
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve({ errors: [] });
-      } else {
-        // Only surface errors that actually point at this widget's own tree —
-        // a non-zero exit can come from pre-existing/unrelated project errors
-        // (e.g. a stale .next/types/validator.ts referencing a route deleted by
-        // a previous widget). Those must NOT count against this widget, or a
-        // perfectly valid generation gets its registration rolled back for an
-        // error it didn't cause. The widget's own generated app/api/<slug>
-        // route IS part of its tree (the prompt invites writing one), so its
-        // errors must not slip past this gate.
-        const lines = output.split("\n").filter((l) =>
-          l.includes("components/widgets/custom")
-          || l.includes("config/custom")
-          || (targetId ? l.includes(`app/api/${targetId}/`) : false),
-        );
-        resolve({ errors: lines });
-      }
-    });
-
-    child.on("error", () => resolve({ errors: ["TypeScript validation could not start. Check that the TypeScript toolchain is installed."] }));
   });
 }

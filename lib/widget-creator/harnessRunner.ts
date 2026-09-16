@@ -4,7 +4,7 @@
 // afterward (tsc + registry vs. nothing).
 import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import { unlinkSync, writeFileSync } from "fs";
+import { readdirSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -84,7 +84,21 @@ export type HarnessOpts = {
       sessionId is set and this is provided — the model already has full
       context (including the avn-widget-build skill, loaded on turn 1). */
   resumePrompt?: string;
+  /** working directory for the CLI — the widget's workbench for generate
+      runs (see workbench.ts); defaults to the repo root */
+  cwd?: string;
 };
+
+/** widget folders under `root`'s components/widgets/custom other than `slug` */
+function listSiblingWidgetDirs(root: string, slug: string): string[] {
+  try {
+    return readdirSync(join(root, "components", "widgets", "custom"), { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && entry.name !== slug)
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
 
 export function runHarness(
   adapter: (typeof HARNESS_ADAPTERS)[HarnessId],
@@ -148,17 +162,24 @@ export function runHarness(
     // Codex also supports sessions and model flags; OpenCode retains its adapter args.
     let args: string[];
     if (adapter.id === "claude") {
-      // Deny Read/Glob/Grep on every other widget's folder, allow only this
-      // run's own — on top of bypassPermissions, which skips the interactive
-      // "ask" step but still respects an explicit deny list (deny always
-      // wins over bypass). The prompt already asks the model not to explore
-      // sibling folders; this is the actual enforcement of that, for claude
-      // specifically (codex/opencode have no equivalent flag wired up here —
-      // see the sibling-read detection in processLine below, which covers
-      // all three adapters instead).
-      const toolScope = watchSlug ? [
-        "--disallowedTools", "Read(./components/widgets/custom/**)", "Glob(./components/widgets/custom/**)", "Grep(./components/widgets/custom/**)",
-        "--allowedTools", `Read(./components/widgets/custom/${watchSlug}/**)`, `Glob(./components/widgets/custom/${watchSlug}/**)`, `Grep(./components/widgets/custom/${watchSlug}/**)`,
+      // Deny Read/Glob/Grep on every *other* widget's folder, by name — on
+      // top of bypassPermissions, which skips the interactive "ask" step but
+      // still respects an explicit deny list. This used to be one blanket
+      // deny on components/widgets/custom/** plus an allow for this run's own
+      // folder, but deny always beats allow, and claude treats a Read deny as
+      // blocking writes too ("File is covered by a Read deny rule ... cannot
+      // be written"), so the harness couldn't write its own widget at all.
+      // In a workbench (see workbench.ts) sibling folders aren't mirrored, so
+      // this list is empty and no flags are passed. codex/opencode have no
+      // equivalent flag — see the sibling-read detection in processLine.
+      const siblingDirs = watchSlug ? listSiblingWidgetDirs(opts?.cwd ?? REPO_ROOT, watchSlug) : [];
+      const toolScope = siblingDirs.length ? [
+        "--disallowedTools",
+        ...siblingDirs.flatMap((name) => [
+          `Read(./components/widgets/custom/${name}/**)`,
+          `Glob(./components/widgets/custom/${name}/**)`,
+          `Grep(./components/widgets/custom/${name}/**)`,
+        ]),
       ] : [];
       if (isResume) {
         // Continue an existing session. The model already has the authoring
@@ -211,7 +232,7 @@ export function runHarness(
     if (adapter.id === "claude") args.push(...modelArgs(adapter.id, choice));
     if (signal.aborted) { record("aborted"); resolve({ status: "aborted" }); return; }
     const child = spawn(adapter.command, args, {
-      cwd: REPO_ROOT,
+      cwd: opts?.cwd ?? REPO_ROOT,
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env },
       // on Windows the CLIs are .cmd/.ps1 shims that bare spawn can't resolve
@@ -257,6 +278,15 @@ export function runHarness(
       try {
         const f = JSON.parse(line);
         isGeneratedContent = Boolean(f.message?.content) || Boolean(f.item) || Boolean(f.part);
+        // Claude Code (2.1.x) emits a rate_limit_event status frame on every
+        // run, normally with status "allowed". Its type name alone matched
+        // the /rate.?limit/ quota pattern, so every successful claude turn
+        // ended as "All harnesses hit a limit (quota)". Only a rejected
+        // status is a real limit.
+        if (f.type === "rate_limit_event") {
+          if (f.rate_limit_info?.status === "rejected" && !limitReason) limitReason = "quota";
+          return;
+        }
       } catch {}
 
       if (!isGeneratedContent) {
@@ -401,7 +431,9 @@ export async function runHarnessChain(
 
     // opts (session resume) only apply to the first harness, and only until
     // the resume-retry below (if any) has consumed it once.
-    const harnessOpts = { ...(i === 0 && !resumeRetried ? { ...opts, sessionId: validSession } : {}), models, stage: opts?.stage };
+    // cwd applies to every harness in the chain — a fallback must keep
+    // writing into the same workbench, never the live tree.
+    const harnessOpts = { ...(i === 0 && !resumeRetried ? { ...opts, sessionId: validSession } : {}), models, stage: opts?.stage, cwd: opts?.cwd };
 
     const { status, limitReason, errorReason, newSessionId, lastText } = await runHarness(
       adapter, fullPrompt, write, signal, continuationNote, harnessOpts, watchSlug,

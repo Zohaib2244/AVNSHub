@@ -9,6 +9,7 @@ import {
   removeFromComponentMap,
   removeRegistryEntry,
 } from "@/lib/widget-creator/customRegistry";
+import { removeWorkbench } from "@/lib/widget-creator/workbench";
 
 export async function POST(req: Request) {
   let body: { id?: string };
@@ -56,6 +57,8 @@ export async function POST(req: Request) {
     if (entry?.flags?.hasApiRoute === true) {
       rmSync(join(process.cwd(), "app/api", id), { recursive: true, force: true });
     }
+
+    removeWorkbench(id);
 
     const removedOrphans = await pruneOrphanCustomWidgetFiles();
 

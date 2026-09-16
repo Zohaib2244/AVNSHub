@@ -9,7 +9,6 @@ import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
 import {
   placeWidgetAuto,
-  unplaceWidgetTemporarily,
   restorePlacementSnapshot,
   getPlacementSnapshot,
   getRegionsThatFitWidget,
@@ -309,14 +308,10 @@ export function ChatCanvas({
     emitWorking();
     setWorkingProjectId(projectId);
 
-    if (settings.editSlug) {
-      const editSlug = settings.editSlug;
-      const snapshot = unplaceWidgetTemporarily(editSlug);
-      if (snapshot.kind !== "none") {
-        hiddenEditRef.current = { slug: editSlug, snapshot };
-        setEditHidden(true);
-      }
-    }
+    // The widget being edited stays on the canvas: the harness works in the
+    // widget's server-side workbench and the live files only change once the
+    // checked draft is applied (docs/WIDGET_WORKBENCH.md), so there's no
+    // half-written state to hide anymore.
 
     const abort = new AbortController();
     abortRef.current = abort;

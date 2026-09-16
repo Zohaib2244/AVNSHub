@@ -709,8 +709,11 @@ function WidgetImportBar() {
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/widget-creator/import", { method: "POST", body });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string };
-      if (res.ok) setStatus({ kind: "ok", msg: `imported ${data.id ?? ""} ✓` });
+      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; updated?: boolean; note?: string };
+      if (res.ok) {
+        const verb = data.updated ? "updated" : "imported";
+        setStatus({ kind: "ok", msg: `${verb} ${data.id ?? ""} ✓${data.note ? ` (${data.note})` : ""}` });
+      }
       else setStatus({ kind: "error", msg: data.error ?? "import failed" });
     } catch {
       setStatus({ kind: "error", msg: "import failed" });

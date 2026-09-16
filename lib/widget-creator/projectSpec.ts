@@ -20,12 +20,14 @@ export type ProjectSpecMeta = {
   entryMode?: string;
 };
 
-function specPath(slug: string): string {
-  return join(CUSTOM_WIDGETS_DIR, slug, "SPEC.md");
+/** `customDir` defaults to the live tree; the generate route passes the
+    widget's workbench so it reads and writes the draft instead */
+function specPath(slug: string, customDir: string = CUSTOM_WIDGETS_DIR): string {
+  return join(customDir, slug, "SPEC.md");
 }
 
-export function readProjectSpec(slug: string): string | null {
-  const path = specPath(slug);
+export function readProjectSpec(slug: string, customDir?: string): string | null {
+  const path = specPath(slug, customDir);
   if (!existsSync(path)) return null;
   try {
     return readFileSync(path, "utf-8");
@@ -100,9 +102,9 @@ export function buildProjectSpecMarkdown(
   return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd()}\n`;
 }
 
-export function writeProjectSpec(slug: string, markdown: string): void {
+export function writeProjectSpec(slug: string, markdown: string, customDir?: string): void {
   try {
-    writeFileSync(specPath(slug), markdown, "utf-8");
+    writeFileSync(specPath(slug, customDir), markdown, "utf-8");
   } catch {
     // best-effort — a missing spec just means the next turn falls back to
     // the existing-code + settingsSummary context, same as before this existed

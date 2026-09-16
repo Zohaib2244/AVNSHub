@@ -231,8 +231,8 @@ export type ComponentModule = { file: string; exportName: string | null };
     of assuming the conventional `<Pascal>Widget.tsx` name. The generator nudges
     the LLM toward that name, but it doesn't always comply (and imported widgets
     may be named differently), so detect the real file + export. */
-export function findComponentModule(id: string): ComponentModule | null {
-  const dir = join(CUSTOM_WIDGETS_DIR, id);
+export function findComponentModule(id: string, customDir: string = CUSTOM_WIDGETS_DIR): ComponentModule | null {
+  const dir = join(customDir, id);
   if (!existsSync(dir)) return null;
   const tsxFiles = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
   if (tsxFiles.length === 0) return null;
@@ -358,6 +358,25 @@ export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: 
     return { ok: false, error: wired.error };
   }
   return { ok: true };
+}
+
+/** Repoint an already-registered widget's lazy import at the component module
+    currently on disk. An edit that renames the component file would otherwise
+    leave the map importing a file about to be deleted — a whole-dashboard
+    compile failure. Rewrites only the one declaration line, and only when it
+    changed. No-op for unregistered ids or when no module can be found. */
+export function syncComponentMapEntry(id: string): void {
+  const mod = findComponentModule(id);
+  if (!mod) return;
+  const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
+  const declPrefix = `const ${localVar(id)} = `;
+  const lines = content.split("\n");
+  const idx = lines.findIndex((line) => line.startsWith(declPrefix));
+  if (idx === -1) return;
+  const wanted = lazyDeclLine(id, mod).replace(/\n$/, "");
+  if (lines[idx] === wanted) return;
+  lines[idx] = wanted;
+  writeFileSync(COMPONENT_MAP_PATH, lines.join("\n"), "utf-8");
 }
 
 /** remove this widget's declaration + map entry by id — line-based so it works
