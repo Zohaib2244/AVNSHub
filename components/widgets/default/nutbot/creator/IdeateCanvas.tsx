@@ -19,6 +19,7 @@ import {
 } from "@/lib/widget-creator/projectStore";
 import { useStickToBottom } from "@/lib/widget-creator/useStickToBottom";
 import { MockupLightbox } from "./MockupLightbox";
+import { ActivityLine, activityFromChunk, formatElapsed, useTicker } from "./RunProgress";
 
 type Variation = { index: number; file: string; html: string };
 type Round = { prompt: string; variations: Variation[] };
@@ -29,6 +30,7 @@ type Phase =
   | { id: "connecting"; harness: HarnessId }
   | { id: "generating"; harness: HarnessId }
   | { id: "done" }
+  | { id: "stopped"; kept: number }
   | { id: "error"; message: string };
 
 type Props = {
@@ -52,23 +54,35 @@ type Props = {
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
   idle: "ready",
-  connecting: "connecting...",
-  generating: "generating...",
+  connecting: "connecting",
+  generating: "drawing mockups",
   done: "done",
+  stopped: "stopped",
   error: "error",
 };
 
-function StatusBar({ phase }: { phase: Phase }) {
+function StatusBar({ phase, progress, elapsed, regenerating }: {
+  phase: Phase;
+  /** the mockup being regenerated, e.g. "variation 2" — replaces the generic label */
+  regenerating: string | null;
+  /** mockups finished so far in the running round */
+  progress: { ready: number; total: number } | null;
+  /** elapsed (running) or last duration (finished), already formatted */
+  elapsed: string | null;
+}) {
   const isActive = phase.id === "connecting" || phase.id === "generating";
   const harness = (phase as { harness?: HarnessId }).harness;
   return (
     <div className={`wc-status-bar${phase.id === "error" ? " error" : phase.id === "done" ? " done" : isActive ? " active" : ""}`}>
       {isActive && <span className="wc-status-dot" />}
       <span className="wc-status-label">
-        {PHASE_LABEL[phase.id]}
+        {phase.id === "generating" && regenerating ? `regenerating ${regenerating}` : PHASE_LABEL[phase.id]}
         {harness && ` · ${harness}`}
+        {isActive && progress && ` · ${progress.ready}/${progress.total} ready`}
+        {phase.id === "stopped" && (phase.kept ? ` · kept ${phase.kept} finished mockup${phase.kept > 1 ? "s" : ""}` : " · nothing finished yet")}
         {phase.id === "error" && ` · ${(phase as { message: string }).message}`}
       </span>
+      {elapsed && <span className="wc-status-time">{elapsed}</span>}
     </div>
   );
 }
@@ -78,6 +92,8 @@ async function streamIdeate(
   signal: AbortSignal,
   onSwitch: (from: HarnessId, to: HarnessId, reason: string) => void,
   onHarnessStart: (harness: HarnessId) => void,
+  /** harness output as it streams — used for the "what is it doing" line */
+  onChunk?: (text: string) => void,
 ): Promise<{ ok: true; variations: string[] } | { ok: false; message: string }> {
   const res = await fetch("/api/widget-creator/ideate", {
     method: "POST",
@@ -118,6 +134,8 @@ async function streamIdeate(
         } else if (type === "done") {
           result = { ok: true, variations: payload.variations as string[] };
         }
+      } else if (event === "chunk") {
+        onChunk?.(payload.text as string);
       } else if (event === "switch_required") {
         confirmProviderSwitch(payload, signal);
       } else if (event === "switch") {
@@ -142,6 +160,14 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
   const [regeneratingFile, setRegeneratingFile] = useState<string | null>(null);
   const [regenPrompt, setRegenPrompt] = useState("");
   const [pendingRound, setPendingRound] = useState<PendingRound | null>(null);
+  // run timing + live activity for the loaders
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  // same value as startedAt, readable from the async run's finally block
+  const startedAtRef = useRef<number | null>(null);
+  const [lastDuration, setLastDuration] = useState<number | null>(null);
+  const [activity, setActivity] = useState<string | null>(null);
+  // the mockup currently being regenerated (its card shows a spinner overlay)
+  const [regenActiveFile, setRegenActiveFile] = useState<string | null>(null);
   const [lightboxHtml, setLightboxHtml] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -193,6 +219,30 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
   const nextIndex = Math.max(0, ...rounds.flatMap((r) => r.variations.map((v) => v.index))) + 1;
   const isGenerating = phase.id === "connecting" || phase.id === "generating";
+  const now = useTicker(isGenerating);
+  const pendingReady = pendingRound ? pendingRound.variations.filter(Boolean).length : 0;
+  const statusElapsed = isGenerating && startedAt !== null
+    ? formatElapsed(now - startedAt)
+    : lastDuration !== null ? formatElapsed(lastDuration) : null;
+
+  function beginRun(at: number) {
+    startedAtRef.current = at;
+    setStartedAt(at);
+    setLastDuration(null);
+    setActivity(null);
+  }
+
+  function endRun(at: number) {
+    if (startedAtRef.current !== null) setLastDuration(at - startedAtRef.current);
+    startedAtRef.current = null;
+    setStartedAt(null);
+    setActivity(null);
+  }
+
+  function onChunk(text: string) {
+    const next = activityFromChunk(text);
+    if (next) setActivity(next === "explaining the change" ? "describing the mockups" : next);
+  }
 
   /** Brief is substantive enough to start generation without a prompt — has
       concept + at least one size description, or explicit notes to work from. */
@@ -236,7 +286,8 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     pollRef.current = setInterval(() => { void poll(); }, 2000);
   }
 
-  async function generate() {
+  /** `requestedAt`: when the user asked — taken in the event handler */
+  async function generate(requestedAt: number) {
     if (isGenerating || readOnly) return;
     if (!sessionId) return;
     // Allow empty prompt if brief is substantial (from Plan); require it otherwise
@@ -249,6 +300,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     const expectedFiles = Array.from({ length: count }, (_, i) => `variation-${nextIndex + i}.html`);
     setPrompt("");
     setPhase({ id: "connecting", harness: activeHarness });
+    beginRun(requestedAt);
     emitWorking();
     setWorkingProjectId(projectId);
 
@@ -262,6 +314,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         abort.signal,
         (_from, to) => setPhase({ id: "connecting", harness: to }),
         (harness) => setPhase({ id: "generating", harness }),
+        onChunk,
       );
 
       if (!result.ok) {
@@ -290,24 +343,28 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     } catch (err) {
       clearSignal();
       setWorkingProjectId(null);
-      if ((err as Error).name === "AbortError") {
-        setPhase({ id: "idle" });
-      } else {
+      // a user stop is recorded by stop() itself (with what was kept)
+      if ((err as Error).name !== "AbortError") {
         setPhase({ id: "error", message: (err as Error).message ?? "request failed" });
       }
     } finally {
       clearPendingPoll();
       abortRef.current = null;
+      setRegenActiveFile(null);
+      endRun(Date.now());
     }
   }
 
-  async function regenerate(file: string, index: number) {
+  /** `requestedAt`: when the user asked — taken in the event handler */
+  async function regenerate(file: string, index: number, requestedAt: number) {
     if (!regenPrompt.trim() || isGenerating || readOnly) return;
     if (!sessionId) return;
     const instruction = regenPrompt.trim();
     setRegenPrompt("");
     setRegeneratingFile(null);
+    setRegenActiveFile(file);
     setPhase({ id: "connecting", harness: activeHarness });
+    beginRun(requestedAt);
     emitWorking();
     setWorkingProjectId(projectId);
 
@@ -320,6 +377,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         abort.signal,
         (_from, to) => setPhase({ id: "connecting", harness: to }),
         (harness) => setPhase({ id: "generating", harness }),
+        onChunk,
       );
 
       if (!result.ok) {
@@ -343,24 +401,33 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     } catch (err) {
       clearSignal();
       setWorkingProjectId(null);
-      if ((err as Error).name === "AbortError") {
-        setPhase({ id: "idle" });
-      } else {
+      // a user stop is recorded by stop() itself (with what was kept)
+      if ((err as Error).name !== "AbortError") {
         setPhase({ id: "error", message: (err as Error).message ?? "request failed" });
       }
     } finally {
       clearPendingPoll();
       abortRef.current = null;
+      setRegenActiveFile(null);
+      endRun(Date.now());
     }
   }
 
   function stop() {
     abortRef.current?.abort();
     clearPendingPoll();
+    // mockups that already finished are real files — keep them as a round
+    // instead of throwing them away with the rest of the stopped run
+    const finished = (pendingRound?.variations ?? []).filter((v): v is Variation => v !== null);
+    if (pendingRound && finished.length > 0) {
+      const label = pendingRound.prompt;
+      setRounds((prev) => [...prev, { prompt: label, variations: finished }]);
+      updateProject(projectId, { hasIdeateRounds: true });
+    }
     setPendingRound(null);
     clearSignal();
     setWorkingProjectId(null);
-    setPhase({ id: "idle" });
+    setPhase({ id: "stopped", kept: finished.length });
   }
 
   function newSession() {
@@ -378,7 +445,12 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
   return (
     <div className="wc-chat">
-      <StatusBar phase={phase} />
+      <StatusBar
+        phase={phase}
+        progress={pendingRound ? { ready: pendingReady, total: pendingRound.files.length } : null}
+        elapsed={statusElapsed}
+        regenerating={regenActiveFile ? regenActiveFile.replace(".html", "").replace("-", " ") : null}
+      />
 
       {readOnly && (
         <div className="wc-readonly-banner">
@@ -431,20 +503,20 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
           </div>
         )}
 
-        {rounds.length === 0 && isGenerating && (
-          <div className="wc-chat-empty wc-status-bar active">
-            <span className="wc-status-dot" />
-            <span className="wc-status-label">cooking up {count} variation{count > 1 ? "s" : ""}...</span>
-          </div>
-        )}
 
         {rounds.map((round, ri) => (
           <div key={ri} className="wc-ideate-round">
             <div className="wc-msg wc-msg-user">{round.prompt}</div>
             <div className="wc-ideate-gallery">
               {round.variations.map((v) => (
-                <div key={v.file} className="wc-ideate-card">
+                <div key={v.file} className={`wc-ideate-card${regenActiveFile === v.file ? " regenerating" : ""}`}>
                   <div className="wc-ideate-card-head">variation {v.index}</div>
+                  {regenActiveFile === v.file && (
+                    <div className="wc-ideate-regen-overlay" role="status">
+                      <span className="wc-spinner" aria-hidden="true" />
+                      regenerating{statusElapsed ? ` · ${statusElapsed}` : ""}
+                    </div>
+                  )}
                   <iframe
                     className="wc-ideate-frame"
                     sandbox="allow-scripts"
@@ -461,7 +533,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                           value={regenPrompt}
                           onChange={(e) => setRegenPrompt(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") regenerate(v.file, v.index);
+                            if (e.key === "Enter") regenerate(v.file, v.index, Date.now());
                             if (e.key === "Escape") setRegeneratingFile(null);
                           }}
                           disabled={isGenerating}
@@ -469,7 +541,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                         <button
                           type="button"
                           className="wc-add-btn"
-                          onClick={() => regenerate(v.file, v.index)}
+                          onClick={() => regenerate(v.file, v.index, Date.now())}
                           disabled={isGenerating || !regenPrompt.trim()}
                         >
                           go
@@ -533,10 +605,9 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                         title={`variation ${variation.index}`}
                       />
                     ) : (
-                      <div className="wc-ideate-frame wc-ideate-frame-pending">
-                        <span className="wc-dot-pulse" />
-                        <span className="wc-dot-pulse" style={{ animationDelay: "0.2s" }} />
-                        <span className="wc-dot-pulse" style={{ animationDelay: "0.4s" }} />
+                      <div className="wc-ideate-frame wc-ideate-frame-pending" role="status">
+                        <span className="wc-spinner" aria-hidden="true" />
+                        <span className="wc-ideate-pending-text">drawing variation {index + nextIndex}</span>
                       </div>
                     )}
                     <div className="wc-ideate-card-actions">
@@ -563,7 +634,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
                           </button>
                         </>
                       ) : (
-                        <span className="wc-ideate-pending-label">waiting for file</span>
+                        <span className="wc-ideate-pending-label">in progress{statusElapsed ? ` · ${statusElapsed}` : ""}</span>
                       )}
                     </div>
                   </div>
@@ -574,11 +645,11 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         )}
 
         {isGenerating && (
-          <div className="wc-generating-hint">
-            <span className="wc-dot-pulse" />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.2s" }} />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.4s" }} />
-          </div>
+          <ActivityLine
+            text={regenActiveFile
+              ? `${activity ?? "starting"} · regenerating ${regenActiveFile.replace(".html", "")}`
+              : `${activity ?? "starting"}${pendingRound ? ` · ${pendingReady} of ${pendingRound.files.length} ready` : ""}`}
+          />
         )}
       </div>
       {lightboxHtml && (
@@ -623,7 +694,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              generate();
+              generate(Date.now());
             }
           }}
           rows={2}
@@ -632,7 +703,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         <button
           type="button"
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
-          onClick={isGenerating ? stop : generate}
+          onClick={isGenerating ? stop : () => generate(Date.now())}
           aria-label={isGenerating ? "stop" : "generate"}
           disabled={readOnly || (!isGenerating && !prompt.trim() && !isBriefSubstantive())}
         >

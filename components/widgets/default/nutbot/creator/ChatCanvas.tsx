@@ -40,6 +40,7 @@ import {
   formatElapsed,
   isRunActive,
   newRun,
+  useTicker,
   type RunView,
 } from "./RunProgress";
 
@@ -225,8 +226,9 @@ export function ChatCanvas({
   const [adding, setAdding] = useState(false);
   // progress of the current (or last) build run — see RunProgress.tsx
   const [run, setRun] = useState<RunView | null>(null);
-  const [now, setNow] = useState(() => Date.now());
   const runActive = isRunActive(run);
+  // ticks the elapsed timers only while a run is in progress
+  const now = useTicker(runActive);
   const { setInstalling, setHubCoreTab } = useLayout();
   const { ref: bodyRef, onScroll: onBodyScroll } = useStickToBottom<HTMLDivElement>([messages, phase, run?.activity]);
   // Chat image attachments (data URLs) for the next send — screenshots and
@@ -352,14 +354,6 @@ export function ChatCanvas({
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
-
-  // tick the elapsed timers only while a run is in progress
-  useEffect(() => {
-    if (!runActive) return;
-    setNow(Date.now());
-    const timer = setInterval(() => setNow(Date.now()), 500);
-    return () => clearInterval(timer);
-  }, [runActive]);
 
   // Sync with the server's record of this widget's last build run
   // (lib/widget-creator/runStatus.ts) for runs this tab didn't stream: one

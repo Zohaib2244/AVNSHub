@@ -6,7 +6,30 @@
 // activity readout. State transitions are pure functions so the SSE handler
 // and the run-status poller (another tab / reload) drive the exact same view.
 
+import { useEffect, useState } from "react";
 import { Check, X } from "lucide-react";
+
+/** Date.now(), re-rendered every 500ms while `active` — drives elapsed timers */
+export function useTicker(active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    // first tick lands within 500ms; until then elapsed values clamp to 0s
+    const timer = setInterval(() => setNow(Date.now()), 500);
+    return () => clearInterval(timer);
+  }, [active]);
+  return now;
+}
+
+/** spinner + one line of "what is happening right now" (shared by build, plan, ideate) */
+export function ActivityLine({ text }: { text: string }) {
+  return (
+    <div className="wc-run-activity" role="status" aria-live="polite">
+      <span className="wc-spinner" aria-hidden="true" />
+      <span className="wc-run-activity-text">{text}</span>
+    </div>
+  );
+}
 
 export type StepId = "prepare" | "write" | "check" | "apply";
 export type StepStatus = "pending" | "active" | "done" | "failed";
@@ -169,13 +192,8 @@ export function RunActivity({ run, now }: { run: RunView; now: number }) {
     : run.remote && active === "write" ? "the harness is writing the widget" : ACTIVE_HINT[active];
   const slowCheck = active === "check" && now - (run.steps.check.startedAt ?? now) > 6000;
   return (
-    <div className="wc-run-activity" role="status" aria-live="polite">
-      <span className="wc-spinner" aria-hidden="true" />
-      <span className="wc-run-activity-text">
-        {run.remote ? "running in another tab · " : ""}
-        {text}
-        {slowCheck ? " — the first check in a new workbench can take ~10s" : ""}
-      </span>
-    </div>
+    <ActivityLine
+      text={`${run.remote ? "running in another tab · " : ""}${text}${slowCheck ? " — the first check in a new workbench can take ~10s" : ""}`}
+    />
   );
 }
