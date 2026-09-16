@@ -336,6 +336,7 @@ export function PublishingEmailBuilderWidget() {
     const storedSelected = readString(readStoredJson(SELECTED_STORAGE_KEY));
     const selected = storedGames.find((game) => game.uid === storedSelected) ?? storedGames[0] ?? null;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists on the client; loading it after mount (not in a lazy initializer) keeps the server render and first client render identical
     setGames(storedGames);
     setDrafts(storedDrafts);
     setSelectedGameId(selected?.uid ?? "");
@@ -360,18 +361,16 @@ export function PublishingEmailBuilderWidget() {
     writeStoredJson(SELECTED_STORAGE_KEY, selectedGameId);
   }, [selectedGameId, isLoaded]);
 
-  useEffect(() => {
-    if (!isLoaded) return;
+  // keep the selection pointing at a game that exists (adjusted during render,
+  // guarded so it settles in one pass, instead of an effect + extra render)
+  if (isLoaded) {
     if (games.length === 0) {
-      setSelectedGameId("");
-      setIsEditorOpen(true);
-      return;
+      if (selectedGameId !== "") setSelectedGameId("");
+      if (!isEditorOpen) setIsEditorOpen(true);
+    } else if (!games.some((game) => game.uid === selectedGameId)) {
+      setSelectedGameId(games[0].uid);
     }
-
-    if (!games.some((game) => game.uid === selectedGameId)) {
-      setSelectedGameId(games[0]?.uid ?? "");
-    }
-  }, [games, isLoaded, selectedGameId]);
+  }
 
   useEffect(() => {
     return () => {

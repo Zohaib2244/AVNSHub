@@ -527,7 +527,7 @@ function RichView({
             notices
           </div>
           <NoticeCard title="approval stamp">Snack Zoning accepted one corridor chip under protest.</NoticeCard>
-          <NoticeCard title="escalation">Sleep Debt Recovery may garnish tomorrow's patience.</NoticeCard>
+          <NoticeCard title="escalation">Sleep Debt Recovery may garnish tomorrow&apos;s patience.</NoticeCard>
           <NoticeCard isGenerated title="follow-up" visible={showFollowUp}>
             Resolved sleep case created Blanket Corner Verification Form SDR-32A.
           </NoticeCard>

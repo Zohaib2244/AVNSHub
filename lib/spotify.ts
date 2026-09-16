@@ -30,12 +30,22 @@ export type SpotifyCreds = {
   refreshToken?: string;
 };
 
+/** Thrown when neither the widget settings nor SPOTIFY_* env vars supply a full
+    set of credentials. That's a setup state, not a failure — routes answer it
+    quietly instead of logging an error on every poll. */
+export class SpotifyNotConfiguredError extends Error {
+  constructor() {
+    super("Missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN");
+    this.name = "SpotifyNotConfiguredError";
+  }
+}
+
 function resolveCreds(creds?: SpotifyCreds): { clientId: string; clientSecret: string; refreshToken: string } {
   const clientId = creds?.clientId?.trim() || process.env.SPOTIFY_CLIENT_ID || "";
   const clientSecret = creds?.clientSecret?.trim() || process.env.SPOTIFY_CLIENT_SECRET || "";
   const refreshToken = creds?.refreshToken?.trim() || process.env.SPOTIFY_REFRESH_TOKEN || "";
   if (!clientId || !clientSecret || !refreshToken) {
-    throw new Error("Missing SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET / SPOTIFY_REFRESH_TOKEN");
+    throw new SpotifyNotConfiguredError();
   }
   return { clientId, clientSecret, refreshToken };
 }

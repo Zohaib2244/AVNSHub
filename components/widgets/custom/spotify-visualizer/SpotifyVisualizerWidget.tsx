@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { type CSSProperties, useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { usePolling } from "@/lib/usePolling";
 import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
@@ -103,9 +103,11 @@ function runCanvas(
   trackRef: MutableRefObject<string>,
   isPlayingRef: MutableRefObject<boolean>,
   fetchTimeRef: MutableRefObject<number>,
-  progressRef: MutableRefObject<number>,
-  elapsedRef: MutableRefObject<string>,
-  durRef: MutableRefObject<string>,
+  footer: {
+    bar: RefObject<HTMLDivElement | null>;
+    elapsed: RefObject<HTMLSpanElement | null>;
+    duration: RefObject<HTMLSpanElement | null>;
+  },
   progressMsRef: MutableRefObject<number>,
   durationMsRef: MutableRefObject<number>,
 ): () => void {
@@ -186,7 +188,6 @@ function runCanvas(
     const [freqs, amps, modBase] = params;
     const wave: number[] = [];
     let maxVal = 0;
-    let sumAbs = 0;
 
     const beat = isPlaying ? 1 : 0.3;
     const energy = isPlaying ? 1 : 0.35;
@@ -206,7 +207,6 @@ function runCanvas(
       wave.push(y);
       const a = Math.abs(y);
       if (a > maxVal) maxVal = a;
-      sumAbs += a;
     }
 
     // Main cyan waveform
@@ -264,13 +264,17 @@ function runCanvas(
     ctx.arc(trigX, midY, trigR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Live progress update for parent
+    // Live progress: written straight to the footer DOM every frame. It used
+    // to go into refs that the JSX read during render, so the time and bar
+    // only moved when a poll happened to re-render the widget.
     if (isPlaying && progressMsRef.current > 0 && durationMsRef.current > 0) {
       const liveMs = progressMsRef.current + (Date.now() - fetchTimeRef.current);
       const capped = Math.min(liveMs, durationMsRef.current);
-      progressRef.current = (capped / durationMsRef.current) * 100;
-      elapsedRef.current = fmtMs(capped);
-      durRef.current = fmtMs(durationMsRef.current);
+      if (footer.bar.current) footer.bar.current.style.width = `${(capped / durationMsRef.current) * 100}%`;
+      if (footer.elapsed.current) footer.elapsed.current.textContent = fmtMs(capped);
+      if (footer.duration.current) footer.duration.current.textContent = fmtMs(durationMsRef.current);
+    } else if (!isPlaying && footer.bar.current) {
+      footer.bar.current.style.width = "0%";
     }
 
     animFrame = requestAnimationFrame(tick);
@@ -289,16 +293,20 @@ function runCanvas(
 export function SpotifyVisualizerWidget() {
   const { size, settings } = useWidget();
   const creds = spotifyCredsFrom(settings);
-  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS, creds);
+  const { data: polled, refresh } = usePolling<NowPlayingData | { notConfigured: true }>(POLL_URL, POLL_MS, creds);
+  // the route answers `{ notConfigured: true }` when no credentials are set
+  const notConfigured = !!polled && "notConfigured" in polled;
+  const data = notConfigured ? undefined : (polled as NowPlayingData | undefined);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef("");
   const isPlayingRef = useRef(false);
-  const fetchTimeRef = useRef(Date.now());
-  const progressRef = useRef(0);
-  const elapsedRef = useRef("0:00");
-  const durRef = useRef("0:00");
+  // set whenever poll data lands, before anything reads it
+  const fetchTimeRef = useRef(0);
+  const barRef = useRef<HTMLDivElement>(null);
+  const elapsedElRef = useRef<HTMLSpanElement>(null);
+  const durationElRef = useRef<HTMLSpanElement>(null);
   const progressMsRef = useRef(0);
   const durationMsRef = useRef(0);
 
@@ -326,7 +334,7 @@ export function SpotifyVisualizerWidget() {
     return runCanvas(
       canvas, stage,
       trackRef, isPlayingRef, fetchTimeRef,
-      progressRef, elapsedRef, durRef,
+      { bar: barRef, elapsed: elapsedElRef, duration: durationElRef },
       progressMsRef, durationMsRef,
     );
   }, []);
@@ -336,7 +344,6 @@ export function SpotifyVisualizerWidget() {
     setControlErr(await sendControl(action, refresh, creds));
   };
 
-  const progressPercent = data?.isPlaying ? progressRef.current : 0;
 
   // ── S: compact ──────────────────────────────────────────────────
   if (compact) {
@@ -446,7 +453,7 @@ export function SpotifyVisualizerWidget() {
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}>
-              {data?.artist ?? "spotify idle"}
+              {data?.artist ?? (notConfigured ? "not configured — add credentials in settings" : "spotify idle")}
               {data && !data.isPlaying && data.playedAt && (
                 <span style={{ color: "var(--text-muted-dim)" }}>
                   {" · "}last played
@@ -538,8 +545,8 @@ export function SpotifyVisualizerWidget() {
               fontFamily: "var(--font-jetbrains-mono), monospace",
               fontSize: "0.55rem",
               flex: "none",
-            }}>
-              {elapsedRef.current}
+            }} ref={elapsedElRef}>
+              0:00
             </span>
             <div style={{
               background: "var(--bg-nested)",
@@ -549,14 +556,14 @@ export function SpotifyVisualizerWidget() {
               height: 6,
               overflow: "hidden",
             }}>
-              <div style={{
+              <div ref={barRef} style={{
                 background: data?.isPlaying
                   ? "linear-gradient(90deg, var(--accent-cyan), var(--accent-orange))"
                   : "var(--accent-cyan)",
                 borderRadius: 99,
                 height: "100%",
                 transition: "width 0.3s ease",
-                width: `${data ? progressPercent : 0}%`,
+                width: "0%",
               }} />
             </div>
             <span style={{
@@ -564,8 +571,8 @@ export function SpotifyVisualizerWidget() {
               fontFamily: "var(--font-jetbrains-mono), monospace",
               fontSize: "0.55rem",
               flex: "none",
-            }}>
-              {durRef.current}
+            }} ref={durationElRef}>
+              0:00
             </span>
           </div>
         )}

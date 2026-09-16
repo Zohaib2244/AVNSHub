@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { DotGothic16, JetBrains_Mono } from "next/font/google";
+import "../../styles/tailwind.css";
 import "../../styles/globals.css";
 import "../../styles/widgets.css";
 

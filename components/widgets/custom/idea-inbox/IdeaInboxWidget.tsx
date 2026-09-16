@@ -106,6 +106,7 @@ export function IdeaInboxWidget() {
     try {
       const saved: unknown = JSON.parse(window.localStorage.getItem(storageKey) ?? "[]");
       if (Array.isArray(saved)) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists on the client; loading it after mount (not in a lazy initializer) keeps the server render and first client render identical
         setIdeas(saved.filter((item): item is Idea =>
           typeof item === "object" && item !== null &&
           typeof (item as Idea).id === "string" && typeof (item as Idea).title === "string" &&

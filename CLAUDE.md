@@ -237,7 +237,7 @@ Secrets are passed at runtime via `env_file: .env.local` â€” they are never
 
 ## Versioning & changelog
 
-Track every notable change in [`CHANGELOG.md`](./CHANGELOG.md) (Keep a Changelog format). Add entries under `## [Unreleased]` (grouped Added / Changed / Fixed / Removed) as you work. On a release, rename `Unreleased` to the version + date and bump **all three** version markers together: `version` in `package.json`, the `v2.x` string in `components/dashboard/BootSequence.tsx`, and the changelog. Current version: **2.1.0**.
+Track every notable change in [`CHANGELOG.md`](./CHANGELOG.md) (Keep a Changelog format). Add entries under `## [Unreleased]` (grouped Added / Changed / Fixed / Removed) as you work. On a release, rename `Unreleased` to the version + date and bump the version in `package.json` and the changelog together (the boot log in `components/dashboard/BootSequence.tsx` reads its version from `package.json`). Current version: **2.1.0**.
 
 ---
 

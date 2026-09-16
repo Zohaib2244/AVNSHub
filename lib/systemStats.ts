@@ -9,6 +9,7 @@
 // throughput, so this uses `systeminformation` (works on Linux — the
 // homelab/Docker target — as well as macOS and Windows for local dev).
 
+import { readFile } from "fs/promises";
 import { loadavg, networkInterfaces, uptime } from "os";
 import si from "systeminformation";
 import type { HostTelemetry } from "@/lib/homelab";
@@ -98,12 +99,34 @@ async function readNetwork(): Promise<HostTelemetry["network"]> {
   );
 }
 
+/** fstab data mounts that aren't mounted right now. Reads /proc/self/mounts
+    rather than the filtered drive list, so a mount hidden from `drives` isn't
+    misreported as missing. Linux-only; returns [] anywhere it can't read. */
+async function readMissingMounts(): Promise<string[]> {
+  try {
+    const [fstab, mounts] = await Promise.all([readFile("/etc/fstab", "utf8"), readFile("/proc/self/mounts", "utf8")]);
+    const mounted = new Set(mounts.split("\n").map((line) => line.split(/\s+/)[1]).filter(Boolean));
+    return fstab
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split(/\s+/))
+      .filter(([, mountPoint, type, options = ""]) =>
+        !!mountPoint && /^\/(mnt|media)\//.test(mountPoint) && type !== "swap" && !options.split(",").includes("noauto"))
+      .map(([, mountPoint]) => mountPoint)
+      .filter((mountPoint) => !mounted.has(mountPoint));
+  } catch {
+    return [];
+  }
+}
+
 async function readHostTelemetry(): Promise<HostTelemetry> {
-  const [load, mem, drives, network] = await Promise.all([
+  const [load, mem, drives, network, missingMounts] = await Promise.all([
     si.currentLoad(),
     si.mem(),
     readDrives(),
     readNetwork(),
+    readMissingMounts(),
   ]);
 
   const usedMem = mem.total - mem.available;
@@ -123,6 +146,7 @@ async function readHostTelemetry(): Promise<HostTelemetry> {
     drives,
     network,
     uptime_seconds: uptime(),
+    missing_mounts: missingMounts,
   };
 }
 

@@ -62,11 +62,6 @@ export function SlotPlacementPopover({
   const filtered = fuzzyFilter(candidates, query, (id) => getManifest(id)?.title ?? id);
   const clampedIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : 0;
 
-  // reset the highlight to the top match whenever the result set changes
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
-
   // keep the highlighted row scrolled into view as arrows move it
   useEffect(() => {
     itemRefs.current[clampedIndex]?.scrollIntoView({ block: "nearest" });
@@ -112,7 +107,11 @@ export function SlotPlacementPopover({
               className="drawer-search"
               placeholder="search widgets..."
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                // a new query means a new result set: highlight the top match
+                setActiveIndex(0);
+              }}
               onKeyDown={handleSearchKeyDown}
               spellCheck={false}
               autoComplete="off"

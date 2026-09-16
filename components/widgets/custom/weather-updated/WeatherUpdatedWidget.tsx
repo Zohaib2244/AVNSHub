@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle, ArrowUp, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain,
   CloudSnow, CloudSun, Droplets, Eye, Gauge, MapPin, RefreshCw, Settings, Sun,
-  Thermometer, Wind, X,
+  Thermometer, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
@@ -208,8 +208,8 @@ export function WeatherUpdatedWidget() {
   const [mTab, setMTab] = useState<"hourly" | "details">("hourly");
   const [lTab, setLTab] = useState<"hourly" | "daily">("hourly");
   const [spin, setSpin] = useState(false);
-  const [, tick] = useState(0);
-  const lastFetchRef = useRef(Date.now());
+  // null until the first poll lands; the stale check starts counting from then
+  const lastFetchRef = useRef<number | null>(null);
 
   const isEmpty = settings.lat === 0 && settings.lon === 0;
 
@@ -230,22 +230,24 @@ export function WeatherUpdatedWidget() {
   );
 
   /* track last successful fetch time */
+  const dataRef = useRef(data);
   useEffect(() => {
+    dataRef.current = data;
     if (data && !("error" in data)) {
       lastFetchRef.current = Date.now();
     }
   }, [data]);
 
-  /* force re-render every 60s for stale indicator */
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 60_000);
-    return () => clearInterval(t);
-  }, []);
-
-  /* auto-refresh when data is stale */
+  /* every 60s: if the data is older than two poll intervals, mark exactly this
+     payload as stale and ask for a refresh. Tying "stale" to the payload's
+     identity means a fresh response clears it without any extra state reset,
+     and nothing reads the clock during render. */
+  const [stalePayload, setStalePayload] = useState<unknown>(undefined);
   useEffect(() => {
     const t = setInterval(() => {
-      if (Date.now() - lastFetchRef.current > settings.pollingInterval * 60_000 * 2) {
+      const last = lastFetchRef.current;
+      if (last !== null && Date.now() - last > settings.pollingInterval * 60_000 * 2) {
+        setStalePayload(dataRef.current);
         refresh();
       }
     }, 60_000);
@@ -253,7 +255,7 @@ export function WeatherUpdatedWidget() {
   }, [settings.pollingInterval, refresh]);
 
   const isStale = !isEmpty && !!data && !("error" in data) && settings.pollingInterval > 0 &&
-    Date.now() - lastFetchRef.current > settings.pollingInterval * 60_000 * 2;
+    stalePayload === data;
 
   const isLoading = !isEmpty && data === null;
   const isError = !!(data && "error" in data);
@@ -285,7 +287,7 @@ export function WeatherUpdatedWidget() {
   /* ─── core weather values ─── */
   const c = weatherData?.current;
   const weatherCode = c?.weather_code ?? null;
-  const WmoIcon = getWmoIcon(weatherCode);
+  const wmoIcon = (props: { size: number; style?: CSSProperties }) => createElement(getWmoIcon(weatherCode), props);
   const conditionLabel = getWmoLabel(weatherCode);
   const temp = c?.temperature_2m ?? null;
   const feelsLike = c?.apparent_temperature ?? null;
@@ -354,7 +356,7 @@ export function WeatherUpdatedWidget() {
             {settings.locationName}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <WmoIcon size={44} style={{ color: iconColor, flex: "none" }} />
+            {wmoIcon({ size: 44, style: { color: iconColor, flex: "none" } })}
             <span style={{ ...mono, fontSize: "2.4rem", fontWeight: 500, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {formatTemp(temp)}
             </span>
@@ -389,7 +391,7 @@ export function WeatherUpdatedWidget() {
             <span style={{ ...mono, fontSize: "2.8rem", fontWeight: 500, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {formatTemp(temp)}
             </span>
-            <WmoIcon size={44} style={{ color: iconColor }} />
+            {wmoIcon({ size: 44, style: { color: iconColor } })}
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span style={{ ...dotGothic, ...uppercase, fontSize: "0.6rem", letterSpacing: "0.1em", color: "var(--accent-orange)" }}>
                 {conditionLabel}
@@ -473,7 +475,7 @@ export function WeatherUpdatedWidget() {
         <div style={{ display: "flex", gap: 8, alignItems: "center", flex: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "6px 10px", background: "var(--bg-nested)", borderRadius: 10, ...border }}>
             <span style={{ ...mono, fontSize: "3rem", fontWeight: 500, lineHeight: 1 }}>{formatTemp(temp)}</span>
-            <WmoIcon size={44} style={{ color: iconColor }} />
+            {wmoIcon({ size: 44, style: { color: iconColor } })}
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span style={{ ...dotGothic, ...uppercase, fontSize: "0.65rem", letterSpacing: "0.1em", color: "var(--accent-orange)" }}>
                 {conditionLabel}

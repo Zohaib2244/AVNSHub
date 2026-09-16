@@ -56,7 +56,9 @@ export function NutBotFaceV2({ compact = false }: Props) {
 
   const signal    = useSyncExternalStore(subscribeSignal, getSignal, getServerSignal);
   const signalRef = useRef(signal);
-  signalRef.current = signal;
+  useEffect(() => {
+    signalRef.current = signal;
+  }, [signal]);
 
   // Map incoming signal → expression; cancel any active click override first
   useEffect(() => {

@@ -82,7 +82,10 @@ function RecentTracks({ data, onPlayTrack }: { data: NowPlayingData | undefined;
 export function NowPlaying() {
   const { size, hoverExpanded, settings } = useWidget();
   const creds = spotifyCredsFrom(settings);
-  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS, creds);
+  const { data: polled, refresh } = usePolling<NowPlayingData | { notConfigured: true }>(POLL_URL, POLL_MS, creds);
+  // the route answers `{ notConfigured: true }` when no credentials are set
+  const notConfigured = !!polled && "notConfigured" in polled;
+  const data = notConfigured ? undefined : (polled as NowPlayingData | undefined);
   const [controlError, setControlError] = useState<string | null>(null);
 
   async function control(action: PlayerAction) {
@@ -139,7 +142,7 @@ export function NowPlaying() {
               </div>
               <div className="spotify-copy">
                 <div className="spotify-title">—</div>
-                <div className="spotify-artist">spotify idle</div>
+                <div className="spotify-artist">{notConfigured ? "not configured — add credentials in settings" : "spotify idle"}</div>
               </div>
               <div className="spotify-controls">
                 <button type="button" className="player-btn" aria-label="previous track" disabled>

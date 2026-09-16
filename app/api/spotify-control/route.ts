@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { controlPlayback, type PlayerAction, type SpotifyCreds } from "@/lib/spotify";
+import { controlPlayback, SpotifyNotConfiguredError, type PlayerAction, type SpotifyCreds } from "@/lib/spotify";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +23,9 @@ export async function POST(request: Request) {
     const result = await controlPlayback(body.action as PlayerAction, body.uri, body.creds);
     return NextResponse.json(result, { status: result.ok ? 200 : 502 });
   } catch (error) {
+    if (error instanceof SpotifyNotConfiguredError) {
+      return NextResponse.json({ ok: false, error: "spotify is not configured" }, { status: 400 });
+    }
     console.error("spotify-control route error:", error);
     return NextResponse.json({ ok: false, error: "control request failed" }, { status: 502 });
   }

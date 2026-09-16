@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  createElement,
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
@@ -392,14 +393,14 @@ function LinkRow({
   onEdit,
   onDelete,
 }: LinkRowProps) {
-  const Icon = getIcon(link.iconName);
+  const icon = createElement(getIcon(link.iconName), { size: 14, strokeWidth: 1.75 });
   const accentVar = resolveAccentVar(link.accent, accentMode);
   return (
     <div className="ql-row">
       <button type="button" className="ql-row-main" onClick={() => onOpen(link)} title={link.url}>
         {showIcons && (
           <span className="ql-icon" style={{ color: accentVar }}>
-            <Icon size={14} strokeWidth={1.75} />
+            {icon}
           </span>
         )}
         <span className="ql-row-text">
@@ -533,7 +534,7 @@ function LinkForm({ editingId, initialDraft, groups, onCancel, onSave, onCreateG
     }
   }
 
-  const PreviewIcon = getIcon(iconName);
+  const previewIcon = createElement(getIcon(iconName), { size: 14, strokeWidth: 1.75 });
 
   return (
     <form className="ql-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
@@ -594,7 +595,7 @@ function LinkForm({ editingId, initialDraft, groups, onCancel, onSave, onCreateG
           </label>
           <div className="ql-icon-pick">
             <span className="ql-icon-preview">
-              <PreviewIcon size={14} strokeWidth={1.75} />
+              {previewIcon}
             </span>
             <select id="ql-f-icon" className="ql-input" value={iconName} onChange={(e) => setIconName(e.target.value)}>
               {ICON_NAMES.map((name) => (
@@ -714,6 +715,7 @@ export function QuickLinksWidget() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage only exists on the client; loading it after mount (not in a lazy initializer) keeps the server render and first client render identical
     setStore(loadStore());
     setHydrated(true);
   }, []);
@@ -729,13 +731,17 @@ export function QuickLinksWidget() {
     };
   }, []);
 
-  useEffect(() => {
+  // entering zen mode closes any open editors — adjusted during render when
+  // zenMode flips on, rather than in an effect that renders twice
+  const [prevZenMode, setPrevZenMode] = useState(zenMode);
+  if (zenMode !== prevZenMode) {
+    setPrevZenMode(zenMode);
     if (zenMode) {
       setFormMode(null);
       setEditingGroupId(null);
       setGroupsExpanded(false);
     }
-  }, [zenMode]);
+  }
 
   const allowManage = !zenMode && size === "L";
   const groupNameById = useMemo(() => new Map(store.groups.map((g) => [g.id, g.name])), [store.groups]);

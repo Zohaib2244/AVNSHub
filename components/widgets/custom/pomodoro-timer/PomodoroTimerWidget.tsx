@@ -67,7 +67,9 @@ export function PomodoroTimerWidget() {
   const [taskName, setTaskName] = useState("");
 
   const taskNameRef = useRef(taskName);
-  taskNameRef.current = taskName;
+  useEffect(() => {
+    taskNameRef.current = taskName;
+  }, [taskName]);
 
   const nextIdRef = useRef(0);
 
@@ -129,11 +131,14 @@ export function PomodoroTimerWidget() {
     return () => clearInterval(id);
   }, [timer.running, focusDurationSec, breakDurationSec, longBreakSec]);
 
-  useEffect(() => {
-    if (!timer.running) {
-      setTimer((prev) => ({ ...prev, timeLeft: focusDurationSec }));
-    }
-  }, [focusDurationSec, timer.running]);
+  // when the focus length changes or the timer stops, reset the countdown —
+  // adjusted during render on those exact transitions instead of in an effect
+  const resetKey = `${focusDurationSec}|${timer.running}`;
+  const [prevResetKey, setPrevResetKey] = useState(resetKey);
+  if (resetKey !== prevResetKey) {
+    setPrevResetKey(resetKey);
+    if (!timer.running) setTimer((prev) => ({ ...prev, timeLeft: focusDurationSec }));
+  }
 
   const handleStart = useCallback(() => {
     setTimer((prev) => ({ ...prev, running: true }));

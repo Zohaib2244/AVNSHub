@@ -7,6 +7,9 @@ import { emitThinking, emitBootComplete } from "@/lib/nutbotSignal";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import "@/components/widgets/default/nutbot/NutBotFaceWidget.css";
 import type { HomelabStatus, HostTelemetry } from "@/lib/homelab";
+import packageJson from "@/package.json";
+
+const APP_VERSION = packageJson.version;
 
 // Reading sessionStorage during render would diverge from the server's render
 // (which always sees "not booted"), causing a hydration mismatch. Defer the
@@ -21,7 +24,12 @@ type Status = {
   homelabLoaded: boolean;
   sys: HostTelemetry | null;
   sysLoaded: boolean;
+  /** "ok" = credentials work, "unset" = no credentials, "fail" = request failed */
+  spotify: "ok" | "unset" | "fail" | null;
 };
+
+/** pad a check name to the log's value column */
+const row = (name: string, value: string) => `  ${name.padEnd(33)}${value}`;
 
 const FLAVOR_LINES = [
   "  waking nutbot up...",
@@ -35,55 +43,65 @@ const FLAVOR_LINES = [
 // picked once per module load (stable for the boot, varies across page loads)
 const flavorLine = FLAVOR_LINES[Math.floor(Math.random() * FLAVOR_LINES.length)];
 
+// Every status here comes from a real request made while the log animates.
+// A check that hasn't answered yet shows "..." and one that failed says so —
+// nothing is hard-coded to "OK".
 function buildLines(status: Status): { text: string; type: LineType }[] {
-  let sysText = "  system.telemetry                 ...";
-  let sysType: LineType = "default";
+  let sys = { text: row("system.telemetry", "..."), type: "default" as LineType };
+  let storage = { text: row("storage.mounts", "..."), type: "default" as LineType };
   if (status.sysLoaded) {
     if (status.sys) {
       const cpu = Math.round(status.sys.cpu.used_pct);
       const mem = Math.round(status.sys.memory.used_pct);
-      sysText = `  system.telemetry                 OK   cpu ${cpu}% · mem ${mem}%`;
-      sysType = "ok";
+      sys = { text: row("system.telemetry", `OK   cpu ${cpu}% · mem ${mem}%`), type: "ok" };
+      const drives = status.sys.drives.filter((d) => d.mount === "/" || d.mount.startsWith("/mnt/"));
+      const full = drives.filter((d) => d.used_pct >= 95);
+      const missing = status.sys.missing_mounts ?? [];
+      storage = missing.length
+        ? { text: row("storage.mounts", `FAIL ${missing.join(", ")} not mounted`), type: "warn" }
+        : full.length
+        ? { text: row("storage.mounts", `WARN ${full.map((d) => `${d.mount} ${Math.round(d.used_pct)}%`).join(", ")}`), type: "warn" }
+        : { text: row("storage.mounts", `OK   ${drives.length} mounted`), type: "ok" };
     } else {
-      sysText = "  system.telemetry                 OK";
-      sysType = "ok";
+      sys = { text: row("system.telemetry", "FAIL unavailable"), type: "warn" };
+      storage = { text: row("storage.mounts", "FAIL unavailable"), type: "warn" };
     }
   }
 
-  let homelabText = "  homelab.ping                     ...";
-  let homelabType: LineType = "default";
+  let homelab = { text: row("homelab.ping", "..."), type: "default" as LineType };
   if (status.homelabLoaded) {
     const services = status.homelab?.services ?? [];
     if (services.length === 0) {
-      homelabText = "  homelab.ping                     PARTIAL";
-      homelabType = "warn";
+      homelab = { text: row("homelab.ping", "SKIP no status source"), type: "default" };
     } else {
-      const up = services.filter((s) => s.status === "up").length;
+      const up = services.filter((svc) => svc.status === "up").length;
       const total = services.length;
-      if (up === total) {
-        homelabText = `  homelab.ping                     OK   ${up}/${total} up`;
-        homelabType = "ok";
-      } else {
-        homelabText = `  homelab.ping                     PARTIAL   ${up}/${total} up`;
-        homelabType = "warn";
-      }
+      homelab = up === total
+        ? { text: row("homelab.ping", `OK   ${up}/${total} up`), type: "ok" }
+        : { text: row("homelab.ping", `WARN ${up}/${total} up`), type: "warn" };
     }
   }
 
+  const spotify: { text: string; type: LineType } = {
+    ok: { text: row("spotify.auth", "OK"), type: "ok" as LineType },
+    unset: { text: row("spotify.auth", "SKIP not configured"), type: "default" as LineType },
+    fail: { text: row("spotify.auth", "FAIL"), type: "warn" as LineType },
+    pending: { text: row("spotify.auth", "..."), type: "default" as LineType },
+  }[status.spotify ?? "pending"];
+
   return [
-    { text: "AVN HUB / v2.3.0-alpha.2  ——  IDENTITY RUNTIME", type: "header" },
+    { text: `AVN HUB / v${APP_VERSION}  ——  IDENTITY RUNTIME`, type: "header" },
     { text: "────────────────────────────────────────", type: "divider" },
-    { text: "  init display drivers              OK", type: "ok" },
-    { text: "  mount /dev/homelab                OK", type: "ok" },
-    { text: "  spotify.auth.handshake            OK", type: "ok" },
-    { text: sysText, type: sysType },
-    { text: homelabText, type: homelabType },
+    sys,
+    storage,
+    homelab,
+    spotify,
     { text: flavorLine, type: "default" },
     { text: "  rendering dashboard...", type: "default" },
   ];
 }
 
-const LINE_COUNT = 9;
+const LINE_COUNT = 8;
 
 const colorFor: Record<LineType, string> = {
   header:  "var(--text-primary)",
@@ -124,7 +142,7 @@ export function BootSequence() {
   const [exiting, setExiting] = useState(false);
   const [done, setDone] = useState(false);
   const [status, setStatus] = useState<Status>({
-    homelab: null, homelabLoaded: false, sys: null, sysLoaded: false,
+    homelab: null, homelabLoaded: false, sys: null, sysLoaded: false, spotify: null,
   });
 
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -162,9 +180,8 @@ export function BootSequence() {
     beginExit();
   }, [beginExit, done, exiting]);
 
-  // fetch real homelab + system telemetry in the background so the boot log
-  // reports true state — gracefully falls back to canned "OK" copy if the
-  // endpoint is unconfigured or slow
+  // fetch real homelab / system / spotify state in the background so the boot
+  // log reports true state; anything that fails is shown as FAIL, not OK
   useEffect(() => {
     if (done) return;
     let cancelled = false;
@@ -176,6 +193,13 @@ export function BootSequence() {
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null)
       .then((data) => { if (!cancelled) setStatus((s) => ({ ...s, sys: data, sysLoaded: true })); });
+    // GET uses the server's SPOTIFY_* env vars; credentials entered only in a
+    // widget's settings aren't known here, so those read as "not configured"
+    fetch("/api/now-playing")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => (data && typeof data === "object" && "notConfigured" in data ? "unset" : "ok"))
+      .catch(() => "fail")
+      .then((spotify) => { if (!cancelled) setStatus((s) => ({ ...s, spotify: spotify as Status["spotify"] })); });
     return () => { cancelled = true; };
   }, [done]);
 

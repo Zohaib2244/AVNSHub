@@ -1,4 +1,9 @@
-@import "tailwindcss";
+/* Plain CSS on purpose: no Tailwind at-rules (@import "tailwindcss", @theme,
+   @apply, ...) may live in this file — they belong in styles/tailwind.css.
+   A file containing any of them is compiled through @tailwindcss/postcss,
+   whose per-file compiler cache inside Turbopack's long-running dev worker
+   kept serving the old output after edits (every change here was invisible
+   until .next/dev was wiped). Plain files skip that plugin entirely. */
 
 /* ─── design tokens ────────────────────────────────────────────────
    "Chunky Blocks + Accent Border" — see DESIGN_VARIATIONS.md
@@ -298,11 +303,6 @@
   --badge-text: #f0f2ed;
   --status-up: #3f712b;
   --status-down: #ad3a1e;
-}
-
-@theme inline {
-  --font-display: var(--font-dot-gothic);
-  --font-mono: var(--font-jetbrains-mono);
 }
 
 /* ─── base ───────────────────────────────────────────────────── */

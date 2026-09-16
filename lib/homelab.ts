@@ -43,6 +43,10 @@ export type HostTelemetry = {
     tx_rate_bps: number;
   };
   uptime_seconds: number;
+  /** data mounts listed in /etc/fstab (under /mnt or /media) that aren't
+      currently mounted — e.g. a USB drive that dropped off the bus. Linux only;
+      absent elsewhere. */
+  missing_mounts?: string[];
 };
 
 type RawService = {

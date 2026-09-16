@@ -346,9 +346,8 @@ export function WorldClockWidget() {
   const firstRingingAlarm = ringingAlarms[0] ?? null;
   const hasRinging = ringingAlarms.length > 0;
 
-  useEffect(() => {
-    if (!hasRinging) setShowRinging(false);
-  }, [hasRinging]);
+  // once nothing is ringing, a stale "show ringing" toggle must not linger for the next alarm
+  if (!hasRinging && showRinging) setShowRinging(false);
 
   if (!firstClock) {
     return (
