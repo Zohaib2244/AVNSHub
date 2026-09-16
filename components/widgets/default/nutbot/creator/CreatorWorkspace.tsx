@@ -150,6 +150,25 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
     });
   }
 
+  /** Leave Ideate without picking a mockup — either nothing generated (a
+   *  broken harness, a refusal), or the user changed their mind after
+   *  entering Ideate. Same handoff as handleFinalize minus the design
+   *  reference, and `hasIdeateRounds` is deliberately left alone so the
+   *  project doesn't claim rounds it never produced. Any reference attached
+   *  by an earlier finalize is kept rather than silently discarded. */
+  function handleSkipToBuild() {
+    const briefPatch = project.brief ? buildSettingsFromBrief(project.brief) : {};
+    updateProject(project.id, {
+      activeMode: "build",
+      workflowMode: "build",
+      buildSettings: {
+        ...(project.buildSettings ?? EMPTY_SETTINGS),
+        ...briefPatch,
+        editSlug: undefined,
+      },
+    });
+  }
+
   function patchBuildSettings(patch: Partial<GenerateSettings>) {
     updateProject(project.id, {
       buildSettings: { ...(project.buildSettings ?? EMPTY_SETTINGS), ...patch },
@@ -371,6 +390,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   activeHarness={activeHarness}
                   harnessChain={harnessChain}
                   onFinalize={handleFinalize}
+                  onSkipToBuild={handleSkipToBuild}
                   brief={project.brief}
                   ideateSessionId={project.ideateSessionId}
                   readOnly={isReviewMode}

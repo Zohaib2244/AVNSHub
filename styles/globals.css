@@ -5,6 +5,23 @@
    Dark is the default; [data-theme="light"] overrides below.
 ──────────────────────────────────────────────────────────────────── */
 
+/* ─── type scale ──────────────────────────────────────────────────
+   Five steps, each >=1.15x the last, floored at ~11px (the legibility
+   limit for DotGothic16, a bitmap-grid face that drops strokes below it).
+   Root is 17px, so the px values in the comments are the rendered sizes.
+   Every font-size in this codebase references one of these — do not
+   reintroduce ad-hoc rem values, the old scale had 18 sizes with 14 of
+   them inside a 4px band, which is why headers and body text read alike.
+   Size alone cannot carry hierarchy at these sizes: pair the step with
+   family (DotGothic = label, JetBrains = content) and colour. */
+:root {
+  --fs-micro: 0.65rem;   /* 11.1px — badges, pills, counts, uppercase micro-labels */
+  --fs-label: 0.75rem;   /* 12.8px — section/field labels, dense rows */
+  --fs-body: 0.875rem;   /* 14.9px — sentences, inputs, settings rows */
+  --fs-lead: 1.2rem;     /* 20.4px — widget titles and primary data values */
+  --fs-stat: 2.2rem;     /* 37.4px — headline stat numbers */
+}
+
 :root {
   --bg-page: #13100c;
   --bg-card: #1e1a14;
@@ -12,8 +29,8 @@
   --border: #3d3220;
   --shadow: #070604;
   --text-primary: #e8dfc8;
-  --text-muted: #9f9887;
-  --text-muted-dim: #8b8475;
+  --text-muted: #b5b0a3;
+  --text-muted-dim: #8b8576;
   --accent-orange: #ff6b2b;
   --accent-cyan: #00b4c8;
   --accent-warm: #e8dfc8;
@@ -29,8 +46,8 @@
   --border: #7a6a52;
   --shadow: #a89878;
   --text-primary: #1c1810;
-  --text-muted: #9a8870;
-  --text-muted-dim: #b0a090;
+  --text-muted: #514739;
+  --text-muted-dim: #796856;
   --accent-orange: #e05a18;
   --accent-cyan: #00768a;
   --accent-warm: #1c1810;
@@ -52,7 +69,7 @@
   --border: #2c3440;
   --shadow: #04060a;
   --text-primary: #d8e2ec;
-  --text-muted: #929aa3;
+  --text-muted: #abb1b8;
   --text-muted-dim: #7f868f;
   --accent-orange: #4da3ff;
   --accent-cyan: #00c8a0;
@@ -69,8 +86,8 @@
   --border: #5a6a7e;
   --shadow: #98a8bc;
   --text-primary: #141a22;
-  --text-muted: #76869a;
-  --text-muted-dim: #98a8b8;
+  --text-muted: #404a56;
+  --text-muted-dim: #596e82;
   --accent-orange: #1a73d8;
   --accent-cyan: #00806a;
   --accent-warm: #141a22;
@@ -86,8 +103,8 @@
   --border: #2c3a28;
   --shadow: #040704;
   --text-primary: #dce8d0;
-  --text-muted: #949f8c;
-  --text-muted-dim: #808a7a;
+  --text-muted: #aab2a3;
+  --text-muted-dim: #7d8877;
   --accent-orange: #8fc63c;
   --accent-cyan: #d89a28;
   --accent-warm: #dce8d0;
@@ -103,8 +120,8 @@
   --border: #66785a;
   --shadow: #9cae8c;
   --text-primary: #161c10;
-  --text-muted: #849474;
-  --text-muted-dim: #a4b494;
+  --text-muted: #434c3b;
+  --text-muted-dim: #60714f;
   --accent-orange: #4e8a10;
   --accent-cyan: #a87010;
   --accent-warm: #161c10;
@@ -120,8 +137,8 @@
   --border: #3a2c40;
   --shadow: #060408;
   --text-primary: #ecdce8;
-  --text-muted: #a1949f;
-  --text-muted-dim: #8c808b;
+  --text-muted: #b4aab3;
+  --text-muted-dim: #8b7f8a;
   --accent-orange: #e84a8a;
   --accent-cyan: #d8a830;
   --accent-warm: #ecdce8;
@@ -137,8 +154,8 @@
   --border: #7a5e76;
   --shadow: #ab92a8;
   --text-primary: #1c1018;
-  --text-muted: #988096;
-  --text-muted-dim: #b8a0b4;
+  --text-muted: #524251;
+  --text-muted-dim: #80607a;
   --accent-orange: #c01868;
   --accent-cyan: #9a7208;
   --accent-warm: #1c1018;
@@ -154,8 +171,8 @@
   --border: #2a4a45;
   --shadow: #030706;
   --text-primary: #d5ece7;
-  --text-muted: #8fa9a4;
-  --text-muted-dim: #748e89;
+  --text-muted: #a5bab6;
+  --text-muted-dim: #758f8a;
   --accent-orange: #ff7a59;
   --accent-cyan: #5ad7b7;
   --accent-warm: #d5ece7;
@@ -171,8 +188,8 @@
   --border: #5f837c;
   --shadow: #95b2aa;
   --text-primary: #10201e;
-  --text-muted: #6f8d88;
-  --text-muted-dim: #99b7b0;
+  --text-muted: #3e4e4c;
+  --text-muted-dim: #52746c;
   --accent-orange: #cf4e32;
   --accent-cyan: #00866d;
   --accent-warm: #10201e;
@@ -188,8 +205,8 @@
   --border: #49313a;
   --shadow: #060304;
   --text-primary: #f0dde4;
-  --text-muted: #a88f99;
-  --text-muted-dim: #8f7882;
+  --text-muted: #bda9b1;
+  --text-muted-dim: #947e87;
   --accent-orange: #ff4d6d;
   --accent-cyan: #39c6d6;
   --accent-warm: #f0dde4;
@@ -205,8 +222,8 @@
   --border: #815d68;
   --shadow: #b6929c;
   --text-primary: #241117;
-  --text-muted: #9c7480;
-  --text-muted-dim: #b99aa4;
+  --text-muted: #5b4149;
+  --text-muted-dim: #895f6c;
   --accent-orange: #d41446;
   --accent-cyan: #008598;
   --accent-warm: #241117;
@@ -222,8 +239,8 @@
   --border: #2c3d37;
   --shadow: #030504;
   --text-primary: #dce8df;
-  --text-muted: #93a196;
-  --text-muted-dim: #7d897f;
+  --text-muted: #a7b2a9;
+  --text-muted-dim: #7b887d;
   --accent-orange: #f2c94c;
   --accent-cyan: #2dd4bf;
   --accent-warm: #dce8df;
@@ -239,8 +256,8 @@
   --border: #647365;
   --shadow: #9eae9c;
   --text-primary: #10180f;
-  --text-muted: #7b8b78;
-  --text-muted-dim: #9fb09b;
+  --text-muted: #444d42;
+  --text-muted-dim: #5f735a;
   --accent-orange: #b38300;
   --accent-cyan: #008f7a;
   --accent-warm: #10180f;
@@ -256,8 +273,8 @@
   --border: #3d3833;
   --shadow: #030303;
   --text-primary: #e7e1d7;
-  --text-muted: #9d968b;
-  --text-muted-dim: #817b73;
+  --text-muted: #b6b0a8;
+  --text-muted-dim: #8b857c;
   --accent-orange: #f0623d;
   --accent-cyan: #b4d455;
   --accent-warm: #e7e1d7;
@@ -273,8 +290,8 @@
   --border: #6f726c;
   --shadow: #a4a096;
   --text-primary: #1c1b18;
-  --text-muted: #878075;
-  --text-muted-dim: #aaa298;
+  --text-muted: #4c4842;
+  --text-muted-dim: #736a5f;
   --accent-orange: #bf3f20;
   --accent-cyan: #6d8a12;
   --accent-warm: #1c1b18;
@@ -594,7 +611,7 @@ html[data-backdrop="glass"] .frame {
   border-radius: 12px;
   color: var(--text-muted);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 1.25rem;
+  font-size: var(--fs-lead);
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
@@ -771,7 +788,7 @@ html[data-backdrop="glass"] .frame {
 .slot-popover-empty {
   padding: 10px 4px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
   text-align: center;
 }
@@ -814,7 +831,7 @@ html[data-backdrop="glass"] .frame {
   background: transparent;
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   text-align: left;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -1099,10 +1116,10 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   gap: 5px;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   margin-bottom: 8px;
 }
 
@@ -1140,7 +1157,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   overflow: hidden;
   text-overflow: ellipsis;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.5rem;
+  font-size: var(--fs-micro);
   font-weight: 700;
   line-height: 1;
   color: var(--accent-cyan);
@@ -1148,7 +1165,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .block-crest-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 1.15rem;
+  font-size: var(--fs-lead);
   line-height: 1.15;
   letter-spacing: 0.04em;
   color: var(--text-primary);
@@ -1175,12 +1192,12 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   }
 
   .block-crest-title {
-    font-size: 0.95rem;
+    font-size: var(--fs-body);
   }
 }
 
 .block-value {
-  font-size: 1.25rem;
+  font-size: var(--fs-lead);
   font-weight: 500;
   line-height: 1.3;
   color: var(--text-primary);
@@ -1198,13 +1215,13 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .block-sub {
-  font-size: 0.75rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
 .block-stat {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 2.2rem;
+  font-size: var(--fs-stat);
   line-height: 1;
   color: var(--accent-cyan);
   margin-bottom: 4px;
@@ -1388,6 +1405,27 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   box-shadow: 5px 5px 0 var(--shadow);
 }
 
+/* The widget settings panel portals to <body> and is positioned `fixed`
+   against the gear button's viewport rect (see WidgetSettingsPopover).
+   The base .wset-panel rule above stays absolute because SlotPlacementPopover
+   still composes it and anchors inside its region. Width is fixed here and
+   mirrored by PANEL_WIDTH in the component — keep the two in sync. */
+.wset-panel.wset-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: auto;
+  /* as a <body> child the panel can now be clamped to the true viewport edge,
+     which is where .hub-core (z-index 100) docks — outrank it, but stay under
+     .hub-dialog-backdrop (9000) so a confirm dialog still covers this */
+  z-index: 200;
+  width: 264px;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 .wset-head {
   display: flex;
   align-items: center;
@@ -1398,7 +1436,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -1406,7 +1444,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-section {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted-dim);
@@ -1421,7 +1459,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   justify-content: space-between;
   gap: 10px;
   padding: 3px 0;
-  font-size: 0.68rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
@@ -1436,18 +1474,18 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-select,
 .wset-input {
-  max-width: 130px;
+  max-width: 148px;
   padding: 3px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-nested);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
 }
 
 .wset-input {
-  width: 64px;
+  width: 76px;
 }
 
 .seg-row {
@@ -1467,7 +1505,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1485,25 +1523,12 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   color: var(--badge-text);
 }
 
-@container widget (max-width: 190px) {
-  .wset-row {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 5px;
-  }
-
-  .wset-row > span:first-child {
-    white-space: normal;
-  }
-
-  .wset-select,
-  .wset-input,
-  .wset-row .seg-row {
-    max-width: 100%;
-  }
-}
-
+/* Widget *content* only. The settings-panel rules that used to live here
+   (and in a 190px block above) collapsed .wset-row, stacked .seg-row and set
+   .seg-btn to `font-size: 0` — they scaled the settings UI to the widget
+   being configured, which is what made options illegible on small widgets.
+   The panel is portalled out of this container now; do not add wset/seg
+   rules back into a `@container widget` block. */
 @container widget (max-width: 140px) {
   .capsule[data-size="S"] > .block {
     padding: 10px 8px;
@@ -1511,26 +1536,6 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
   .capsule[data-size="S"] .block-label,
   .capsule[data-size="S"] .block-crest {
-    display: none;
-  }
-
-  .seg-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .seg-btn {
-    gap: 0;
-    padding: 3px 6px;
-    font-size: 0;
-    letter-spacing: 0;
-  }
-
-  .seg-btn svg {
-    flex-shrink: 0;
-  }
-
-  .wset-row > span:first-child {
     display: none;
   }
 }
@@ -1548,7 +1553,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.64rem;
+  font-size: var(--fs-label);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -1666,7 +1671,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   writing-mode: vertical-rl;
   text-orientation: mixed;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: lowercase;
   white-space: nowrap;
@@ -1722,7 +1727,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .canvas-pill-glyph {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-label);
   font-weight: 700;
   line-height: 1;
   color: var(--text-primary);
@@ -1760,7 +1765,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   outline: none;
 }
 
@@ -1796,7 +1801,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-muted);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -1856,7 +1861,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .hub-canvas-glyph-btn .canvas-pill-glyph {
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
 }
 
 .hub-canvas-name-input {
@@ -1871,7 +1876,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--accent-orange);
   color: var(--badge-text);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -1917,7 +1922,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-core-tab-meta {
   color: var(--text-muted-dim);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1985,9 +1990,9 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .hub-setting-label {
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -2020,7 +2025,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2079,7 +2084,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 8px;
   background: var(--bg-nested);
   color: var(--text-muted);
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -2142,10 +2147,10 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-region-head {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   margin-bottom: 6px;
 }
 
@@ -2154,13 +2159,13 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   justify-content: space-between;
   padding: 2px 0;
-  font-size: 0.68rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
 .hub-region-label {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2196,7 +2201,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   min-width: 24px;
   text-align: center;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--text-primary);
   border-left: 1px solid var(--border);
@@ -2208,12 +2213,12 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-core-fixed-note {
   color: var(--text-muted-dim);
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
 }
 
 .hub-core-placeholder {
   color: var(--text-muted-dim);
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 
@@ -2235,7 +2240,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2249,14 +2254,14 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-core-io-error {
   margin-top: 4px;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   color: var(--status-down);
   font-family: var(--font-jetbrains-mono), monospace;
 }
 
 .hub-core-io-ok {
   margin-top: 4px;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   color: var(--accent-cyan);
   font-family: var(--font-jetbrains-mono), monospace;
 }
@@ -2292,7 +2297,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
 }
 
 .hub-widget-search input::placeholder {
@@ -2321,7 +2326,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2331,7 +2336,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-filter-tab span {
   color: var(--text-muted-dim);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0;
 }
 
@@ -2393,7 +2398,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-widget-title {
   color: var(--text-primary);
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2402,7 +2407,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-meta {
   color: var(--text-muted-dim);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
 }
 
 .hub-widget-actions {
@@ -2463,7 +2468,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-card);
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2476,12 +2481,24 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 /* ── Widget-install lock overlay ─────────────────────────────────────────────
-   Covers the entire .slot-page (including the HubCore edge panel) while a new
-   widget is being compiled and registered. Blocks all pointer + keyboard
-   interaction via pointer-events:all on the overlay (top z-index) and
-   pointer-events:none on the canvas content via the data-installing selector.
-   The page reloads once registration completes, so this state is always
-   transient. */
+   Covers the whole viewport while a new widget is compiled and registered.
+
+   `fixed`, not `absolute`: the absolute box resolved against .slot-page, so
+   anything painted outside that box stayed uncovered and clickable — most
+   visibly the HubCore edge dock, which is `right: 0` + `translateX(100%)`
+   against .frame-with-tabs and therefore hangs past .frame's right edge, out
+   through .slot-page's padding and beyond it. Those protruding edge controls
+   were the one part of the page the "lock" never actually locked. Fixed also
+   makes the cover independent of .slot-page's max-width (1800px — a wider
+   monitor left the gutters exposed), its padding, and the scroll position.
+
+   Interaction is blocked by `inert` on .frame (set in SlotDashboard), not by
+   the overlay: unlike pointer-events, inert also stops tab-navigation into
+   the controls underneath and takes them out of the accessibility tree, which
+   is what makes this a real lock rather than a pane you can reach around.
+   The dim below is now visual only (plus a fallback where inert is missing).
+
+   The page reloads once registration completes, so this state is transient. */
 
 .slot-frame[data-installing="true"] .slot-region {
   opacity: 0.2;
@@ -2489,10 +2506,18 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   transition: opacity 0.3s ease;
 }
 
+/* nothing behind a modal cover should scroll away from it */
+html:has(.installing-overlay) {
+  overflow: hidden;
+}
+
 .installing-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 600;
+  /* above every page surface, including .hub-core-panel (200) and the widget
+     settings popover (200); still below .hub-dialog-backdrop (9000) so a
+     confirm dialog can cover this, matching the pre-existing ordering */
+  z-index: 8000;
   background: color-mix(in srgb, var(--bg-page) 72%, transparent);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -2500,7 +2525,6 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   justify-content: center;
   pointer-events: all;
-  border-radius: inherit;
 }
 
 .installing-badge {
@@ -2514,7 +2538,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   box-shadow: 4px 4px 0 var(--shadow);
   color: var(--text-primary);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   user-select: none;
@@ -2526,7 +2550,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .installing-badge-sub {
   color: var(--text-muted);
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
 }
 
@@ -2579,7 +2603,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -2588,7 +2612,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-body {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
   line-height: 1.55;
   color: var(--text-muted);
   margin: 0 0 18px;
@@ -2602,7 +2626,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-cancel {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 5px 14px;
@@ -2621,7 +2645,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-confirm {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 5px 14px;

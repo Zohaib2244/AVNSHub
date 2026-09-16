@@ -12,6 +12,7 @@ import type { HarnessId } from "./harnessAdapters";
 
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
 import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
+import { randomId } from "@/lib/uuid";
 
 export type WidgetBrief = {
   title: string;
@@ -302,7 +303,7 @@ export function createProject(
   const hasIdentity = Boolean(name || icon || slug);
 
   const project: WidgetProject = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     displayName: name || displayName,
     activeMode: entryMode,
     workflowMode: entryMode,

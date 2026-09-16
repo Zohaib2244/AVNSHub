@@ -247,7 +247,7 @@ export async function POST(req: Request) {
           .map((f) => `<!-- ${f} -->\n${readFileSync(join(sessionDir, f), "utf-8")}`)
           .join("\n\n");
 
-      const { outcome } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork, { stage: "ideate" });
+      const { outcome, lastText } = await runHarnessChain(fullPrompt, requestedHarness, chain, write, abortController.signal, partialWork, { stage: "ideate" });
 
       // "aborted" (user stop) deliberately skips the done-verification below —
       // a stopped run reporting "no variation files found" would be noise.
@@ -263,7 +263,16 @@ export async function POST(req: Request) {
         const written = expected.filter((f) => existsSync(join(sessionDir, f)));
 
         if (written.length === 0) {
-          sendEvent(write, "error", { message: "mockup generation finished but no variation files were found on disk" });
+          // The harness reported success but produced nothing. Its own last
+          // message is almost always the actual explanation (a blocked
+          // sandbox, a refusal, a misread path) — quoting it here beats
+          // making the user scroll the transcript to find out why.
+          const said = lastText?.replace(/\s+/g, " ").trim();
+          sendEvent(write, "error", {
+            message: said
+              ? `mockup generation finished but wrote no variation files. ${requestedHarness} said: "${said.length > 400 ? `${said.slice(0, 400)}…` : said}"`
+              : "mockup generation finished but no variation files were found on disk",
+          });
         } else {
           if (written.length < expected.length) {
             sendEvent(write, "status", { type: "partial", missing: expected.filter((f) => !written.includes(f)) });

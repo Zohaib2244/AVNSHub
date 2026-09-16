@@ -8,7 +8,7 @@ import { unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
-import { lineSignalsLimit, type LimitReason } from "@/lib/widget-creator/limitDetection";
+import { lineSignalsLimit, lineSignalsSandboxFailure, describeLimitReason, type LimitReason } from "@/lib/widget-creator/limitDetection";
 
 import { modelArgs, DEFAULT_MODELS, type ModelDefaults } from "./models";
 import { readModelDefaults, saveUsage, resolveSession, saveSession } from "./runStore";
@@ -104,6 +104,10 @@ export function runHarness(
   limitReason?: LimitReason;
   errorReason?: string;
   newSessionId?: string;
+  /** the harness's last piece of prose output — surfaced by callers that
+      verify the run's on-disk result, so "the harness claimed done but wrote
+      nothing" can quote its own explanation instead of just asserting it */
+  lastText?: string;
 }> {
   return new Promise((resolve) => {
     let tempPromptPath: string | undefined;
@@ -226,8 +230,22 @@ export function runHarness(
     let newSessionId: string | null = null;
     let buffer = "";
     let stderrTail = "";
+    let lastText = "";
+    // Set once the sandbox-failure kill has been issued, so the remaining
+    // buffered lines don't each try to kill the child again.
+    let sandboxKilled = false;
 
     function processLine(line: string) {
+      // Checked before (and outside) the isGeneratedContent gate below: a
+      // broken sandbox reports itself inside the harness's own command-output
+      // frames, which that gate deliberately skips. Every command will fail
+      // the same way, so stop the run now rather than paying for a full turn
+      // that cannot touch the disk — the chain then offers the next harness.
+      if (!sandboxKilled && lineSignalsSandboxFailure(line)) {
+        sandboxKilled = true;
+        limitReason = "sandbox";
+        child.kill("SIGTERM");
+      }
       const reported = parseUsage(adapter.id, line);
       if (reported) { usage = reported.usage; actualModel = reported.model ?? actualModel; }
       // Skip limit detection on frames carrying actual model/tool content —
@@ -277,6 +295,10 @@ export function runHarness(
           }
         }
         sendEvent(write, "chunk", { text });
+        // Tool-call lines are normalized to "[tool: Name] ..." by every
+        // adapter's parseChunk; keep only real prose so lastText is the
+        // harness's own explanation, not the last file it happened to read.
+        if (!text.trimStart().startsWith("[tool:")) lastText = text.trim() || lastText;
       }
     }
 
@@ -290,6 +312,12 @@ export function runHarness(
     child.stderr.on("data", (data: Buffer) => {
       const text = data.toString();
       stderrTail = (stderrTail + text).slice(-2000);
+      if (!sandboxKilled && lineSignalsSandboxFailure(text)) {
+        sandboxKilled = true;
+        limitReason = "sandbox";
+        child.kill("SIGTERM");
+        return;
+      }
       const reason = lineSignalsLimit(text);
       if (reason && !limitReason) limitReason = reason;
     });
@@ -302,17 +330,17 @@ export function runHarness(
       // failure and spawn the next harness in the chain.
       if (signal.aborted) {
         record("aborted");
-        resolve({ status: "aborted" });
+        resolve({ status: "aborted", lastText });
       } else if (limitReason) {
         record("limit");
-        resolve({ status: "limit", limitReason });
+        resolve({ status: "limit", limitReason, lastText });
       } else if (code !== 0) {
         record("error");
         // code === null means killed by an external signal (not our abort)
-        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}${stderrTail.trim() ? `: ${stderrTail.trim()}` : ""}` });
+        resolve({ status: "error", errorReason: `exited with ${code !== null ? `code ${code}` : `signal ${killSignal}`}${stderrTail.trim() ? `: ${stderrTail.trim()}` : ""}`, lastText });
       } else {
         record("done");
-        resolve({ status: "done", newSessionId: newSessionId ?? undefined });
+        resolve({ status: "done", newSessionId: newSessionId ?? undefined, lastText });
       }
     });
 
@@ -354,7 +382,7 @@ export async function runHarnessChain(
   opts?: HarnessOpts,
   /** widget slug this whole chain is scoped to — see runHarness's watchSlug */
   watchSlug?: string,
-): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string; harness?: HarnessId }> {
+): Promise<{ outcome: "done" | "failed" | "aborted"; sessionId?: string; harness?: HarnessId; lastText?: string }> {
   const models = opts?.models ?? await readModelDefaults();
   const validSession = await resolveSession(opts?.sessionId, requestedHarness, models[requestedHarness]?.model ?? "");
   const orderedChain = [requestedHarness, ...chain.filter((id) => id !== requestedHarness)].filter((id, i, ids) => Object.hasOwn(HARNESS_ADAPTERS, id) && ids.indexOf(id) === i);
@@ -375,7 +403,7 @@ export async function runHarnessChain(
     // the resume-retry below (if any) has consumed it once.
     const harnessOpts = { ...(i === 0 && !resumeRetried ? { ...opts, sessionId: validSession } : {}), models, stage: opts?.stage };
 
-    const { status, limitReason, errorReason, newSessionId } = await runHarness(
+    const { status, limitReason, errorReason, newSessionId, lastText } = await runHarness(
       adapter, fullPrompt, write, signal, continuationNote, harnessOpts, watchSlug,
     );
 
@@ -386,7 +414,7 @@ export async function runHarnessChain(
 
     // User stop — terminal. No switch/error events, and critically no
     // fallback: pressing stop must never spawn the next harness.
-    if (status === "aborted") return { outcome: "aborted" };
+    if (status === "aborted") return { outcome: "aborted", lastText };
 
     // A `--resume` attempt that fails to even run often just means the CLI's
     // own session store expired (e.g. picking an edit back up weeks later) —
@@ -404,7 +432,7 @@ export async function runHarnessChain(
       const nextId = orderedChain[i + 1];
       if (nextId) {
         const reason = status === "limit"
-          ? (limitReason === "quota" ? "rate limit / quota reached" : limitReason === "overload" ? "upstream service overloaded (not your quota)" : "unknown")
+          ? describeLimitReason(limitReason ?? null)
           : errorReason ?? "failed to start";
         const approved = await requestSwitch(signal, (id) => sendEvent(write, "switch_required", {
           id, from: harnessId, to: nextId, reason, model: models[nextId].model || "CLI default",
@@ -414,7 +442,11 @@ export async function runHarnessChain(
           return { outcome: "aborted" };
         }
         sendEvent(write, "switch", { from: harnessId, to: nextId, reason });
-        if (status === "limit" || errorReason) {
+        if (limitReason === "sandbox") {
+          // Nothing was written — the sandbox blocked every command — so the
+          // fallback must start clean rather than hunt for partial output.
+          continuationNote = `The previous harness (${harnessId}) could not execute a single command on this machine (${reason}) and wrote nothing to disk. Start the task from scratch.`;
+        } else if (status === "limit" || errorReason) {
           // The previous CLI actually ran (limit, or started-then-crashed) and
           // may have written partial work. Hand that work to the fallback
           // inline so it doesn't re-read it from disk. (A "failed to start"
@@ -429,7 +461,11 @@ export async function runHarnessChain(
         continue;
       }
       if (status === "limit") {
-        sendEvent(write, "error", { message: `All harnesses hit a limit (${limitReason ?? "unknown"}). Try again later.` });
+        sendEvent(write, "error", {
+          message: limitReason === "sandbox"
+            ? `${harnessId} could not execute any command on this machine (${describeLimitReason(limitReason)}), and no other harness is left to try.`
+            : `All harnesses hit a limit (${limitReason ?? "unknown"}). Try again later.`,
+        });
       } else if (errorReason) {
         // Chain exhausted on a crash — previously this path ended silently
         // and the client stream just stopped with no explanation.
@@ -437,7 +473,7 @@ export async function runHarnessChain(
       }
       return { outcome: "failed" };
     }
-    return { outcome: "done", sessionId: capturedSessionId, harness: harnessId };
+    return { outcome: "done", sessionId: capturedSessionId, harness: harnessId, lastText };
   }
   return { outcome: "failed" };
 }

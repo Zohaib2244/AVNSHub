@@ -99,8 +99,10 @@ export function SlotWidgetCell({
 }) {
   const { editMode, activePopover, setActivePopover } = useLayout();
   const manifest = getManifest(instance.id);
-  if (!manifest) return null;
   const cellRef = useRef<HTMLDivElement>(null);
+  // the settings panel portals to document.body and positions itself against
+  // this button's viewport rect
+  const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [previewRect, setPreviewRect] = useState<Rect | null>(null);
   // shared so opening one widget's settings closes any other open popover
@@ -165,6 +167,13 @@ export function SlotWidgetCell({
 
     return clearPending;
   }, [activeHoverEffect, hoverMetrics, instance.col, instance.row, instance.colSpan, instance.rowSpan]);
+
+  // Bail out for an unregistered id only AFTER every hook above has run —
+  // an early return placed among them makes the hook order conditional
+  // (react-hooks/rules-of-hooks). No hook here reads `manifest`, and the
+  // first use of it is sizeClassForFootprint below, so this is the earliest
+  // legal exit.
+  if (!manifest) return null;
 
   const effectiveHoverEffect = activeHoverEffect ?? flip?.effect;
   const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
@@ -361,6 +370,7 @@ export function SlotWidgetCell({
       </button>
       <button
         type="button"
+        ref={settingsBtnRef}
         className="slot-settings-btn"
         aria-label={`configure ${instance.id} widget`}
         tabIndex={editMode ? 0 : -1}
@@ -378,6 +388,7 @@ export function SlotWidgetCell({
             onUpdateSettings={(settings) => updateWidgetSettings(instance.id, settings)}
             onHide={() => removeWidget(instance.id)}
             onClose={() => setActivePopover(null)}
+            anchorRef={settingsBtnRef}
           />
         )}
       </AnimatePresence>

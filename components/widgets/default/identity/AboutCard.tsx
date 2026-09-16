@@ -2,7 +2,7 @@
 
 import "./AboutCard.css";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Github, Info, Server } from "lucide-react";
+import { Github, Server } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { ThemeToggle } from "@/components/widgets/default/identity/ThemeToggle";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
@@ -10,10 +10,6 @@ import { WIDGETS } from "@/config/widgets";
 import { getServerSlotLayout, getSlotLayout, subscribeSlotLayout } from "@/lib/slotLayout";
 
 const DEFAULT_REPO_URL = "https://github.com/Zohaib2244/AVNSHub";
-const DEFAULT_ABOUT =
-  "A self-hosted, infinitely extensible dashboard framework — an empty canvas you fill with whatever you want. " +
-  "Widgets are a component plus a manifest, and NutBot scaffolds brand-new ones from a single prompt.";
-
 function textSetting(value: unknown, fallback: string) {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
@@ -85,20 +81,14 @@ function Stats() {
 }
 
 export function AboutCard() {
-  const { settings, size } = useWidget();
+  const { settings } = useWidget();
   const displayName = textSetting(settings.displayName, "AVN Hub");
   const tagline = textSetting(settings.tagline, "front page to your life");
-  const initials = textSetting(settings.initials, "AVN").slice(0, 4).toUpperCase();
-  const aboutText = textSetting(settings.aboutText, DEFAULT_ABOUT);
   const repoUrl = textSetting(settings.repoUrl, DEFAULT_REPO_URL);
 
   return (
     <div className="namecard about-card">
       <div className="namecard-main">
-        <div className="namecard-mark" aria-hidden="true">
-          <Info size={16} strokeWidth={1.75} />
-          <span>{initials}</span>
-        </div>
         <div className="namecard-identity">
           <div className="namecard-logo">{displayName}</div>
           <div className="namecard-tagline">{tagline}</div>
@@ -115,7 +105,6 @@ export function AboutCard() {
       </div>
 
       <div className="about-body">
-        {size === "L" && <p className="about-text">{aboutText}</p>}
         <Stats />
       </div>
 

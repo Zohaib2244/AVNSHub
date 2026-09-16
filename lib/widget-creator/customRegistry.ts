@@ -275,7 +275,19 @@ export function addToComponentMap(id: string, mod?: ComponentModule): { ok: bool
       error: "config/customComponentMap.tsx is missing its marker comments — restore them or the widget cannot be wired in",
     };
   }
-  const resolved = mod ?? findComponentModule(id) ?? { file: componentName(id), exportName: componentName(id) };
+  // Never guess. A map entry is a *static* import in customComponentMap.tsx,
+  // so one pointing at a file that isn't there is not a broken widget — it is
+  // a module-resolution failure that fails the whole module graph up through
+  // app/page.tsx and takes the entire dashboard down with it, with no error
+  // boundary able to catch it. Refusing to write the line is always better
+  // than writing one built from a conventional-name guess.
+  const resolved = mod ?? findComponentModule(id);
+  if (!resolved) {
+    return {
+      ok: false,
+      error: `no component .tsx file found in components/widgets/custom/${id}/ — refusing to add a map entry that would not resolve`,
+    };
+  }
   content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
   writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");

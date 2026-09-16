@@ -328,3 +328,11 @@ and `->`/`=>` instead of arrow glyphs.
   platform writes/updates it automatically after every successful turn from
   the creator's settings. If one is included above under "Project spec", it
   is already the authoritative context; don't second-guess it by exploring.
+- **Delete, move, or rename the component `.tsx` when editing it — always
+  rewrite it in place.** The hub runs against a live dev server that
+  recompiles on every file event, and `config/customComponentMap.tsx` holds a
+  static import of this exact path. If the file is absent for even the moment
+  between a delete and the write that follows, that import fails to resolve
+  and the *entire dashboard* 500s — not just this widget — until the file is
+  back. Removing it first to "start clean" is never worth that. Same reason:
+  don't rename the file to change a component's name.

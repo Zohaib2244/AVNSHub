@@ -16,6 +16,8 @@ import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { useWidget } from "@/components/framework/WidgetContext";
+import { useServiceLog, type ServiceLogLine } from "@/lib/nutbot/useServiceLog";
 
 export const LOG_MESSAGES = [
   "[ok] homelab uplink ... stable",
@@ -42,6 +44,42 @@ function renderLogLine(text: string) {
   );
 }
 
+/** short relative age — a live feed can sit untouched for hours, so a line with
+    no age reads as "just now" and makes a quiet feed look stuck */
+function ago(at: number): string {
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 45) return "now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+}
+
+function ServiceLogRow({ line, tick }: { line: ServiceLogLine; tick: number }) {
+  void tick; // re-render hook so relative ages stay honest without their own timer
+  const body = (
+    <>
+      <span className={`term-tag term-tag-${line.level}`}>[{line.level}]</span>{" "}
+      <span className="term-svc">{line.service}</span> {line.text}
+      {line.repeat > 1 && <span className="term-repeat">×{line.repeat}</span>}
+      <span className="term-age">{ago(line.at)}</span>
+    </>
+  );
+  // Replayed backlog renders instantly: animating 200 rows in at once on
+  // connect is both ugly and a needless layout storm.
+  if (!line.live) return <div className="term-line">{body}</div>;
+  return (
+    <motion.div
+      className="term-line"
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      {body}
+    </motion.div>
+  );
+}
+
 const NUTBOT_TAB_KEY = "nutmag-nutbot-tab";
 const TAB_ORDER: MainTab[] = ["log", "chat", "shells", "creator"];
 
@@ -65,21 +103,45 @@ export function NutBotTerminal() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFocusMode, exitFocusMode]);
 
+  const { settings } = useWidget();
+  const realtime = settings.realtimeLog === true;
+  const maxLines = Math.max(5, Math.min(200, Number(settings.logMaxLines) || 40));
+  const feed = useServiceLog({
+    enabled: realtime,
+    lifecycle: settings.logLifecycle !== false,
+    stdout: settings.logStdout === true,
+    mute: typeof settings.logMute === "string" ? settings.logMute : "",
+    maxLines,
+  });
+
+  // Relative ages must age even when no new line arrives — without this a feed
+  // that goes quiet freezes every timestamp at whatever it said on arrival.
+  const [ageTick, setAgeTick] = useState(0);
+  useEffect(() => {
+    if (!realtime) return;
+    const id = setInterval(() => setAgeTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, [realtime]);
+
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
 
+  // The canned ticker is the `realtime: false` presentation — decorative, and
+  // deliberately still running so the widget reads as alive on a fresh install
+  // where nobody has opted into the real feed yet.
   useEffect(() => {
+    if (realtime) return;
     const id = setInterval(() => {
       setLogLines((prev) => {
         const entry = { id: logId.current++, text: LOG_MESSAGES[logIndex.current % LOG_MESSAGES.length] };
         logIndex.current += 1;
         const next = [...prev, entry];
-        return next.length > 7 ? next.slice(next.length - 7) : next;
+        return next.length > maxLines ? next.slice(next.length - maxLines) : next;
       });
     }, 1800);
     return () => clearInterval(id);
-  }, []);
+  }, [realtime, maxLines]);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
   // `activeTab` is what the user clicked (drives the tab bar's highlight, so it
@@ -142,10 +204,18 @@ export function NutBotTerminal() {
 
   // Only the log tab is a scrolling feed that should pin to the bottom. Firing
   // this for every tab yanked chat/creator/shells to the bottom on each switch.
+  //
+  // Pin only when the reader is already at the bottom. The demo ticker capped
+  // itself at 7 lines so there was never scrollback to lose; the real feed
+  // keeps 200, and force-scrolling would drag someone out of history every
+  // time a container so much as reports a health check.
   useEffect(() => {
     if (displayedTab !== "log") return;
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [logLines, displayedTab]);
+    const el = bodyRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 48) el.scrollTop = el.scrollHeight;
+  }, [logLines, feed.lines, displayedTab]);
 
   // deliberately keyed to displayedTab, not activeTab — see the fade-out effect
   const isShells   = displayedTab === "shells";
@@ -231,7 +301,26 @@ export function NutBotTerminal() {
               setTabPhase("idle");
             }}
           >
-            {tab === "log" && (
+            {tab === "log" && (realtime ? (
+              <>
+                <div className={`term-feed-status${feed.status.connected ? " live" : ""}`}>
+                  <span className="term-feed-dot" aria-hidden="true" />
+                  <span>{feed.status.connected ? "live · docker" : feed.status.detail}</span>
+                </div>
+                {feed.lines.length === 0 ? (
+                  <div className="term-line term-feed-empty">
+                    {feed.status.connected
+                      ? "no service activity yet — the feed is idle, not stuck"
+                      : "waiting for the docker event stream…"}
+                  </div>
+                ) : (
+                  feed.lines.map((line) => (
+                    <ServiceLogRow key={line.id} line={line} tick={ageTick} />
+                  ))
+                )}
+                <span className="term-caret" aria-hidden="true" />
+              </>
+            ) : (
               <>
                 <AnimatePresence initial={false}>
                   {logLines.map((line) => (
@@ -248,7 +337,7 @@ export function NutBotTerminal() {
                 </AnimatePresence>
                 <span className="term-caret" aria-hidden="true" />
               </>
-            )}
+            ))}
 
             {tab === "chat" && <NutBotChat />}
 

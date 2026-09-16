@@ -67,7 +67,7 @@
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
 }
@@ -205,7 +205,7 @@
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -266,7 +266,7 @@
   justify-content: center;
   border-radius: 5px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;

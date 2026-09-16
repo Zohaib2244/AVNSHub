@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { Settings2, Check, Loader2 } from "lucide-react";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs, type ChatBackend } from "@/lib/prefs";
@@ -16,6 +16,8 @@ const PROVIDER_FILTERS: { id: ProviderFilter; label: string }[] = [
 export function ModelSettings() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<"defaults" | "usage">("defaults");
+  const tabId = useId();
   const [closing, setClosing] = useState(false);
   const [draft, setDraft] = useState<ModelDefaults>(prefs.modelDefaults);
   const [provider, setProvider] = useState(prefs.activeHarness);
@@ -24,6 +26,7 @@ export function ModelSettings() {
   const [customModes, setCustomModes] = useState({ claude: false, codex: false });
   const [runs, setRuns] = useState<UsageRun[]>([]);
   const [error, setError] = useState("");
+  const [usageError, setUsageError] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [providerFilter, setProviderFilter] = useState<ProviderFilter>("all");
@@ -33,14 +36,17 @@ export function ModelSettings() {
   useEffect(() => {
     if (!open || closing) return;
     dialog.current?.showModal();
+  }, [open, closing]);
+  useEffect(() => {
+    if (!open || closing || tab !== "usage") return;
     const controller = new AbortController();
     const refresh = () => fetch("/api/widget-creator/usage", { signal: controller.signal })
-      .then(async (res) => { if (!res.ok) throw new Error(); setRuns(await res.json()); setLoaded(true); })
-      .catch(() => { if (!controller.signal.aborted) setError("Could not load usage history. Try reopening settings."); });
+      .then(async (res) => { if (!res.ok) throw new Error(); const data = await res.json(); if (controller.signal.aborted) return; setRuns(data); setLoaded(true); setUsageError(""); })
+      .catch(() => { if (!controller.signal.aborted) setUsageError("Could not load usage history. Retrying automatically…"); });
     void refresh();
     const timer = setInterval(refresh, 5000);
     return () => { controller.abort(); clearInterval(timer); };
-  }, [open, closing]);
+  }, [open, closing, tab]);
 
   function closeMenu() {
     if (closing) return;
@@ -90,6 +96,16 @@ export function ModelSettings() {
       onPointerDown={(e) => { pressedBackdrop.current = isBackdropPoint(e); }}
       onClick={(e) => { if (pressedBackdrop.current && isBackdropPoint(e)) { pressedBackdrop.current = false; closeMenu(); } }}>
       <div className="model-settings-head"><h2 id="model-settings-title">Model settings <span className="model-version">v2.4</span></h2><button type="button" onClick={closeMenu} aria-label="close model settings">×</button></div>
+      <div className="model-settings-tabs" role="tablist" aria-label="Model settings">
+        {(["defaults", "usage"] as const).map((id) => <button key={id} type="button" role="tab" id={`${tabId}-${id}-tab`} aria-controls={`${tabId}-${id}-panel`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} onKeyDown={(event) => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const next = event.key === "Home" ? "defaults" : event.key === "End" ? "usage" : id === "defaults" ? "usage" : "defaults";
+          setTab(next);
+          document.getElementById(`${tabId}-${next}-tab`)?.focus();
+        }}>{id === "defaults" ? "Defaults" : "Usage"}</button>)}
+      </div>
+      <section role="tabpanel" id={`${tabId}-defaults-panel`} aria-labelledby={`${tabId}-defaults-tab`} hidden={tab !== "defaults"} tabIndex={0}>
       <p>Saved defaults for Chat, Plan, Ideate and Build. Your CLI subscription handles access.</p>
       <label className="model-settings-field">Creator provider<select aria-label="Creator provider" value={provider} onChange={(e) => { setProvider(e.target.value as typeof provider); setSaved(false); }}><option value="claude">Claude</option><option value="codex">Codex</option><option value="opencode">OpenCode</option></select></label>
       <label className="model-settings-field">Chat backend<select aria-label="Chat backend" value={chatBackend} onChange={(e) => { setChatBackend(e.target.value as ChatBackend); setSaved(false); }}><option value="auto">Auto — Bonfire, then ask before using a CLI</option><option value="bonfire">Bonfire — local LLM</option><option value="claude">Claude</option><option value="codex">Codex</option><option value="opencode">OpenCode</option><option value="off">Off</option></select></label>
@@ -114,9 +130,12 @@ export function ModelSettings() {
       <p>Model suggestions are guidance, not an account availability check. An unavailable selection reports an error. Provider changes always ask first; saved model changes apply on your next request.</p>
       <div className="model-settings-actions"><button type="button" onClick={closeMenu}>cancel</button><button type="button" className={`model-save${saved ? " saved" : ""}`} disabled={saving} aria-busy={saving} onClick={save}>{saving ? <Loader2 size={14} className="model-saving-icon" /> : saved ? <Check size={14} /> : null}<span aria-live="polite">{saving ? "saving…" : saved ? "defaults saved" : "save defaults"}</span></button></div>
       {error && <p role="alert">{error}</p>}
+      </section>
+      <section role="tabpanel" id={`${tabId}-usage-panel`} aria-labelledby={`${tabId}-usage-tab`} hidden={tab !== "usage"} tabIndex={0}>
       <h3>Usage by stage</h3>
       <p>Last 200 CLI attempts on this hub, including failures. Counts are reported by the CLI; they are not subscription quota or a bill. Cached input is already included in input. OpenCode and interrupted runs may not report counts.</p>
-      {!loaded ? <p>Loading usage…</p> : runs.length === 0 ? <p>No tracked runs yet. Make a request to start tracking.</p> : <>
+      {usageError && <p role="alert">{usageError}</p>}
+      {!loaded ? !usageError && <p>Loading usage…</p> : runs.length === 0 ? <p>No tracked runs yet. Make a request to start tracking.</p> : <>
         <div className="model-usage-filter" role="group" aria-label="Filter usage by provider">
           {PROVIDER_FILTERS.map(({ id, label }) => {
             const attempts = id === "all" ? runs.length : runs.filter((run) => run.harness === id).length;
@@ -132,6 +151,7 @@ export function ModelSettings() {
         </tbody></table></div>}
         <h3>Recent attempts <span className="model-usage-scope">all providers</span></h3><div className="model-settings-table"><table><thead><tr><th>When / stage</th><th>Provider / model</th><th>Input</th><th>Cached</th><th>Output</th><th>Result</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{new Date(run.startedAt).toLocaleString()}<br />{run.stage}</td><td>{run.harness}<br />{run.model}</td><td>{number(run.input)}</td><td>{number(run.cached)}</td><td>{number(run.output)}</td><td>{run.status}<br />{Math.round(run.durationMs / 1000)}s</td></tr>)}</tbody></table></div>
       </>}
+      </section>
     </dialog>, document.body)}
   </>;
 }

@@ -23,6 +23,7 @@ const _office_time_tracker = lazy(() => import("@/components/widgets/custom/offi
 const _pomodoro_timer = lazy(() => import("@/components/widgets/custom/pomodoro-timer/PomodoroTimerWidget").then((m) => ({ default: m.PomodoroTimerWidget })));
 const _publishing_email_builder = lazy(() => import("@/components/widgets/custom/publishing-email-builder/PublishingEmailBuilderWidget").then((m) => ({ default: m.PublishingEmailBuilderWidget })));
 const _weather_updated = lazy(() => import("@/components/widgets/custom/weather-updated/WeatherUpdatedWidget").then((m) => ({ default: m.WeatherUpdatedWidget })));
+const _idea_inbox = lazy(() => import("@/components/widgets/custom/idea-inbox/IdeaInboxWidget").then((m) => ({ default: m.IdeaInboxWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -40,5 +41,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "pomodoro-timer": _pomodoro_timer,
   "publishing-email-builder": _publishing_email_builder,
   "weather-updated": _weather_updated,
+  "idea-inbox": _idea_inbox,
 // --- custom-map end ---
 };

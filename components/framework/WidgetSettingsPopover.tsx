@@ -4,8 +4,22 @@
 // on each card in edit mode. The Placement section is the same for every
 // widget (limited to what its manifest supports); the Widget section is
 // auto-generated from the manifest's settings schema.
+//
+// The panel is PORTALLED to document.body and positioned `fixed` against the
+// gear button's viewport rect. It used to be an absolutely-positioned child of
+// the card, which meant a 250px panel could be wider than the widget it
+// configured, and — worse — that it sat inside the card's `@container widget`
+// scope, so `.wset-row` labels and `.seg-btn` text were being *deleted* on
+// small widgets (`font-size: 0`) to make it fit. Settings UI must never scale
+// with the thing it configures: every widget, at every size, gets the same
+// panel now. Do not reintroduce those container queries.
+//
+// Note the sibling SlotPlacementPopover still composes the base `.wset-panel`
+// class and relies on its `position: absolute` anchoring, so the portal styling
+// lives on the `.wset-portal` modifier rather than on `.wset-panel` itself.
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { EyeOff, X } from "lucide-react";
 import {
@@ -16,6 +30,13 @@ import {
 } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+
+/** panel width; mirrored by `.wset-panel.wset-portal` in globals.css */
+const PANEL_WIDTH = 264;
+/** gap between the gear button and the panel edge */
+const ANCHOR_GAP = 6;
+/** keep-off-the-viewport-edge margin */
+const VIEWPORT_MARGIN = 8;
 
 function SchemaField({
   field,
@@ -109,6 +130,7 @@ export function WidgetSettingsPopover({
   onUpdateSettings,
   onHide,
   hideWidgetSettings = false,
+  anchorRef,
 }: {
   manifest: WidgetManifest;
   instance: WidgetInstance;
@@ -116,6 +138,10 @@ export function WidgetSettingsPopover({
   onUpdateSettings?: (settings: SettingsValues) => void;
   onHide?: () => void;
   hideWidgetSettings?: boolean;
+  /** the gear button the panel is positioned against. A ref, not the element:
+      reading `.current` during the parent's render is not allowed, so the
+      element is resolved inside the positioning effect instead. */
+  anchorRef?: RefObject<HTMLElement | null>;
 }) {
   const { updateInstance } = useLayout();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -132,6 +158,44 @@ export function WidgetSettingsPopover({
     if (onUpdateSettings) onUpdateSettings(settings);
     else updateInstance(instance.id, { settings });
   }
+
+  // `null` until measured — the panel renders hidden for one frame so its real
+  // height can be read before deciding whether it opens below or above.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  const reposition = useCallback(() => {
+    const anchor = anchorRef?.current;
+    const panel = panelRef.current;
+    if (!anchor || !panel) return;
+    const r = anchor.getBoundingClientRect();
+    const h = panel.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // right-align to the gear (matching the old top-right anchoring), then
+    // clamp so a widget near either frame edge still gets the full panel
+    const maxLeft = Math.max(VIEWPORT_MARGIN, vw - PANEL_WIDTH - VIEWPORT_MARGIN);
+    const left = Math.min(Math.max(r.right - PANEL_WIDTH, VIEWPORT_MARGIN), maxLeft);
+
+    // prefer below the gear; flip above when it would overflow the viewport
+    let top = r.bottom + ANCHOR_GAP;
+    if (top + h > vh - VIEWPORT_MARGIN) {
+      const above = r.top - h - ANCHOR_GAP;
+      top = above >= VIEWPORT_MARGIN ? above : Math.max(VIEWPORT_MARGIN, vh - h - VIEWPORT_MARGIN);
+    }
+    setPos({ top, left });
+  }, [anchorRef]);
+
+  useLayoutEffect(() => {
+    reposition();
+    window.addEventListener("resize", reposition);
+    // capture: the frame and region columns scroll independently of the page
+    window.addEventListener("scroll", reposition, true);
+    return () => {
+      window.removeEventListener("resize", reposition);
+      window.removeEventListener("scroll", reposition, true);
+    };
+  }, [reposition]);
 
   useEffect(() => {
     function onDown(e: PointerEvent) {
@@ -151,10 +215,17 @@ export function WidgetSettingsPopover({
     };
   }, [onClose]);
 
-  return (
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <motion.div
       ref={panelRef}
-      className="wset-panel"
+      className="wset-panel wset-portal"
+      style={{
+        top: pos?.top ?? 0,
+        left: pos?.left ?? 0,
+        visibility: pos ? "visible" : "hidden",
+      }}
       initial={{ opacity: 0, y: -6, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, y: -6, scale: 0.97 }}
@@ -205,6 +276,7 @@ export function WidgetSettingsPopover({
           ))}
         </>
       )}
-    </motion.div>
+    </motion.div>,
+    document.body,
   );
 }

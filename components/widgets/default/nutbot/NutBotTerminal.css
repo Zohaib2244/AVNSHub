@@ -20,6 +20,17 @@
      card background for the terminal's dense small type — every "muted" use
      inside NutBot goes through this instead */
   --nb-muted: color-mix(in srgb, var(--text-muted) 52%, var(--text-primary));
+  /* control surface. Buttons in here were mostly transparent, and the few
+     that weren't used --bg-nested — which is *darker* than --bg-card in every
+     dark palette, so a filled button read as a recess rather than something
+     raised. At these sizes a 1px border alone didn't say "button" either, so
+     controls get their own surface, mixed away from the nested background
+     toward the text colour: that lifts in dark palettes and deepens in light
+     ones, staying distinct from both --bg-card and --bg-nested in each.
+     Derived with color-mix (like --nb-muted above) so all eight palettes and
+     both modes get it without redefining any tokens. */
+  --nb-btn-bg: color-mix(in srgb, var(--bg-nested) 86%, var(--text-primary));
+  --nb-btn-bg-hover: color-mix(in srgb, var(--bg-nested) 76%, var(--text-primary));
   /* mono content runs at weight 500 for legibility; DotGothic16 only ships
      400 — block synthetic bold so the pixel-font labels don't render smeared */
   font-synthesis: none;
@@ -186,7 +197,76 @@
 .term-tag-ok    { color: var(--accent-cyan); }
 .term-tag-info  { color: var(--accent-orange); }
 .term-tag-warn,
+.term-tag-err,
 .term-tag-error { color: var(--status-down, #c0392b); }
+/* stdout lines are quoted container output, not hub commentary — muted so the
+   lifecycle events stay the thing your eye lands on when both sources are on */
+.term-tag-log   { color: var(--text-muted); }
+
+/* ─── realtime service feed ─────────────────────────────────────────── */
+
+.term-svc {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.term-repeat {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85em;
+  color: var(--accent-orange);
+}
+
+.term-age {
+  margin-left: 6px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.term-feed-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.term-feed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex: none;
+}
+
+.term-feed-status.live .term-feed-dot {
+  background: var(--accent-cyan);
+  animation: term-feed-pulse 2s ease-in-out infinite;
+}
+
+.term-feed-status.live { color: var(--accent-cyan); }
+
+.term-feed-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@keyframes term-feed-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term-feed-status.live .term-feed-dot { animation: none; }
+}
 
 /* blinking block caret at the end of the log */
 .term-caret {
@@ -222,7 +302,7 @@
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
 }
@@ -324,7 +404,7 @@
   padding: 2px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   font-family: var(--font-dot-gothic), monospace;
   font-size: calc(0.58rem * var(--nb-scale, 1));
@@ -389,7 +469,7 @@
   height: 14px;
   border-radius: 3px;
   border: none;
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   opacity: 0;

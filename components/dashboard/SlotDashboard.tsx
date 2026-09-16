@@ -195,7 +195,11 @@ export function SlotDashboard() {
 
   return (
     <div className="slot-page mx-auto max-w-[1800px] px-5 py-6" style={{ position: "relative" }}>
-      <div className="frame frame-with-tabs">
+      {/* inert (not just pointer-events) is what actually locks the page during
+          an install — it blocks clicks, keyboard/tab navigation and assistive
+          tech alike, and covers the HubCore edge dock that hangs outside this
+          box and so was never under the overlay. See .installing-overlay. */}
+      <div className="frame frame-with-tabs" inert={isInstalling}>
         <HubCorePanel />
         <div
           className="frame-inner"

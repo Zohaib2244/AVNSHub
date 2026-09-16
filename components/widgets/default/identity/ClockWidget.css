@@ -2,13 +2,13 @@
 
 .clock-time {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 2.2rem;
+  font-size: var(--fs-stat);
   line-height: 1;
   color: var(--text-primary);
 }
 
 .clock-date {
-  font-size: 0.75rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
   margin-top: 4px;
 }
@@ -31,7 +31,7 @@
   display: flex;
   justify-content: space-between;
   margin-top: 4px;
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   color: var(--text-muted);
 }
 
@@ -97,7 +97,7 @@
 }
 
 .lofi-label {
-  font-size: 0.7rem;
+  font-size: var(--fs-label);
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -122,7 +122,7 @@
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   cursor: pointer;
@@ -149,10 +149,10 @@
   justify-content: space-between;
   margin-bottom: 6px;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
 }
 
 .cal-grid {
@@ -164,13 +164,13 @@
 
 .cal-grid .dow {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.55rem;
+  font-size: var(--fs-micro);
   color: var(--text-muted-dim);
   padding: 2px 0;
 }
 
 .cal-grid .day {
-  font-size: 0.65rem;
+  font-size: var(--fs-micro);
   padding: 3px 2px;
   border-radius: 4px;
   color: var(--text-muted);

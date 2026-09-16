@@ -280,6 +280,21 @@ export const WIDGETS = {
     sizes: ["S", "M", "L"],
     orientations: ["h", "v"],
     defaults: { size: "S", orientation: "h" },
+    // Log feed. Off = the canned demo ticker (decorative, always "busy").
+    // On = real Docker activity for every container on the host, via
+    // /api/service-log. The two sources are independent because they have
+    // wildly different volumes: lifecycle is a handful of lines a day, stdout
+    // is a firehose across ~39 services.
+    settings: [
+      { key: "realtimeLog", label: "realtime log", type: "toggle", default: false },
+      { key: "logLifecycle", label: "· lifecycle + health", type: "toggle", default: true },
+      { key: "logStdout", label: "· container stdout", type: "toggle", default: false },
+      { key: "logMute", label: "· mute (comma-separated)", type: "text", default: "", placeholder: "redis, -db, cron" },
+      // The demo ticker was hard-capped at 7, which left the rest of the
+      // terminal body empty on anything but a short widget. Applies to both
+      // modes so the feed fills whatever height the widget actually has.
+      { key: "logMaxLines", label: "· max lines", type: "number", default: 40, min: 5, max: 200 },
+    ],
     flags: { className: "nutbot-block" },
   },
   // id stays "identity" — it is the persistence key every saved layout and
@@ -295,8 +310,6 @@ export const WIDGETS = {
     settings: [
       { key: "displayName", label: "display name", type: "text", default: "AVN Hub", placeholder: "Name to show" },
       { key: "tagline", label: "tagline", type: "text", default: "front page to your life", placeholder: "Short tagline" },
-      { key: "initials", label: "initials", type: "text", default: "AVN", placeholder: "AVN" },
-      { key: "aboutText", label: "about text", type: "text", default: "", placeholder: "Shown at L size" },
       { key: "repoUrl", label: "source repo url", type: "text", default: "", placeholder: "https://github.com/…" },
     ],
     flags: { plainChrome: true },

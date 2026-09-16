@@ -597,5 +597,25 @@
     "flags": {
       "hasApiRoute": true
     }
+  },
+  "idea-inbox": {
+    "title": "Idea Inbox",
+    "iconName": "Lightbulb",
+    "sizes": [
+      "S",
+      "M",
+      "L"
+    ],
+    "orientations": [
+      "h"
+    ],
+    "defaults": {
+      "size": "M",
+      "orientation": "h"
+    },
+    "settings": [],
+    "flags": {
+      "hasApiRoute": false
+    }
   }
 }

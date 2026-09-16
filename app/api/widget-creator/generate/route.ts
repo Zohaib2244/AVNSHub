@@ -14,6 +14,7 @@ import {
   isValidCustomWidgetId,
 } from "@/lib/widget-creator/customRegistry";
 import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
+import { startComponentKeepAlive } from "@/lib/widget-creator/componentKeepAlive";
 import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
 import { snapshotGitStatus, unexpectedChanges } from "@/lib/widget-creator/gitAudit";
 import { readProjectSpec, writeProjectSpec, buildProjectSpecMarkdown, type ProjectSpecMeta } from "@/lib/widget-creator/projectSpec";
@@ -401,6 +402,9 @@ export async function POST(req: Request) {
         }
       };
 
+      // declared out here so the finally below can stop it
+      let stopKeepAlive: () => void = () => {};
+
       try {
 
       // For edits: snapshot the existing .tsx files before spawning the harness.
@@ -408,6 +412,20 @@ export async function POST(req: Request) {
       // cut off (rate limit, error), restoreMissingWidgetFiles() puts the last
       // working version back so the site never reaches "module not found".
       if (existedBeforeThisRun && targetId) backupWidgetFiles(targetId);
+
+      // Backups alone only helped *after* the run — by which point a deleted
+      // .tsx had already 500'd the page, and the resulting disconnect had
+      // aborted the run mid-patch so the replacement never landed. Watch for
+      // the deletion instead and undo it within the same inotify tick, so the
+      // static import in customComponentMap.tsx never sees a missing file.
+      stopKeepAlive = existedBeforeThisRun && targetId
+        ? startComponentKeepAlive(
+            join(REPO_ROOT, "components/widgets/custom", targetId),
+            (file) => sendEvent(write, "chunk", {
+              text: `[guard] ${file} was deleted mid-run and has been restored from backup — rewrite files in place instead of deleting and re-adding them.\n`,
+            }),
+          )
+        : () => {};
 
       // Write-audit snapshot — taken after sanitizeComponentMap() and the
       // backups above so this run's own bookkeeping never shows up in the diff.
@@ -546,6 +564,9 @@ export async function POST(req: Request) {
       }
 
       } finally {
+        // Stop the watcher before the post-run restore/cleanup touches the
+        // .bak files it reads from.
+        stopKeepAlive();
         // Always release — a client abort flows cancel() → abort → the chain
         // resolves ("aborted") → here, so the lock can't leak on disconnect.
         releaseGenerationLock();

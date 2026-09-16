@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Square, RefreshCw, Hammer, Plus, Minus, Map, Maximize2 } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
+import { randomId } from "@/lib/uuid";
 import {
   updateProject,
   setWorkingProjectId,
@@ -35,6 +36,10 @@ type Props = {
   activeHarness: HarnessId;
   harnessChain: HarnessId[];
   onFinalize: (html: string) => void;
+  /** Leave Ideate for Build without picking a mockup — available at any time
+      after entering Ideate, and the only way forward when generation produced
+      nothing. */
+  onSkipToBuild: () => void;
   /** the project's Plan-mode brief, if any — the actual input to generation
       when the prompt box is left empty, and shown as a "carried over from
       plan" indicator */
@@ -126,7 +131,7 @@ async function streamIdeate(
   return result ?? { ok: false, message: "stream ended without a result" };
 }
 
-export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, brief, ideateSessionId, readOnly = false }: Props) {
+export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinalize, onSkipToBuild, brief, ideateSessionId, readOnly = false }: Props) {
   const roundsKey = projectIdeateKey(projectId);
 
   const sessionId = ideateSessionId ?? null;
@@ -168,7 +173,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
 
   useEffect(() => {
     if (ideateSessionId) return;
-    const id = crypto.randomUUID();
+    const id = randomId();
     updateProject(projectId, { ideateSessionId: id });
   }, [ideateSessionId, projectId]);
 
@@ -362,7 +367,7 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
     if (isGenerating || readOnly) return;
     const oldSessionId = sessionId;
     if (oldSessionId) fetch(`/api/widget-creator/ideate/file?session=${oldSessionId}`, { method: "DELETE" }).catch(() => {});
-    const id = crypto.randomUUID();
+    const id = randomId();
     updateProject(projectId, { ideateSessionId: id });
     removeProjectBlob(roundsKey);
     setRounds([]);
@@ -381,19 +386,46 @@ export function IdeateCanvas({ projectId, activeHarness, harnessChain, onFinaliz
         </div>
       )}
 
-      {brief && (
+      {(brief || !readOnly) && (
         <div className="wc-handoff-strip">
-          <span className="wc-handoff-chip" title={brief.concept}>
-            <Map size={9} strokeWidth={2} />
-            <span className="wc-handoff-chip-label">carried over from plan: {brief.title}</span>
-          </span>
+          {brief && (
+            <span className="wc-handoff-chip" title={brief.concept}>
+              <Map size={9} strokeWidth={2} />
+              <span className="wc-handoff-chip-label">carried over from plan: {brief.title}</span>
+            </span>
+          )}
+          {!readOnly && (
+            <button
+              type="button"
+              className="wc-ideate-skip-btn"
+              onClick={onSkipToBuild}
+              disabled={isGenerating}
+              title="go straight to Build without picking a mockup — the plan brief still carries over"
+            >
+              skip
+              <Hammer size={9} strokeWidth={2} />
+              build
+            </button>
+          )}
         </div>
       )}
 
       <div className="wc-chat-body wc-ideate-body" ref={bodyRef} onScroll={onBodyScroll}>
         {rounds.length === 0 && !isGenerating && (
           <div className="wc-chat-empty">
-            {isBriefSubstantive()
+            {phase.id === "error" ? (
+              <>
+                nothing was generated. retry below with a different provider, or move on —
+                Build works fine without a mockup, and your plan still carries over.
+                {!readOnly && (
+                  <button type="button" className="wc-ideate-skip-btn wc-ideate-skip-btn--inline" onClick={onSkipToBuild}>
+                    skip
+                    <Hammer size={9} strokeWidth={2} />
+                    build
+                  </button>
+                )}
+              </>
+            ) : isBriefSubstantive()
               ? "your plan is carried over — just press send to generate mockups from it (the box below is only for extra notes)"
               : "describe a widget concept below and pick how many variations to brainstorm"}
           </div>

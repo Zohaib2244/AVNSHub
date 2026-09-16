@@ -94,7 +94,7 @@
   box-shadow: inset 0 1px 0 rgba(0,0,0,.2);
 }
 .nutbot-v2-model-tag {
-  font-size: .5rem; letter-spacing: .18em; color: #9c907e;
+  font-size: var(--fs-micro); letter-spacing: .18em; color: #9c907e;
   text-transform: uppercase;
   font-family: var(--font-dot-gothic), monospace;
 }
