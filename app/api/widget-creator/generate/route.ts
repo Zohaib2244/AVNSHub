@@ -28,6 +28,7 @@ import {
   snapshotTree,
   workbenchCustomDir,
 } from "@/lib/widget-creator/workbench";
+import { finishRun, getRun, setRunStage, startRun } from "@/lib/widget-creator/runStatus";
 
 const REPO_ROOT = process.cwd();
 
@@ -370,13 +371,35 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const write: SSEWriter = (data) => {
+      const send: SSEWriter = (data) => {
         try {
           controller.enqueue(encoder.encode(data));
         } catch {
           // client disconnected
         }
       };
+
+      // Every stage change is mirrored into runStatus (lib/widget-creator/
+      // runStatus.ts) so a tab that didn't see this stream — reloaded, or
+      // another device — can still show what happened. harness_start and
+      // switch are emitted inside the runner, so they're picked up here.
+      const runId = randomUUID();
+      startRun(runId, targetId);
+      const write: SSEWriter = (data) => {
+        const harness = /"type":"harness_start","harness":"([a-z]+)"/.exec(data)?.[1]
+          ?? /^event: switch\ndata: .*"to":"([a-z]+)"/m.exec(data)?.[1];
+        if (harness) setRunStage(runId, targetId, "writing", harness);
+        send(data);
+      };
+      const stage = (name: "checking" | "applying") => {
+        setRunStage(runId, targetId, name);
+        sendEvent(write, "status", { type: name === "checking" ? "tsc_check" : "applying" });
+      };
+      const failRun = (message: string, extra: Record<string, unknown> = {}) => {
+        sendEvent(write, "error", { message, stage: getRun(targetId)?.stage, ...extra });
+        finishRun(runId, targetId, "error", { message });
+      };
+      sendEvent(write, "status", { type: "preparing", runId });
 
       try {
 
@@ -386,8 +409,8 @@ export async function POST(req: Request) {
       const ws = await prepareWorkbench(targetId);
       const wbCustomDir = workbenchCustomDir(ws);
       if (ws.discardedDraft) {
-        sendEvent(write, "chunk", {
-          text: `[workbench] "${targetId}" changed outside the creator while an unfinished draft was pending — the draft was discarded and this turn starts from the live version.\n`,
+        sendEvent(write, "notice", {
+          text: `"${targetId}" was changed outside the creator while an unfinished draft was pending — that draft was discarded and this run starts from the current version.`,
         });
       }
       const corePrompt = buildCorePrompt(settings, promptWithImages, wbCustomDir);
@@ -428,22 +451,20 @@ export async function POST(req: Request) {
       if (outcome === "done") {
         let ok = true;
         if (!findComponentModule(targetId, wbCustomDir)) {
-          sendEvent(write, "error", { message: `no component .tsx file was written in components/widgets/custom/${targetId}/ — nothing was applied` });
+          failRun(`no component .tsx file was written in components/widgets/custom/${targetId}/ — nothing was applied`);
           ok = false;
         }
 
         if (ok) {
-          sendEvent(write, "status", { type: "tsc_check" });
+          stage("checking");
           const tscResult = await runWorkbenchTsc(ws);
           if (tscResult.errors.length > 0) {
             // The draft stays in the workbench for the next fix turn; the live
             // widget is untouched and keeps working.
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
-            sendEvent(write, "error", {
-              message: existedBeforeThisRun
-                ? "TypeScript errors in the edited draft — nothing was applied, your widget is unchanged. Re-submit to fix."
-                : "TypeScript errors in the generated draft — fix the errors above, then re-submit to try again.",
-            });
+            failRun(existedBeforeThisRun
+              ? "type check failed — nothing was applied, your widget still runs the previous version. The draft is kept: describe the fix and resubmit."
+              : "type check failed — nothing was installed. The draft is kept: describe the fix and resubmit.");
             ok = false;
           }
         }
@@ -461,11 +482,10 @@ export async function POST(req: Request) {
             writeProjectSpec(targetId, buildProjectSpecMarkdown(targetId, settings, projectMeta), wbCustomDir);
           }
 
+          stage("applying");
           const applied = planApply(ws);
           if (!applied.ok) {
-            sendEvent(write, "error", {
-              message: `"${targetId}" was changed outside the creator during this run (${applied.conflicts.join(", ")}) — nothing was applied. Re-submit to rebuild on top of the current version.`,
-            });
+            failRun(`"${targetId}" was changed outside the creator during this run (${applied.conflicts.join(", ")}) — nothing was applied. Resubmit to rebuild on top of the current version.`);
             ok = false;
           } else {
             // New and changed files land first (atomic per file), then an
@@ -489,7 +509,7 @@ export async function POST(req: Request) {
                 orientations: settings.orientations,
               });
               if (!wired.ok) {
-                sendEvent(write, "error", { message: `widget applied but registration failed: ${wired.error}` });
+                failRun(`the widget's files were applied but registration failed: ${wired.error}`);
                 ok = false;
               }
               syncComponentMapEntry(targetId);
@@ -502,6 +522,7 @@ export async function POST(req: Request) {
         if (ok) {
           // Include sessionId so ChatCanvas can --resume on the next
           // refinement turn instead of re-sending the full ~6K-token prompt.
+          finishRun(runId, targetId, "done", { registered: existedBeforeThisRun });
           sendEvent(write, "status", {
             type: "done",
             slug: targetId,
@@ -513,8 +534,14 @@ export async function POST(req: Request) {
       }
 
       } catch (err) {
-        sendEvent(write, "error", { message: `widget creator failed: ${err instanceof Error ? err.message : String(err)}` });
+        failRun(`widget creator failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
+        // Whatever path ended the run, the record must not stay "running".
+        const run = getRun(targetId);
+        if (run?.runId === runId && !run.finishedAt) {
+          if (abortController.signal.aborted) finishRun(runId, targetId, "aborted", { message: "stopped before finishing — nothing was applied; the partial draft is kept for your next message" });
+          else finishRun(runId, targetId, "error", { message: "the harness run ended without a result — nothing was applied" });
+        }
         // Always release — a client abort flows cancel() → abort → the chain
         // resolves ("aborted") → here, so the lock can't leak on disconnect.
         releaseGenerationLock();

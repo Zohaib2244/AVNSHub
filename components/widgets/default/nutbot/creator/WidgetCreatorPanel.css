@@ -401,6 +401,148 @@
   white-space: nowrap;
 }
 
+/* elapsed time for the current / last build run */
+.wc-status-time {
+  flex-shrink: 0;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.62rem * var(--nb-scale, 1));
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── build run progress (RunProgress.tsx) ─────────────────────
+   prepare › write › check › apply, mirroring the server's workbench
+   pipeline. Pending steps are dim, the active one spins in orange,
+   finished ones get a cyan check, a failed one an orange cross. */
+.wc-run-steps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 6px;
+  padding: 0;
+  list-style: none;
+  flex-shrink: 0;
+}
+
+.wc-run-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(0.58rem * var(--nb-scale, 1));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--nb-muted, var(--text-muted));
+  opacity: 0.55;
+  transition: color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, background-color 0.2s ease;
+}
+
+.wc-run-step-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.wc-run-sep {
+  color: var(--nb-muted, var(--text-muted));
+  opacity: 0.5;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+  line-height: 1;
+}
+
+.wc-run-step.active {
+  opacity: 1;
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 8%, transparent);
+}
+
+.wc-run-step.done {
+  opacity: 1;
+  color: var(--accent-cyan);
+  border-color: color-mix(in srgb, var(--accent-cyan) 55%, var(--border));
+}
+
+.wc-run-step.failed {
+  opacity: 1;
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  border-style: dashed;
+}
+
+.wc-run-step-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 9px;
+  height: 9px;
+}
+
+.wc-run-step.pending .wc-run-step-icon::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+
+.wc-run-step-time {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.56rem * var(--nb-scale, 1));
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+/* ring spinner — used by the active step and the activity line */
+.wc-spinner {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: wc-spin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes wc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* still show that something is running, just without the fast spin */
+@media (prefers-reduced-motion: reduce) {
+  .wc-spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+/* "what is it doing right now" line at the bottom of the chat */
+.wc-run-activity {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 2px;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+  color: var(--accent-orange);
+  animation: cr-row-in 0.22s ease backwards;
+}
+
+.wc-run-activity-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* generating dots */
 .wc-generating-hint {
   display: flex;
@@ -609,6 +751,17 @@
 
 .wc-msg-error-tag {
   color: var(--status-down, #c0392b);
+  font-weight: 600;
+}
+
+/* neutral run notices: stopped, interrupted, draft discarded, mode switch */
+.wc-msg-notice {
+  border: 1px dashed var(--border);
+  color: var(--nb-muted, var(--text-muted));
+}
+
+.wc-msg-notice-tag {
+  color: var(--accent-cyan);
   font-weight: 600;
 }
 
