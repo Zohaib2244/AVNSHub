@@ -24,6 +24,7 @@ type RegistryEntry = {
   sizes: WidgetManifest["sizes"];
   orientations: WidgetManifest["orientations"];
   defaults: WidgetManifest["defaults"];
+  minPx?: WidgetManifest["minPx"];
   settings?: SettingsField[];
   flags?: WidgetManifest["flags"];
 };
@@ -43,6 +44,7 @@ export const CUSTOM_WIDGETS: Record<string, WidgetManifest> = Object.fromEntries
       sizes: meta.sizes,
       orientations: meta.orientations,
       defaults: meta.defaults,
+      minPx: meta.minPx,
       settings: meta.settings,
       flags: meta.flags,
     } satisfies WidgetManifest,

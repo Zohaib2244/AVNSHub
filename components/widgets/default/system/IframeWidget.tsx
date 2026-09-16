@@ -6,7 +6,7 @@
 //
 // Protocol (all messages scoped to window.location.origin):
 //   host → iframe  NUTMAG_THEME    { tokens, mode, palette }       on load + theme change
-//   host → iframe  NUTMAG_CONTEXT  { size, settings }              on load + size/settings change
+//   host → iframe  NUTMAG_CONTEXT  { size, orientation, settings } on load + size/orientation/settings change
 //   iframe → host  NUTMAG_RESIZE   { height: number }              whenever content height changes
 
 import { useWidget } from "@/components/framework/WidgetContext";
@@ -32,15 +32,19 @@ function buildThemeMessage() {
 }
 
 export function IframeWidget() {
-  const { id, size, settings } = useWidget();
+  const { id, size, orientation, settings } = useWidget();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(128);
 
   // keep latest size + settings in refs so the onLoad closure always sends fresh values
   const sizeRef = useRef(size);
+  const orientationRef = useRef(orientation);
   const settingsRef = useRef(settings);
-  sizeRef.current = size;
-  settingsRef.current = settings;
+  useEffect(() => {
+    sizeRef.current = size;
+    orientationRef.current = orientation;
+    settingsRef.current = settings;
+  });
 
   const origin = typeof window !== "undefined" ? window.location.origin : "*";
 
@@ -52,7 +56,7 @@ export function IframeWidget() {
       const win = iframe.contentWindow;
       if (!win) return;
       win.postMessage(buildThemeMessage(), origin);
-      win.postMessage({ type: "NUTMAG_CONTEXT", size: sizeRef.current, settings: settingsRef.current }, origin);
+      win.postMessage({ type: "NUTMAG_CONTEXT", size: sizeRef.current, orientation: orientationRef.current, settings: settingsRef.current }, origin);
     };
     iframe.addEventListener("load", onLoad);
     return () => iframe.removeEventListener("load", onLoad);
@@ -65,13 +69,13 @@ export function IframeWidget() {
     });
   }, [origin]);
 
-  // re-send context whenever size or settings change
+  // re-send context whenever size, orientation or settings change
   useEffect(() => {
     iframeRef.current?.contentWindow?.postMessage(
-      { type: "NUTMAG_CONTEXT", size, settings },
+      { type: "NUTMAG_CONTEXT", size, orientation, settings },
       origin,
     );
-  }, [size, settings, origin]);
+  }, [size, orientation, settings, origin]);
 
   // listen for height resize requests from the iframe
   useEffect(() => {

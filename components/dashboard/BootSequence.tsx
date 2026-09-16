@@ -213,15 +213,19 @@ export function BootSequence() {
       onClick={skip}
       role="presentation"
     >
+      {/* The two halves meet at the exact vertical centre — where the log text
+          sits — so the accent seam stays invisible while booting and only
+          lights up as the panels split apart on exit; otherwise it draws a line
+          straight through the text. */}
       <motion.div
         className="absolute inset-x-0 top-0 h-1/2"
-        style={{ background: "var(--bg-page)", borderBottom: "2px solid var(--accent-orange)" }}
+        style={{ background: "var(--bg-page)", borderBottom: `2px solid ${exiting ? "var(--accent-orange)" : "transparent"}` }}
         animate={{ y: exiting ? "-100%" : 0 }}
         transition={{ duration: 0.55, ease: [0.76, 0, 0.24, 1] }}
       />
       <motion.div
         className="absolute inset-x-0 bottom-0 h-1/2"
-        style={{ background: "var(--bg-page)", borderTop: "2px solid var(--accent-orange)" }}
+        style={{ background: "var(--bg-page)", borderTop: `2px solid ${exiting ? "var(--accent-orange)" : "transparent"}` }}
         animate={{ y: exiting ? "100%" : 0 }}
         transition={{ duration: 0.55, ease: [0.76, 0, 0.24, 1] }}
       />

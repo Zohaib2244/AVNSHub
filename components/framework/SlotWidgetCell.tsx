@@ -1,7 +1,7 @@
 "use client";
 
 // One placed widget inside a SlotRegion. Derives the widget's S/M/L size +
-// h/v orientation from its persisted cell footprint (lib/grid/sizeClass.ts)
+// h/v orientation from its cell's real pixel box (lib/grid/sizeClass.ts)
 // and renders it through the same WidgetShell Graph Layout uses — existing
 // widget content components need zero changes to work here. In edit mode, a
 // remove button returns the widget to the unplaced pool, a move handle
@@ -15,7 +15,7 @@ import { getManifest } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
 import { getSlotLayout, removeWidget, setWidgetRect, updateWidgetSettings, type SlotWidgetInstance } from "@/lib/slotLayout";
 import type { WidgetInstance } from "@/lib/layout";
-import { sizeClassForFootprint } from "@/lib/grid/sizeClass";
+import { minPixelSize, sizeClassForFootprint } from "@/lib/grid/sizeClass";
 import { buildOccupancy, canPlace, growRect, shrinkRect, maxGrowth, type Direction, type Rect } from "@/lib/grid/occupancy";
 import type { HoverExpandEffect } from "@/lib/grid/hoverExpand";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -85,6 +85,7 @@ export function SlotWidgetCell({
   instance,
   hoverEffect,
   hoverMetrics,
+  trackMetrics,
   onHoverIntent,
   onHoverExit,
   entranceDelay,
@@ -92,6 +93,9 @@ export function SlotWidgetCell({
   instance: SlotWidgetInstance;
   hoverEffect?: HoverExpandEffect;
   hoverMetrics?: HoverGridMetrics;
+  /** the region's measured track size — always present once measured, unlike
+      hoverMetrics which only exists during a hover-expand */
+  trackMetrics?: HoverGridMetrics;
   onHoverIntent?: (id: string, preferredDirections: Direction[]) => void;
   onHoverExit?: () => void;
   /** forwarded straight to WidgetShell — see its prop comment */
@@ -195,11 +199,18 @@ export function SlotWidgetCell({
   // A drag-resize still feeds it: that gesture really is changing the
   // footprint, so re-laying-out as the user drags is the correct feedback.
   const contentRect: Rect = previewRect ?? persistedRect;
+  const contentPx = trackMetrics
+    ? {
+        width: contentRect.colSpan * trackMetrics.trackWidth + Math.max(0, contentRect.colSpan - 1) * trackMetrics.gap,
+        height: contentRect.rowSpan * trackMetrics.trackHeight + Math.max(0, contentRect.rowSpan - 1) * trackMetrics.gap,
+      }
+    : null;
   const { size, orientation } = sizeClassForFootprint(
     { colSpan: contentRect.colSpan, rowSpan: contentRect.rowSpan },
     regionDims,
     manifest.sizes,
     manifest.orientations,
+    contentPx,
   );
   const settingsInstance: WidgetInstance = {
     id: instance.id,
@@ -223,6 +234,23 @@ export function SlotWidgetCell({
     const pitchX = (regionRect.width + gap) / dims.cols;
     const pitchY = (regionRect.height + gap) / dims.rows;
 
+    // convert the widget's minimum pixel box into a cell-span floor at the
+    // current pitch: n spans cover n * pitch - gap px, so n >= (px + gap) / pitch
+    const spanMin = minFootprint(instance.id);
+    const pxMin = manifest ? minPixelSize(manifest.sizes, manifest.minPx) : null;
+    const min = pxMin
+      ? {
+          colSpan: Math.max(spanMin.colSpan, Math.ceil((pxMin.width + gap) / pitchX - 0.01)),
+          rowSpan: Math.max(spanMin.rowSpan, Math.ceil((pxMin.height + gap) / pitchY - 0.01)),
+        }
+      : { ...spanMin };
+    // never above the current footprint: a widget already placed below its
+    // floor (placed before the floor existed, or squeezed by a region/screen
+    // change) must not "shrink" into a bigger rect that could overlap
+    // neighbours — it just can't get any smaller
+    min.colSpan = Math.min(min.colSpan, persistedRect.colSpan);
+    min.rowSpan = Math.min(min.rowSpan, persistedRect.rowSpan);
+
     const siblings: Rect[] = slotLayout.widgets
       .filter((w) => w.region === instance.region)
       .map((w) => ({ col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan }));
@@ -238,7 +266,7 @@ export function SlotWidgetCell({
       dims,
       occupancy: buildOccupancy(dims, siblings, persistedRect),
       baseRect: persistedRect,
-      min: minFootprint(instance.id),
+      min,
     };
     e.currentTarget.setPointerCapture(e.pointerId);
   }

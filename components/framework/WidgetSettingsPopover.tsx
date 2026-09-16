@@ -1,24 +1,29 @@
 "use client";
 
-// Per-widget configuration popover, opened from the gear button that appears
-// on each card in edit mode. The Placement section is the same for every
-// widget (limited to what its manifest supports); the Widget section is
-// auto-generated from the manifest's settings schema.
+// Per-widget configuration dialog, opened from the gear button that appears
+// on each card in edit mode. Android-widget style: a centred panel over a dim
+// that spotlights the widget being configured (every other widget dims, this
+// one stays lit so you can see which card you're editing). The Placement
+// section is the same for every widget; the Widget section is auto-generated
+// from the manifest's settings schema.
 //
-// The panel is PORTALLED to document.body and positioned `fixed` against the
-// gear button's viewport rect. It used to be an absolutely-positioned child of
-// the card, which meant a 250px panel could be wider than the widget it
-// configured, and — worse — that it sat inside the card's `@container widget`
-// scope, so `.wset-row` labels and `.seg-btn` text were being *deleted* on
-// small widgets (`font-size: 0`) to make it fit. Settings UI must never scale
-// with the thing it configures: every widget, at every size, gets the same
-// panel now. Do not reintroduce those container queries.
+// Edits are a DRAFT until Save: the save button only becomes active once a
+// value actually differs from what's stored. Closing any other way — the ×,
+// a click on the dim/outside the panel, or Escape — discards the draft.
+// "remove widget" is a direct action and applies immediately.
+//
+// The dialog is PORTALLED to document.body. It used to be an absolutely-
+// positioned child of the card, which put it inside the card's
+// `@container widget` scope, so `.wset-row` labels and `.seg-btn` text were
+// *deleted* on small widgets (`font-size: 0`) to make it fit. Settings UI must
+// never scale with the thing it configures. Do not reintroduce those container
+// queries.
 //
 // Note the sibling SlotPlacementPopover still composes the base `.wset-panel`
-// class and relies on its `position: absolute` anchoring, so the portal styling
-// lives on the `.wset-portal` modifier rather than on `.wset-panel` itself.
+// class and relies on its `position: absolute` anchoring, so the dialog styling
+// lives on the `.wset-modal` modifier rather than on `.wset-panel` itself.
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "framer-motion";
 import { EyeOff, X } from "lucide-react";
@@ -31,12 +36,8 @@ import {
 import type { WidgetInstance } from "@/lib/layout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 
-/** panel width; mirrored by `.wset-panel.wset-portal` in globals.css */
-const PANEL_WIDTH = 264;
-/** gap between the gear button and the panel edge */
-const ANCHOR_GAP = 6;
-/** keep-off-the-viewport-edge margin */
-const VIEWPORT_MARGIN = 8;
+/** breathing room between the spotlit widget and its cut-out edge */
+const SPOTLIGHT_PAD = 6;
 
 function SchemaField({
   field,
@@ -138,13 +139,12 @@ export function WidgetSettingsPopover({
   onUpdateSettings?: (settings: SettingsValues) => void;
   onHide?: () => void;
   hideWidgetSettings?: boolean;
-  /** the gear button the panel is positioned against. A ref, not the element:
-      reading `.current` during the parent's render is not allowed, so the
-      element is resolved inside the positioning effect instead. */
+  /** the gear button that opened the dialog; its card is the one spotlit.
+      A ref, not the element: reading `.current` during the parent's render is
+      not allowed, so it's resolved inside the measuring effect instead. */
   anchorRef?: RefObject<HTMLElement | null>;
 }) {
   const { updateInstance } = useLayout();
-  const panelRef = useRef<HTMLDivElement>(null);
 
   // A customHeader widget draws its own header, so the shell never renders the
   // name/icon at all and the headerStyle control would do nothing — drop it
@@ -153,130 +153,147 @@ export function WidgetSettingsPopover({
   const frameworkFields = manifest.flags?.customHeader
     ? FRAMEWORK_SETTINGS.filter((f) => f.key !== "headerStyle")
     : FRAMEWORK_SETTINGS;
+  const widgetFields = !hideWidgetSettings ? manifest.settings ?? [] : [];
 
-  function updateSettings(settings: SettingsValues) {
-    if (onUpdateSettings) onUpdateSettings(settings);
-    else updateInstance(instance.id, { settings });
+  const [draft, setDraft] = useState<SettingsValues>({});
+
+  const savedValue = useCallback(
+    (field: SettingsField) => instance.settings[field.key] ?? field.default,
+    [instance.settings],
+  );
+  const valueOf = (field: SettingsField) => (field.key in draft ? draft[field.key] : savedValue(field));
+
+  // only keys whose draft differs from what's stored — editing a value and
+  // then changing it back leaves the dialog clean again
+  const changes: SettingsValues = {};
+  for (const field of [...frameworkFields, ...widgetFields]) {
+    if (field.key in draft && draft[field.key] !== savedValue(field)) changes[field.key] = draft[field.key];
+  }
+  const dirty = Object.keys(changes).length > 0;
+
+  function save() {
+    if (!dirty) return;
+    if (onUpdateSettings) onUpdateSettings(changes);
+    else updateInstance(instance.id, { settings: changes });
+    onClose();
   }
 
-  // `null` until measured — the panel renders hidden for one frame so its real
-  // height can be read before deciding whether it opens below or above.
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-
-  const reposition = useCallback(() => {
-    const anchor = anchorRef?.current;
-    const panel = panelRef.current;
-    if (!anchor || !panel) return;
-    const r = anchor.getBoundingClientRect();
-    const h = panel.offsetHeight;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-
-    // right-align to the gear (matching the old top-right anchoring), then
-    // clamp so a widget near either frame edge still gets the full panel
-    const maxLeft = Math.max(VIEWPORT_MARGIN, vw - PANEL_WIDTH - VIEWPORT_MARGIN);
-    const left = Math.min(Math.max(r.right - PANEL_WIDTH, VIEWPORT_MARGIN), maxLeft);
-
-    // prefer below the gear; flip above when it would overflow the viewport
-    let top = r.bottom + ANCHOR_GAP;
-    if (top + h > vh - VIEWPORT_MARGIN) {
-      const above = r.top - h - ANCHOR_GAP;
-      top = above >= VIEWPORT_MARGIN ? above : Math.max(VIEWPORT_MARGIN, vh - h - VIEWPORT_MARGIN);
-    }
-    setPos({ top, left });
+  // viewport rect of the card being configured, for the spotlight cut-out
+  const [spot, setSpot] = useState<{ top: number; left: number; width: number; height: number } | null>(null);
+  const measure = useCallback(() => {
+    const card = anchorRef?.current?.closest<HTMLElement>(".slot-cell, .widget-slot");
+    if (!card) return setSpot(null);
+    const r = card.getBoundingClientRect();
+    setSpot({
+      top: r.top - SPOTLIGHT_PAD,
+      left: r.left - SPOTLIGHT_PAD,
+      width: r.width + SPOTLIGHT_PAD * 2,
+      height: r.height + SPOTLIGHT_PAD * 2,
+    });
   }, [anchorRef]);
 
   useLayoutEffect(() => {
-    reposition();
-    window.addEventListener("resize", reposition);
+    measure();
+    window.addEventListener("resize", measure);
     // capture: the frame and region columns scroll independently of the page
-    window.addEventListener("scroll", reposition, true);
+    window.addEventListener("scroll", measure, true);
     return () => {
-      window.removeEventListener("resize", reposition);
-      window.removeEventListener("scroll", reposition, true);
+      window.removeEventListener("resize", measure);
+      window.removeEventListener("scroll", measure, true);
     };
-  }, [reposition]);
+  }, [measure]);
 
   useEffect(() => {
-    function onDown(e: PointerEvent) {
-      const target = e.target as Element;
-      // the gear button toggles on click — closing here too would reopen it
-      if (target.closest(".gear-btn, .slot-settings-btn")) return;
-      if (panelRef.current && !panelRef.current.contains(target)) onClose();
-    }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
+    return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
 
   if (typeof document === "undefined") return null;
 
+  const fade = { initial: { opacity: 0 }, animate: { opacity: 1 }, exit: { opacity: 0 }, transition: { duration: 0.18 } };
+
   return createPortal(
-    <motion.div
-      ref={panelRef}
-      className="wset-panel wset-portal"
-      style={{
-        top: pos?.top ?? 0,
-        left: pos?.left ?? 0,
-        visibility: pos ? "visible" : "hidden",
-      }}
-      initial={{ opacity: 0, y: -6, scale: 0.97 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -6, scale: 0.97 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
-    >
-      <div className="wset-head">
-        <span className="wset-title">{manifest.title}</span>
-        <button type="button" className="overlay-close" onClick={onClose} aria-label="close widget settings">
-          <X size={11} strokeWidth={2} />
-        </button>
-      </div>
-
-
-      <div className="wset-section">interaction</div>
-      {frameworkFields.map((field) => (
-        <SchemaField
-          key={field.key}
-          field={field}
-          value={instance.settings[field.key] ?? field.default}
-          onChange={(value) => updateSettings({ [field.key]: value })}
-        />
-      ))}
-
-      {onHide && (
-        <button
-          type="button"
-          className="wset-hide-btn"
-          onClick={() => {
-            onHide();
-            onClose();
-          }}
+    <>
+      {/* the dim: a cut-out box whose huge spread shadow darkens everything
+          except the spotlit card; falls back to a plain full-screen dim */}
+      <motion.div
+        className={`wset-dim${spot ? " wset-dim-spot" : ""}`}
+        style={spot ?? undefined}
+        aria-hidden="true"
+        {...fade}
+      />
+      {/* click catcher — any click outside the panel closes (and discards) */}
+      <div className="wset-backdrop" onPointerDown={onClose} aria-hidden="true" />
+      <div className="wset-modal-wrap">
+        <motion.div
+          className="wset-panel wset-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${manifest.title} settings`}
+          initial={{ opacity: 0, y: 10, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 10, scale: 0.96 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
         >
-          <EyeOff size={12} strokeWidth={1.75} />
-          remove widget
-        </button>
-      )}
+          <div className="wset-head">
+            <span className="wset-title">{manifest.title}</span>
+            <button type="button" className="overlay-close" onClick={onClose} aria-label="close widget settings">
+              <X size={11} strokeWidth={2} />
+            </button>
+          </div>
 
-      {!hideWidgetSettings && (manifest.settings?.length ?? 0) > 0 && (
-        <>
-          <div className="wset-section">widget</div>
-          {manifest.settings!.map((field) => (
-            <SchemaField
-              key={field.key}
-              field={field}
-              value={instance.settings[field.key] ?? field.default}
-              onChange={(value) => updateSettings({ [field.key]: value })}
-            />
-          ))}
-        </>
-      )}
-    </motion.div>,
+          <div className="wset-modal-body">
+            <div className="wset-section">interaction</div>
+            {frameworkFields.map((field) => (
+              <SchemaField
+                key={field.key}
+                field={field}
+                value={valueOf(field)}
+                onChange={(value) => setDraft((d) => ({ ...d, [field.key]: value }))}
+              />
+            ))}
+
+            {widgetFields.length > 0 && (
+              <>
+                <div className="wset-section">widget</div>
+                {widgetFields.map((field) => (
+                  <SchemaField
+                    key={field.key}
+                    field={field}
+                    value={valueOf(field)}
+                    onChange={(value) => setDraft((d) => ({ ...d, [field.key]: value }))}
+                  />
+                ))}
+              </>
+            )}
+
+            {onHide && (
+              <button
+                type="button"
+                className="wset-hide-btn"
+                onClick={() => {
+                  onHide();
+                  onClose();
+                }}
+              >
+                <EyeOff size={12} strokeWidth={1.75} />
+                remove widget
+              </button>
+            )}
+          </div>
+
+          <div className="wset-modal-actions">
+            <span className="wset-modal-hint">{dirty ? "unsaved changes" : "no changes"}</span>
+            <button type="button" className="wset-save" disabled={!dirty} onClick={save}>
+              save
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    </>,
     document.body,
   );
 }

@@ -20,6 +20,7 @@ export type RegistryEntry = {
   sizes: string[];
   orientations: string[];
   defaults: { size: string; orientation: string; hidden?: boolean };
+  minPx?: { width: number; height: number };
   settings?: unknown[];
   flags?: Record<string, unknown>;
 };
@@ -177,6 +178,7 @@ export function buildRegistryEntry(input: EntryInput, existing?: RegistryEntry):
     sizes: finalSizes,
     orientations: finalOris,
     defaults: { size: defaultSize, orientation: finalOris[0] },
+    minPx: existing?.minPx,
     settings: existing?.settings ?? [],
     flags: existing?.flags,
   };
@@ -209,6 +211,11 @@ export function mergeWidgetManifest(base: RegistryEntry, raw: unknown): Registry
     // keep defaults consistent with possibly-narrowed sizes/orientations
     if (!out.sizes.includes(out.defaults.size)) out.defaults.size = out.sizes.includes("M") ? "M" : out.sizes[0];
     if (!out.orientations.includes(out.defaults.orientation)) out.defaults.orientation = out.orientations[0];
+  }
+  if (m.minPx && typeof m.minPx === "object") {
+    const px = m.minPx as Record<string, unknown>;
+    const valid = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 4000;
+    if (valid(px.width) && valid(px.height)) out.minPx = { width: Math.round(px.width), height: Math.round(px.height) };
   }
   if (Array.isArray(m.settings)) out.settings = m.settings;
   if (m.flags && typeof m.flags === "object") out.flags = m.flags as Record<string, unknown>;

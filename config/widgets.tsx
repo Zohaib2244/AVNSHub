@@ -146,6 +146,12 @@ export type WidgetManifest = {
   sizes: WidgetSize[];
   orientations: Orientation[];
   defaults: { size: WidgetSize; orientation: Orientation; hidden?: boolean };
+  /** Slot Layout only — smallest cell box (CSS px) this widget still works in.
+      Drag-resize won't shrink it below this. When omitted, a widget without
+      an "S" layout still gets a floor at the S/M boundary (see minPixelSize
+      in lib/grid/sizeClass.ts), so it can't be squeezed into a box it has no
+      layout for. */
+  minPx?: { width: number; height: number };
   /** widget-specific options — drives the auto-generated settings form */
   settings?: SettingsField[];
   flags?: {

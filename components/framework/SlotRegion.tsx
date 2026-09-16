@@ -60,6 +60,11 @@ export function SlotRegion({
   const lastPointerRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const [hoverPreview, setHoverPreview] = useState<HoverExpandPreview | null>(null);
   const [hoverMetrics, setHoverMetrics] = useState<HoverGridMetrics | null>(null);
+  // Live track size, independent of hover-expand: each cell turns this into
+  // its real pixel box to pick S/M/L (lib/grid/sizeClass.ts). Re-measured
+  // whenever the region's box changes — window resize, frame-ratio drags,
+  // dims edits — so layouts follow what's actually on screen.
+  const [trackMetrics, setTrackMetrics] = useState<HoverGridMetrics | null>(null);
 
   const hoverItems = instances.map((w) => ({
     id: w.id,
@@ -75,6 +80,30 @@ export function SlotRegion({
       setHoeActive(null);
     };
   }, []);
+
+  useEffect(() => {
+    const el = regionRef.current;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const gap = parseFloat(getComputedStyle(el).columnGap) || 12;
+      const next = {
+        gap,
+        trackWidth: Math.round((rect.width - gap * (dims.cols - 1)) / dims.cols),
+        trackHeight: Math.round((rect.height - gap * (dims.rows - 1)) / dims.rows),
+      };
+      setTrackMetrics((current) =>
+        current && current.gap === next.gap && current.trackWidth === next.trackWidth && current.trackHeight === next.trackHeight
+          ? current
+          : next,
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [dims.cols, dims.rows]);
 
   // inert blocks all pointer, keyboard, and AT interaction on non-focused
   // regions; removed immediately on exit so other widgets respond right away
@@ -319,6 +348,7 @@ export function SlotRegion({
           instance={instance}
           hoverEffect={activeHoverPreview?.effects[instance.id]}
           hoverMetrics={activeHoverMetrics ?? undefined}
+          trackMetrics={trackMetrics ?? undefined}
           onHoverIntent={requestHoverExpand}
           onHoverExit={clearHoverExpand}
           entranceDelay={entranceDelays?.[instance.id]}

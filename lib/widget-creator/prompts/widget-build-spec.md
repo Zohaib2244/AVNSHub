@@ -70,31 +70,58 @@ the user can never reach that layout.
 
 ## Space discipline (widgets live in a hard size budget)
 
-A widget renders inside a dashboard grid cell, NOT a page. Rough footprints
-(width x height, varies with screen, rows are 128px-based):
+A widget renders inside a dashboard grid cell, NOT a page. The user resizes
+widgets freely, and `size` is picked from the cell's **real pixel box**
+(outer size, before the card's ~14px/16px padding and header):
 
-- S: ~220 x 140
-- M: ~440 x 140 horizontal / ~440 x 300 vertical
-- L: ~680 x 300 horizontal / ~440 x 460 vertical
+- **S**: narrower than 300px OR shorter than 150px. This covers tiny
+  squares (~236x96) but also tall-narrow (~236x204) and wide-short strips
+  (~485x96, ~727x120). Design S for BOTH shapes: never assume S is wide
+  or tall.
+- **M**: everything between S and L, typically ~485x204 up to ~485x312.
+- **L**: at least 600x250 OR 400x400.
+- `orientation` is `"v"` when the box is taller than wide, else `"h"`.
 
-Rules that follow from this:
+Within one size the box still varies a lot, so layouts must **flex to the
+space**, never assume exact pixels. Rules that follow from this:
 
 - The root element must fill its container (`height: 100%`) and NEVER
-  overflow it. No fixed pixel heights taller than the footprint, no
-  `min-width` that exceeds it, no page-level scrolling.
+  overflow it. No fixed pixel widths/heights, no `min-width` larger than
+  ~200px, no page-level scrolling.
 - If content can outgrow the space (lists, logs, history), give THAT inner
-  area `overflow-y: auto` and `min-height: 0` on its flex parents - the
-  block itself never scrolls.
+  area `overflow-y: auto` and `min-height: 0` on its flex parents — never
+  `overflow: hidden` on an area holding controls or text the user needs.
+- **Every horizontal row must be able to shrink.** Put `minWidth: 0` on
+  flex children that hold text or inputs, and `flex: "0 0 auto"` on buttons
+  and icons so they stay visible while the text/input gives way. A row
+  whose total intrinsic width is wider than ~200px will be cut off at S.
+- **Text entry: use an auto-growing `<textarea rows={1}>`, not
+  `<input type="text">`**, for anything a user may type more than a few
+  words into. Set `resize: "none"`, `width: "100%"`, `minWidth: 0`,
+  `boxSizing: "border-box"`, `overflowWrap: "anywhere"`, and on every
+  change set `height = "auto"` then `height = min(scrollHeight, cap)` with
+  `overflowY: "auto"` past the cap (pick a cap that fits the size: ~48px S,
+  ~64px M, ~96px L). Enter submits, Shift+Enter inserts a newline.
+- User-authored text in lists wraps (`overflowWrap: "anywhere"`,
+  `whiteSpace: "pre-wrap"`) inside a scrolling list; clamp it with
+  `WebkitLineClamp` only in S where there's no room to scroll.
+- **One primary action per control.** Never render a second button that
+  duplicates another (e.g. a header "Add" plus the form's own "Add").
 - Density over decoration: paddings 8-12px, gaps 4-8px, inputs ~24-28px
   tall, font sizes on the small end of the token scale. Every element must
   earn its pixels.
-- A smaller size shows FEWER things, not everything smaller. If the widget
-  has many fields/sections, S/M show the essential subset; the full set is
-  an L-only layout (and `"L"` goes in manifest `sizes`).
-- Prefer one focused view with a compact switcher (tabs, dropdown, chips)
-  over side-by-side panels - side-by-side rarely fits, especially at M.
-- Long text truncates (`text-overflow: ellipsis` + `min-width: 0` on flex
-  children) instead of wrapping into multiple lines that blow the height.
+- A smaller size shows FEWER things, not everything smaller. S shows the
+  single most useful thing plus at most one control; secondary sections
+  (history, "done" lists, stats) are L-only or hidden behind a tab.
+- Prefer one focused view with a compact switcher (tabs, chips) over
+  stacked or side-by-side sections — a collapsible section below a list
+  steals height and gets cropped; a tab that swaps the list does not.
+- Don't repeat the widget's own title inside the component — the shell's
+  header already shows it (or the user has hidden it on purpose).
+- Short labels/values truncate (`textOverflow: "ellipsis"`,
+  `whiteSpace: "nowrap"`, `overflow: "hidden"`, `minWidth: 0`).
+- If the widget is unusable below some size, declare `minPx` in the
+  manifest (below) instead of cramming — resizes then stop there.
 
 ## manifest.json shape
 
@@ -111,6 +138,10 @@ Rules that follow from this:
 }
 ```
 
+- `minPx` (optional) — `{ "width": number, "height": number }`, the
+  smallest outer cell box in px the widget still works in; drag-resize
+  won't go below it. Omit it unless the widget truly breaks when small. A
+  widget whose `sizes` lack `"S"` already gets a 300x150 floor.
 - `iconName` — a `lucide-react` icon name as a **string**, PascalCase (no
   import in this file).
 - `settings` — each field is one of: `{type:"toggle",default:boolean}`,

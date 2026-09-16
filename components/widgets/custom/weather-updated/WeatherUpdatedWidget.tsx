@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle, ArrowUp, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain,
   CloudSnow, CloudSun, Droplets, Eye, Gauge, MapPin, RefreshCw, Settings, Sun,
@@ -314,7 +315,7 @@ export function WeatherUpdatedWidget() {
         <button onClick={openSettings} style={{ background: "var(--accent-orange)", border: "none", color: "var(--badge-text)", cursor: "pointer", fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: "0.52rem", padding: "4px 12px", borderRadius: 6, fontWeight: 500 }} type="button">
           Open Settings
         </button>
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </div>
     );
   }
@@ -363,7 +364,7 @@ export function WeatherUpdatedWidget() {
           </span>
         </div>
         {isStale && <StaleIndicator />}
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </Root>
     );
   }
@@ -448,7 +449,7 @@ export function WeatherUpdatedWidget() {
             </div>
           )}
         </div>
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </Root>
     );
   }
@@ -561,14 +562,20 @@ export function WeatherUpdatedWidget() {
           </button>
         </div>
       </div>
-      {showSettings && <SettingsOverlay />}
+      {showSettings && settingsOverlay()}
     </Root>
   );
 
   /* ─── internal sub-components ─── */
 
-  function SettingsOverlay() {
-    return (
+  // Portaled to <body>: the slot card sets `contain: layout paint`, which
+  // makes position: fixed resolve against (and clip to) the card, so an
+  // in-place overlay was trapped inside small widgets. Called as a plain
+  // function, not <SettingsOverlay />, because a component defined inside
+  // the render gets a new identity each render and remounts on every
+  // keystroke, dropping input focus.
+  function settingsOverlay() {
+    return createPortal(
       <div
         style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100,
@@ -580,7 +587,7 @@ export function WeatherUpdatedWidget() {
         <div
           style={{
             background: "var(--bg-card)", ...border, borderRadius: 14,
-            boxShadow: "6px 6px 0 var(--shadow)", width: 320, padding: 16,
+            boxShadow: "6px 6px 0 var(--shadow)", width: "min(320px, calc(100vw - 32px))", maxHeight: "calc(100vh - 32px)", overflowY: "auto", boxSizing: "border-box", padding: 16,
             display: "flex", flexDirection: "column", gap: 10,
           }}
           onClick={(e) => e.stopPropagation()}
@@ -621,7 +628,8 @@ export function WeatherUpdatedWidget() {
             Save Settings
           </button>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 

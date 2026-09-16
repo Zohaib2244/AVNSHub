@@ -139,15 +139,28 @@ export function WidgetShell({
     ? storedHeaderStyle
     : globalHeaderStyle;
 
+  // Slot Layout cells have a hard size budget, so the name/icon must not take
+  // height from the content there: it becomes a small tag on the card's
+  // top-left border, shown only on hover and in edit mode (CSS:
+  // .block-hover-tag). Stamp and crest both use the tag; ghost shows nothing.
+  // Graph Layout's rows grow with content, so it keeps the in-flow header.
+  const hoverTag = Boolean(config?.slot);
+  const hoverTagEl = hoverTag && !flags.customHeader && headerStyle !== "ghost" && (
+    <div className="block-hover-tag" aria-hidden="true">
+      <Icon size={12} strokeWidth={1.75} />
+      <span>{manifest.title}</span>
+    </div>
+  );
+
   const body = (
     <>
-      {!flags.customHeader && headerStyle === "stamp" && (
+      {!hoverTag && !flags.customHeader && headerStyle === "stamp" && (
         <div className="block-label">
           <Icon size={14} strokeWidth={1.75} />
           {manifest.title}
         </div>
       )}
-      {!flags.customHeader && headerStyle === "crest" && (
+      {!hoverTag && !flags.customHeader && headerStyle === "crest" && (
         <div className="block-crest">
           <div className="block-crest-mark" aria-hidden="true">
             <Icon size={16} strokeWidth={1.75} />
@@ -204,6 +217,7 @@ export function WidgetShell({
       }}
     >
       <WidgetContext.Provider value={ctx}>
+        {hoverTagEl}
         {flags.plainChrome ? body : (
           <div className={blockClasses} data-backdrop={cardBackdrop}>
             {body}

@@ -122,6 +122,7 @@ weather: {
 | `sizes` | ✅ | Allowed size tiers. **This is the resize limit** — the settings popover only offers these. Order them small→large. |
 | `orientations` | ✅ | Allowed shapes (`"h"` and/or `"v"`). One value = no shape toggle shown. |
 | `defaults` | ✅ | `{ size, orientation, hidden? }` — the starting placement. `hidden: true` ships the widget off-screen (re-addable from the manager). |
+| `minPx` | — | Slot Layout only: `{ width, height }` in CSS px — the smallest cell box the widget still works in. Drag-resize stops there. A widget without an `"S"` size already gets a 300x150 floor. |
 | `detail` | — | A component auto-rendered **below** the main content **at L size only**. The cheapest way to add a rich large layout without size-branching the main component. |
 | `settings` | — | Schema for the auto-generated per-widget settings form. |
 | `flags` | — | `plainChrome` (no card chrome at all), `customHeader` (chrome but the component renders its own header), `accent` (orange left border), `className` (extra class on `.block`). |
@@ -231,9 +232,29 @@ actual rendered width:
 
 ### D. Sizing & overflow
 
-Slot Layout lets users choose region grids, so the same S/M/L markup can render
-in cells that are much narrower or shorter than the old fixed span presets.
-Keep compact layouts resilient:
+In Slot Layout the size tier comes from the cell's **measured pixel box**
+(`lib/grid/sizeClass.ts` › `SIZE_CLASS_PX`), not its span count, because the
+same span is a different box in each region, on each screen, and after a
+frame-ratio drag:
+
+- **S** — narrower than 300px *or* shorter than 150px (1x1, but also 1x2
+  columns and one-row strips like 2x1/3x1)
+- **L** — at least 600x250 *or* 400x400
+- **M** — everything in between (typically 2x2)
+- orientation `"v"` when the box is taller than wide
+
+A widget filling its whole region still gets its largest size. In edit mode
+each cell shows an `S · 2×1` badge that updates live while resizing. Within a
+tier the box still varies, so keep layouts resilient:
+
+- Flex children holding text or inputs get `min-width: 0`; buttons/icons get
+  `flex: 0 0 auto` so the text gives way, not the controls. (The framework
+  also lets inputs/textareas/selects shrink inside cards, but a fixed-width
+  sibling can still push a row past the edge.)
+- Free-text entry uses an auto-growing `textarea` capped per size, not a
+  single-line `input` that scrolls sideways.
+- Don't put collapsible sections under a list — they steal height and get
+  cropped. Swap the list's contents with a tab instead.
 
 - Rows of buttons, pills, badges, or segmented controls should wrap instead of
   assuming one horizontal line.
@@ -681,8 +702,9 @@ or changes its settings in the gear popover:
 ```js
 window.addEventListener("message", (e) => {
   if (e.data?.type !== "NUTMAG_CONTEXT") return;
-  const { size, settings } = e.data;
+  const { size, orientation, settings } = e.data;
   // size: "S" | "M" | "L"
+  // orientation: "h" | "v" — "v" when the cell is taller than wide
   // settings: { [key]: value } — values from the manifest settings schema
   render(size, settings);
 });
