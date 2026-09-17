@@ -1306,6 +1306,12 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   color: var(--accent-cyan);
   margin-bottom: 4px;
 }
+
+/* headline stat that needs attention (e.g. homelab services down) — mirrors
+   .block-value.accent, which existed for the smaller value type only */
+.block-stat.accent {
+  color: var(--accent-orange);
+}
 /* ─── L-size detail ──────────────────────────────────────────────
    extra content rendered below the main content at L size — either the
    manifest's `detail` component (auto-rendered by WidgetShell) or a widget's

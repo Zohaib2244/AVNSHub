@@ -109,23 +109,10 @@ const AMBIENT_DATA_STYLES = `
     display: flex;
     flex: none;
     gap: 10px;
-    justify-content: space-between;
+    justify-content: flex-end;
     min-width: 0;
   }
 
-  .ambient-data-title {
-    color: var(--text-muted);
-    flex: 1 1 auto;
-    font-family: var(--font-dot-gothic), monospace;
-    font-size: 0.62rem;
-    letter-spacing: 0.14em;
-    min-width: 0;
-    overflow: hidden;
-    padding: 0;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
 
   .ambient-data-badge {
     background: var(--bg-nested);
@@ -456,10 +443,6 @@ const AMBIENT_DATA_STYLES = `
   }
 
   @container widget (max-width: 230px) {
-    .ambient-data-title {
-      font-size: 0.56rem;
-      letter-spacing: 0.1em;
-    }
 
     .ambient-data-badge {
       box-shadow: 2px 2px 0 var(--shadow);
@@ -500,8 +483,9 @@ function cellClassName(tone: CellTone): string {
 
 function HeaderRow({ load }: { load: Load }) {
   return (
+    // the widget's name lives in the card chrome (and, in Slot Layout, the
+    // hover tag) — repeating it here only ate a row of a small card
     <div className="ambient-data-topline">
-      <div className="block-label ambient-data-title">ambient load mosaic</div>
       <div className="ambient-data-badge">{load.ready ? `cpu ${pct(load.cpu)}` : "reading…"}</div>
     </div>
   );

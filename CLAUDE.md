@@ -98,7 +98,9 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
 - Env var: `STEAM_API_KEY`, `STEAM_PROFILE_ID`
 
 ### 4. Homelab Status ðŸ–¥ï¸
-- Source: self-hosted `/status` endpoint on homelab server
+- Source: **Uptime Kuma** (`lib/uptimeKuma.ts`) - it already monitors every service, so the hub reads Kuma rather than a bespoke status endpoint. Two sources, in order: a published status page over Kuma's documented public API (`UPTIME_KUMA_STATUS_PAGE`), else Kuma's own SQLite read-only (`UPTIME_KUMA_DB`, default `/opt/docker/monitoring-stack/uptime-kuma/data/kuma.db` - zero setup, ~30ms for every monitor incl. 24h uptime). Falls back to `HOMELAB_STATUS_URL` when Kuma is unreachable. The read lives in `app/api/homelab/route.ts`, never in `lib/homelab.ts`, which client components import.
+- Kuma carries more than the v1 shape: each service also has its monitor group, Kuma's last message ("Request failed with status code 502") and the last response time; the widget shows up/total at S, a labelled dot row at M, and groups + down-now messages at L.
+- Legacy source: self-hosted `/status` endpoint on homelab server
 - Shows: row of service dots (green = up, red = down) + average uptime %
 - Cached every 60s â€” do not hammer the endpoint
 - Env var: `HOMELAB_STATUS_URL`
@@ -113,7 +115,7 @@ A widget = **one content component + one manifest entry** in `config/widgets.tsx
   "last_checked": "2026-06-08T14:32:00Z"
 }
 ```
-- **v2 (design-only, see `lib/homelab.ts`)**: per-service `telemetry` â€” storage for Immich/Nextcloud, download queues for Sonarr/Radarr/qBittorrent, request queue for Jellyseerr, media sessions for Jellyfin. The aggregator that produces this per-service telemetry is a separate homelab-side project, not yet built, so `ArrStack`/`StorageApps`/`Jellyfin` stay on `HOMELAB_MOCK_DATA`/`HOMELAB_STATUS_URL` mock data for now.
+- **v2 (design-only, see `lib/homelab.ts`)**: per-service `telemetry` â€” storage for Immich/Nextcloud, download queues for Sonarr/Radarr/qBittorrent, request queue for Jellyseerr, media sessions for Jellyfin. No widget consumes it: the `ArrStack`/`StorageApps`/`Jellyfin` widgets it was written for are no longer in the registry. Live status now comes from Uptime Kuma (above); per-service queue/storage telemetry would need a separate aggregator (or direct *arr/Immich API calls) if those widgets are ever rebuilt.
 - **Host telemetry (System Stats / Disk Storage / Network Stats widgets) is real, not mocked** â€” `lib/systemStats.ts` reads live CPU/memory/disk/network straight off the machine the Next.js server process is actually running on, via the `systeminformation` package (Node has no built-in cross-platform way to get disk usage or network throughput). Served via `/api/system-stats`, polled every 60s, 10s server-side cache. Deliberately a different machine/concept from the mocked per-service homelab telemetry above â€” this is "the box AVN Hub itself runs on," not "the homelab's other services." `getServerStats()`'s drive list filters out macOS's internal `/System/Volumes/*` and `/private/*` mounts (APFS implementation detail, not real user-facing drives); no-op on Linux. Widget title reads "system stats" (not "server") â€” the manifest id stays `server-stats` since it's a persistence key.
 
 ### 5. GitHub Activity
@@ -198,7 +200,12 @@ SPOTIFY_CLIENT_SECRET=  # in its gear settings (per-widget). Env vars are the
 SPOTIFY_REFRESH_TOKEN=  # fallback used when a settings field is left blank.
 STEAM_API_KEY=          # optional â€” Currently Playing widget settings can supply these
 STEAM_PROFILE_ID=76561199044933923
-HOMELAB_STATUS_URL=
+HOMELAB_STATUS_URL=    # fallback only - Uptime Kuma is preferred (below)
+UPTIME_KUMA_DB=        # optional - path to kuma.db; defaults to the avns2 bind-mount
+                       # (/opt/docker/monitoring-stack/uptime-kuma/data/kuma.db).
+                       # Read-only; no API key or status page needed.
+UPTIME_KUMA_STATUS_PAGE=  # optional - URL of a published Kuma status page; preferred
+                       # over the DB when set (documented public API, version-stable)
 GITHUB_TOKEN=           # optional â€” GitHub widget settings can supply username + token
 HOMELAB_MOCK_DATA=      # optional, dev-only â€” "true" serves realistic mock v2 telemetry
                         # (CPU/Mem/disks/network + all 8 services) instead of HOMELAB_STATUS_URL,

@@ -133,6 +133,7 @@ async function fetchRaw(): Promise<RawResponse | null> {
     return rawCache.data;
   }
 
+  // dev-only stand-in for machines with no homelab access
   if (process.env.HOMELAB_MOCK_DATA === "true") {
     const data = mockRawResponse();
     rawCache = { data, expiresAt: Date.now() + CACHE_TTL_MS };
