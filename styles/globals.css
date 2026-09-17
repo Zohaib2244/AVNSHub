@@ -508,12 +508,26 @@ html[data-backdrop="glass"] .frame {
    `inert` attribute is applied by SlotRegion.tsx; the opacity change gives
    visual feedback that matches the interaction state). The center region gets
    an orange accent border to signal it owns the frame. */
-.slot-frame[data-focus-mode="true"] .slot-region:not(.slot-region-center) {
-  opacity: 0.08;
+/* Focus mode: the focused widget lifts out of its cell and grows over the
+   canvas (SlotWidgetCell sets the fixed box; .slot-cell already transitions
+   left/top/width/height, which is what animates the pop-out and the return).
+   Everything else keeps its place and dims behind the backdrop. */
+.slot-focus-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--shadow) 62%, transparent);
+  cursor: zoom-out;
 }
 
-.slot-frame[data-focus-mode="true"] .slot-region-center .block,
-.slot-frame[data-focus-mode="true"] .slot-region-center .namecard {
+.slot-cell.focused {
+  /* above the backdrop; the transition comes from .slot-cell itself */
+  z-index: 60;
+}
+
+.slot-cell.focused .block,
+.slot-cell.focused .namecard {
   border-color: var(--accent-orange);
   box-shadow: 5px 5px 0 var(--shadow);
 }

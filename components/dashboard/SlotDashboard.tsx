@@ -23,10 +23,9 @@ import { getCanvases, getServerCanvases, subscribeCanvases } from "@/lib/canvase
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
 
-// Nearly all space goes to center — left/right columns and base row collapse
-// to a hairline so grid gaps still render and the transition feels like a pull
-// rather than a hard cut.
-const FOCUS_RATIOS: FrameRatios = { columns: [0.05, 1, 0.05], centerRows: [1, 0.05] };
+// Focus mode no longer re-proportions the frame: the focused widget lifts out
+// of its cell and grows over the canvas (see SlotWidgetCell), so every other
+// widget keeps its place and simply dims behind the backdrop.
 
 /* canvas-switch entrance cascade — Central Base (NutBot, by default) goes first (STAGGER_BASE,
    which matches the outer .slot-frame's exit-fade duration below so the new
@@ -71,7 +70,7 @@ export function SlotDashboard() {
     () => getCanvases().activeId,
     () => getServerCanvases().activeId,
   );
-  const { editMode, focusWidgetId, isInstalling, setKeyboardFocusWidgetId } = useLayout();
+  const { editMode, focusWidgetId, exitFocusMode, isInstalling, setKeyboardFocusWidgetId } = useLayout();
   const isFocusMode = focusWidgetId !== null;
 
   const frameRef = useRef<HTMLDivElement>(null);
@@ -94,10 +93,7 @@ export function SlotDashboard() {
       w.region === "center" ? STAGGER_BASE : STAGGER_BASE + Math.min(++staggerStep, STAGGER_MAX_STEPS) * STAGGER_STEP;
   }
 
-  const ratios = previewRatios ?? slotLayout.frameRatios;
-  // In focus mode use collapsed side/base ratios; otherwise use the persisted
-  // (or drag-preview) ratios.
-  const activeRatios = isFocusMode ? FOCUS_RATIOS : ratios;
+  const activeRatios = previewRatios ?? slotLayout.frameRatios;
 
   // Framer-motion animates the grid template values by interpolating the
   // numbers inside the string (its "complex" type). Drag previews stay instant
@@ -201,6 +197,20 @@ export function SlotDashboard() {
           box and so was never under the overlay. See .installing-overlay. */}
       <div className="frame frame-with-tabs" inert={isInstalling}>
         <HubCorePanel />
+        {/* dims the canvas behind an expanded widget; clicking it collapses */}
+        <AnimatePresence>
+          {isFocusMode && (
+            <motion.div
+              key="focus-backdrop"
+              className="slot-focus-backdrop"
+              onClick={exitFocusMode}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            />
+          )}
+        </AnimatePresence>
         <div
           className="frame-inner"
           onPointerDown={(e) => {

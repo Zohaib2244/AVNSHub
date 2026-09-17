@@ -101,7 +101,7 @@ export function SlotWidgetCell({
   /** forwarded straight to WidgetShell — see its prop comment */
   entranceDelay?: number;
 }) {
-  const { editMode, activePopover, setActivePopover } = useLayout();
+  const { editMode, activePopover, setActivePopover, focusWidgetId } = useLayout();
   const manifest = getManifest(instance.id);
   const cellRef = useRef<HTMLDivElement>(null);
   // the settings panel portals to document.body and positions itself against
@@ -116,6 +116,20 @@ export function SlotWidgetCell({
 
   const persistedRect: Rect = { col: instance.col, row: instance.row, colSpan: instance.colSpan, rowSpan: instance.rowSpan };
   const rect = activeHoverEffect?.visualRect ?? previewRect ?? persistedRect;
+
+  // ── focus mode ("expand" on NutBot) ────────────────────────────────
+  // The widget lifts out of its cell and grows over the canvas instead of
+  // squeezing the rest of the grid: its slot stays reserved (placement is
+  // explicit, so the empty area doesn't reflow anything), the card goes
+  // `position: fixed` at the exact pixels it already occupied, and the next
+  // frame retargets it to the frame's box — .slot-cell already transitions
+  // left/top/width/height, so that reads as one smooth pop-out. Reversed on
+  // exit, back to the rect the cell still owns.
+  const focused = focusWidgetId === instance.id;
+  const [focusBox, setFocusBox] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+  const restingRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(null);
+  const focusRafRef = useRef<number | null>(null);
+  const focusTimeoutRef = useRef<number | null>(null);
 
   const [flip, setFlip] = useState<{ rect: Rect; effect: HoverExpandEffect; metrics: HoverGridMetrics } | null>(null);
   const wasExpandedRef = useRef(false);
@@ -171,6 +185,55 @@ export function SlotWidgetCell({
 
     return clearPending;
   }, [activeHoverEffect, hoverMetrics, instance.col, instance.row, instance.colSpan, instance.rowSpan]);
+
+  useLayoutEffect(() => {
+    const clearPending = () => {
+      if (focusRafRef.current !== null) cancelAnimationFrame(focusRafRef.current);
+      if (focusTimeoutRef.current !== null) window.clearTimeout(focusTimeoutRef.current);
+      focusRafRef.current = null;
+      focusTimeoutRef.current = null;
+    };
+    clearPending();
+
+    const cell = cellRef.current;
+    if (!cell) return;
+
+    if (focused) {
+      const rect = cell.getBoundingClientRect();
+      const resting = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+      restingRectRef.current = resting;
+      setFocusBox(resting);
+      focusRafRef.current = requestAnimationFrame(() => {
+        focusRafRef.current = null;
+        const frame = cell.closest(".slot-frame")?.getBoundingClientRect();
+        if (!frame) return;
+        setFocusBox({ left: frame.left, top: frame.top, width: frame.width, height: frame.height });
+      });
+    } else if (restingRectRef.current) {
+      // animate home, then hand the card back to the grid
+      setFocusBox(restingRectRef.current);
+      focusTimeoutRef.current = window.setTimeout(() => {
+        focusTimeoutRef.current = null;
+        restingRectRef.current = null;
+        setFocusBox(null);
+      }, FLIP_DURATION_MS);
+    }
+
+    return clearPending;
+  }, [focused]);
+
+  // keep the grown card matching the frame while focused (window resize, or
+  // the frame-ratio handles being dragged underneath it)
+  useLayoutEffect(() => {
+    if (!focused) return;
+    const onResize = () => {
+      const cell = cellRef.current;
+      const frame = cell?.closest(".slot-frame")?.getBoundingClientRect();
+      if (frame) setFocusBox({ left: frame.left, top: frame.top, width: frame.width, height: frame.height });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [focused]);
 
   // Bail out for an unregistered id only AFTER every hook above has run —
   // an early return placed among them makes the hook order conditional
@@ -344,6 +407,10 @@ export function SlotWidgetCell({
   // default size before re-expanding.
 
   const hoverStyle = flip && effectiveHoverMetrics ? hoverBoxStyle(flip.rect, effectiveHoverMetrics) : null;
+  // focus wins over a hover-expand preview: both position the same box
+  const focusStyle: CSSProperties | null = focusBox
+    ? { position: "fixed", left: focusBox.left, top: focusBox.top, width: focusBox.width, height: focusBox.height, zIndex: 60 }
+    : null;
 
   // clamp the grid placement to the region's track count so a stale/oversized
   // rect (e.g. left over from a region shrink or an interrupted resize) can
@@ -358,12 +425,15 @@ export function SlotWidgetCell({
       ref={cellRef}
       className={`slot-cell${editMode ? " editing" : ""}${previewRect ? " resizing" : ""}${
         effectiveHoverEffect ? ` hover-${effectiveHoverEffect.state}` : ""
-      }`}
+      }${focusBox ? " focused" : ""}`}
       data-hover-expand={effectiveHoverEffect?.state}
       style={{
+        // the grid placement stays set while focused so the slot is still
+        // reserved — the fixed positioning below just lifts the card out of it
         gridColumn: hoverStyle ? undefined : `${safeCol + 1} / span ${safeColSpan}`,
         gridRow: hoverStyle ? undefined : `${safeRow + 1} / span ${safeRowSpan}`,
         ...hoverStyle,
+        ...focusStyle,
       }}
       onPointerEnter={handleHoverPointerEnter}
     >
