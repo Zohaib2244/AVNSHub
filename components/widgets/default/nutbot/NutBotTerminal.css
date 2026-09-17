@@ -56,7 +56,7 @@
 .term-version { color: var(--nb-muted, var(--text-muted)); font-family: var(--font-jetbrains-mono), monospace; font-size: .65em; letter-spacing: 0; padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; }
 .term-actions .term-focus-btn { width: 30px; height: 30px; display: grid; place-items: center; }
 .term-actions .model-settings-trigger { height: 30px; }
-.term-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; padding: 3px; gap: 2px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--bg-nested); }
+.term-tabs { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; padding: 3px; gap: 2px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--bg-nested); }
 
 /* ── tab button (pill indicator style) ───────────────────────── */
 
@@ -88,17 +88,25 @@
   color: var(--accent-orange);
 }
 
-/* animated background pill (motion.div with layoutId="term-tab-bg") */
-.term-tab-bg {
+/* one highlight pill for the whole bar: it travels to the active tab instead
+   of each tab fading its own in (which read as the highlight teleporting).
+   Position/width come from the active button, measured in NutBotTerminal.tsx. */
+.term-tab-indicator {
   position: absolute;
-  inset: 0;
+  top: 3px;
+  left: 0;
+  bottom: 3px;
+  width: 0;
   opacity: 0;
-  transform: scale(.94);
-  transition: opacity .18s ease, transform .22s cubic-bezier(.2,.8,.2,1);
   border-radius: 6px;
   background: color-mix(in srgb, var(--accent-orange) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent-orange) 22%, transparent);
   pointer-events: none;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1), opacity .18s ease;
+}
+
+.term-tab-indicator.ready {
+  opacity: 1;
 }
 
 /* tab label + icon sit above the bg */
@@ -644,7 +652,6 @@
   flex-shrink: 0;
 }
 
-.term-tab.active .term-tab-bg { opacity: 1; transform: scale(1); }
 .term-tab:focus-visible, .term-actions button:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 2px; }
 @container widget (max-width: 280px) { .term-tab-icon { display: none; } .term-title { gap: 5px; } .term-identity { gap: 4px; } }
-@media (prefers-reduced-motion: reduce) { .term-tab-bg, .term-body { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .term-tab-indicator, .term-body { transition: none; } }

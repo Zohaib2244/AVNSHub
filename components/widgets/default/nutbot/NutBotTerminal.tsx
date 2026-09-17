@@ -144,6 +144,9 @@ export function NutBotTerminal() {
   }, [realtime, maxLines]);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
+  // geometry of the sliding tab highlight, measured from the active button
+  const tabsRef = useRef<HTMLElement | null>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
   // `activeTab` is what the user clicked (drives the tab bar's highlight, so it
   // reacts instantly); `displayedTab` is what the body is actually showing.
   // They diverge only for the ~110ms fade-out below.
@@ -174,6 +177,22 @@ export function NutBotTerminal() {
   useEffect(() => {
     if (skipTabWrite.current) return;
     try { sessionStorage.setItem(NUTBOT_TAB_KEY, activeTab); } catch {}
+  }, [activeTab]);
+
+  // Measure the active tab so the highlight can slide to it. Re-measured when
+  // the tab bar resizes (widget resize, focus mode's --nb-scale bump, or the
+  // icons dropping out under 280px).
+  useEffect(() => {
+    const nav = tabsRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const button = nav.querySelector<HTMLElement>(`.term-tab[data-tab="${activeTab}"]`);
+      if (button) setIndicator({ left: button.offsetLeft, width: button.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
   }, [activeTab]);
 
   // Tab switches run fade-out -> swap -> fade-in, NOT a crossfade. The body
@@ -250,12 +269,19 @@ export function NutBotTerminal() {
             </button>
           </div>
         </div>
-        <nav className="term-tabs" aria-label="NutBot views">
+        <nav className="term-tabs" aria-label="NutBot views" ref={tabsRef}>
+          {/* one pill that slides between tabs — each tab used to fade in its
+              own, so the highlight jumped rather than travelled */}
+          <span
+            aria-hidden="true"
+            className={`term-tab-indicator${indicator ? " ready" : ""}`}
+            style={indicator ? { transform: `translateX(${indicator.left}px)`, width: indicator.width } : undefined}
+          />
           {TAB_ORDER.map((tab) => <button key={tab} type="button"
+            data-tab={tab}
             className={`term-tab${activeTab === tab ? " active" : ""}`}
             aria-current={activeTab === tab ? "page" : undefined}
             onClick={() => selectTab(tab)}>
-            <span className="term-tab-bg" aria-hidden="true" />
             <span className="term-tab-content">
               <span className="term-tab-icon" aria-hidden="true">{{ log: "◈", chat: "◎", shells: "⌨", creator: "✦" }[tab]}</span>
               {tab}
