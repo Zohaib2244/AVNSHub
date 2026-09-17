@@ -83,10 +83,38 @@ const AMBIENT_DATA_STYLES = `
     box-sizing: border-box;
   }
 
+  /* An S cell is short (~236x96 on the default grid): stacking a square
+     mosaic above the stat pushed the stat out of the card, so S runs side by
+     side instead, with the mosaic taking the leftover width and its cells
+     flexing to the height available. */
   .ambient-data-root--s {
+    align-items: center;
+    flex-direction: row;
     gap: 8px;
     justify-content: center;
     overflow: hidden;
+  }
+
+  .ambient-data-root--s .ambient-data-mosaic-shell {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+  }
+
+  .ambient-data-root--s .ambient-data-mosaic {
+    flex: 1;
+    grid-auto-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .ambient-data-root--s .ambient-data-cell {
+    aspect-ratio: auto;
+    min-height: 0;
+  }
+
+  .ambient-data-root--s .ambient-data-s-stat {
+    flex: none;
   }
 
   .ambient-data-root--m {
@@ -102,6 +130,24 @@ const AMBIENT_DATA_STYLES = `
     gap: 12px;
     overflow-y: auto;
     padding-right: 2px;
+  }
+
+  /* the mosaic gives way first; readouts, loom and caption keep their size */
+  .ambient-data-root--l .ambient-data-mosaic-shell {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 120px;
+  }
+
+  .ambient-data-root--l .ambient-data-mosaic {
+    flex: 1;
+    grid-auto-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .ambient-data-root--l .ambient-data-cell {
+    aspect-ratio: auto;
+    min-height: 0;
   }
 
   .ambient-data-topline {
@@ -143,7 +189,25 @@ const AMBIENT_DATA_STYLES = `
   .ambient-data-root--m .ambient-data-mosaic-shell {
     border-radius: 14px;
     box-shadow: inset 3px 3px 0 var(--shadow);
+    display: flex;
+    /* The cells are square by default, which made the mosaic taller than an
+       M card and pushed the readouts out of the card entirely (the root
+       clips, so they weren't even scrollable). Here the mosaic takes the
+       space left over instead, and the cells flex to fill it. */
+    flex: 1 1 auto;
+    min-height: 0;
     padding: 10px;
+  }
+
+  .ambient-data-root--m .ambient-data-mosaic {
+    flex: 1;
+    grid-auto-rows: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .ambient-data-root--m .ambient-data-cell {
+    aspect-ratio: auto;
+    min-height: 0;
   }
 
   .ambient-data-root--s .ambient-data-mosaic-shell {
@@ -321,7 +385,10 @@ const AMBIENT_DATA_STYLES = `
 
   .ambient-data-read-value {
     color: var(--text-primary);
-    font-family: var(--font-dot-gothic), monospace;
+    /* JetBrains Mono, per the type rules: DotGothic16 is for labels and the
+       headline stat, mono for data values — and DotGothic's glyphs collided
+       at this size here */
+    font-family: var(--font-jetbrains-mono), monospace;
     font-size: 1.2rem;
     line-height: 1;
     margin-top: 6px;
@@ -596,7 +663,7 @@ export function AmbientDataWidget() {
       <div className="ambient-data-root ambient-data-root--m" style={tempo}>
         <StyleBlock />
         <HeaderRow load={load} />
-        <Mosaic columns={8} count={32} load={load.cpu} scan />
+        <Mosaic columns={8} count={24} load={load.cpu} scan />
         <Readouts load={load} />
       </div>
     );
