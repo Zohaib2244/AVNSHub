@@ -112,6 +112,52 @@ function AutoTextarea({ autoFocus, label, maxHeight, onCancel, onChange, onSubmi
   return <textarea aria-label={label} autoFocus={autoFocus} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} ref={ref} rows={1} style={textareaStyle} value={value} />;
 }
 
+/* Feedback for the two actions you press most: the copy button swaps to a
+   check and pulses, the done tick pops as it flips. Both are keyed on the
+   idea id so pressing the same button twice replays the animation. */
+const FEEDBACK_STYLES = `
+  .ii-pop { animation: iiPop 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .ii-flash { animation: iiFlash 1.2s ease-out; }
+  /* a completed idea leaves the list, so it lingers just long enough to show
+     the tick flip and fade out rather than blinking away */
+  .ii-leave { animation: iiLeave 0.34s ease forwards; }
+
+  @keyframes iiPop {
+    0%   { transform: scale(1); }
+    45%  { transform: scale(1.28); }
+    100% { transform: scale(1); }
+  }
+
+  @keyframes iiFlash {
+    0%, 70% { border-color: var(--accent-cyan); color: var(--accent-cyan); }
+    100%    { border-color: var(--border); }
+  }
+
+  @keyframes iiLeave {
+    0%   { opacity: 1; transform: none; }
+    100% { opacity: 0; transform: translateX(10px) scale(0.98); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ii-pop { animation: none; }
+    .ii-flash { animation-duration: 0.01s; }
+    .ii-leave { animation-duration: 0.01s; }
+  }
+`;
+
+const paneRowStyle = (selected: boolean): CSSProperties => ({
+  alignItems: "center",
+  background: selected ? "color-mix(in srgb, var(--accent-cyan) 10%, transparent)" : "transparent",
+  border: "1.5px solid",
+  borderColor: selected ? "var(--accent-cyan)" : "transparent",
+  borderRadius: 7,
+  display: "flex",
+  flex: "0 0 auto",
+  gap: 6,
+  minWidth: 0,
+  padding: "4px 5px",
+});
+
 export function IdeaInboxWidget() {
   const { size } = useWidget();
   const [ideas, setIdeas] = useState<Idea[]>([]);
@@ -122,6 +168,11 @@ export function IdeaInboxWidget() {
   const [loaded, setLoaded] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  // M/L are a two-pane layout like the Notes widget: this is the idea open in
+  // the right-hand pane
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // id whose done-tick should replay its pop animation
+  const [pulseId, setPulseId] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -156,9 +207,13 @@ export function IdeaInboxWidget() {
     setIdeas((current) => [{ id: createIdeaId(), title, createdAt: new Date().toISOString() }, ...current]);
     setDraft("");
   };
-  const toggleDone = (id: string, done: boolean) => setIdeas((current) => current.map((idea) =>
-    idea.id === id ? { ...idea, completedAt: done ? new Date().toISOString() : undefined } : idea
-  ));
+  const toggleDone = (id: string, done: boolean) => {
+    setIdeas((current) => current.map((idea) =>
+      idea.id === id ? { ...idea, completedAt: done ? new Date().toISOString() : undefined } : idea
+    ));
+    setPulseId(id);
+    window.setTimeout(() => setPulseId((current) => (current === id ? null : current)), 340);
+  };
   const saveEdit = () => {
     const title = editingTitle.trim();
     if (!editingId || !title) return;
@@ -211,26 +266,56 @@ export function IdeaInboxWidget() {
       </button>}
     </div>
   );
-  const row = (idea: Idea, { clamp = false, actions = true } = {}) => {
-    const isEditing = editingId === idea.id;
+  /** done tick — pops as it flips, orange while done */
+  const doneButton = (idea: Idea, extra: CSSProperties = {}) => {
     const isDone = Boolean(idea.completedAt);
     return (
+      <button
+        aria-label={isDone ? `Restore ${idea.title}` : `Mark ${idea.title} done`}
+        aria-pressed={isDone}
+        className={pulseId === idea.id ? "ii-pop" : undefined}
+        key={`${idea.id}-${isDone}-${pulseId === idea.id}`}
+        onClick={() => toggleDone(idea.id, !isDone)}
+        style={{
+          ...iconButtonStyle,
+          background: isDone ? "var(--accent-orange)" : "var(--bg-nested)",
+          borderColor: isDone ? "var(--accent-orange)" : "var(--border)",
+          color: isDone ? "var(--bg-card)" : "var(--text-primary)",
+          ...extra,
+        }}
+        type="button"
+      >
+        <Check {...iconProps} />
+      </button>
+    );
+  };
+
+  /** copy — swaps to a check and flashes cyan for the copied window */
+  const copyButton = (idea: Idea, withLabel = false) => {
+    const copied = copiedId === idea.id;
+    return (
+      <button
+        aria-label={copied ? "Copied" : `Copy ${idea.title}`}
+        className={copied ? "ii-flash" : undefined}
+        key={`${idea.id}-${copied}`}
+        onClick={() => copyIdea(idea)}
+        style={{ ...iconButtonStyle, ...(withLabel ? { padding: "4px 7px" } : {}) }}
+        title={copied ? "Copied" : "Copy"}
+        type="button"
+      >
+        <span className={copied ? "ii-pop" : undefined} style={{ display: "inline-flex" }}>
+          {copied ? <Check {...iconProps} /> : <Copy {...iconProps} />}
+        </span>
+        {withLabel && (copied ? "Copied" : "Copy")}
+      </button>
+    );
+  };
+
+  const row = (idea: Idea, { clamp = false, actions = true } = {}) => {
+    const isEditing = editingId === idea.id;
+    return (
       <div className="more-row" key={idea.id} style={{ alignItems: "flex-start", background: "var(--bg-nested)", border: "1.5px solid var(--border)", borderRadius: 12, display: "flex", flex: "0 0 auto", gap: 7, minWidth: 0, padding: "6px 7px" }}>
-        <button
-          aria-label={isDone ? `Restore ${idea.title}` : `Mark ${idea.title} done`}
-          aria-pressed={isDone}
-          onClick={() => toggleDone(idea.id, !isDone)}
-          style={{
-            ...iconButtonStyle,
-            background: isDone ? "var(--accent-orange)" : "var(--bg-nested)",
-            borderColor: isDone ? "var(--accent-orange)" : "var(--border)",
-            color: isDone ? "var(--bg-card)" : "var(--text-primary)",
-            marginTop: 1,
-          }}
-          type="button"
-        >
-          <Check {...iconProps} />
-        </button>
+        {doneButton(idea, { marginTop: 1 })}
         <div style={{ flex: 1, minWidth: 0 }}>
           {isEditing ? (
             <form onSubmit={(event) => { event.preventDefault(); saveEdit(); }} style={{ alignItems: "flex-end", display: "flex", gap: 4, minWidth: 0 }}>
@@ -245,9 +330,7 @@ export function IdeaInboxWidget() {
           <div className="more-meta" style={{ ...monoStyle, color: "var(--text-muted)", fontSize: "0.58rem", marginTop: 3 }}>{idea.completedAt ? `Done ${formatDate(idea.completedAt)}` : `Added ${formatDate(idea.createdAt)}`}</div>
         </div>
         {!isEditing && <div style={{ display: "flex", flex: "0 0 auto", gap: 4 }}>
-          <button aria-label={`Copy ${idea.title}`} onClick={() => copyIdea(idea)} style={iconButtonStyle} type="button">
-            {copiedId === idea.id ? <Check {...iconProps} /> : <Copy {...iconProps} />}
-          </button>
+          {copyButton(idea)}
           {actions && <button aria-label={`Edit ${idea.title}`} onClick={() => { setEditingId(idea.id); setEditingTitle(idea.title); }} style={iconButtonStyle} type="button">
             <Pencil {...iconProps} />
           </button>}
@@ -258,49 +341,158 @@ export function IdeaInboxWidget() {
       </div>
     );
   };
-  const emptyNote = (text: string) => <div className="block-sub" style={{ color: "var(--text-muted)", padding: "4px 0" }}>{text}</div>;
-
-  // S: next idea + quick add. No done section, no toolbar - there's no room to spare.
-  if (size === "S") {
-    const next = active[0];
-    return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{next ? row(next, { clamp: true, actions: false }) : emptyNote("Your next thought belongs here.")}</div>
-      {addForm(48)}
-    </div>;
-  }
-
-  // M: one add form + active list, with a Copy All / Complete All toolbar. No done section.
-  if (size === "M") {
-    return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
-      {addForm(64)}
-      {toolbar(active, { allowComplete: true })}
-      <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-        {active.length ? active.map((idea) => row(idea)) : emptyNote("Nothing waiting--add the first thought.")}
-      </div>
-    </div>;
-  }
-
-  // L: a compact active/done switch swaps the list, so "done" never steals height.
+  /** active / done switch in the left pane header (L only) */
   const tabStyle = (on: boolean): CSSProperties => ({
     ...buttonStyle,
     background: on ? "var(--bg-card)" : "var(--bg-nested)",
     boxShadow: on ? "none" : buttonStyle.boxShadow,
     color: on ? "var(--accent-orange)" : "var(--text-muted)",
   });
-  const visible = showDone ? completed : active;
-  return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
-    <div style={{ alignItems: "center", display: "flex", flex: "0 0 auto", flexWrap: "wrap", gap: 6, justifyContent: "space-between" }}>
-      <div style={{ display: "flex", gap: 6 }}>
-        <button aria-pressed={!showDone} onClick={() => setShowDone(false)} style={tabStyle(!showDone)} type="button">Active · {active.length}</button>
-        <button aria-pressed={showDone} onClick={() => setShowDone(true)} style={tabStyle(showDone)} type="button">Done · {completed.length}</button>
-      </div>
-      {toolbar(visible, { allowComplete: !showDone })}
+
+  const emptyNote = (text: string) => <div className="block-sub" style={{ color: "var(--text-muted)", padding: "4px 0" }}>{text}</div>;
+
+  // S: next idea + quick add. No done section, no toolbar - there's no room to spare.
+  if (size === "S") {
+    const next = active[0];
+    return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
+      <style>{FEEDBACK_STYLES}</style>
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{next ? row(next, { clamp: true, actions: false }) : emptyNote("Your next thought belongs here.")}</div>
+      {addForm(48)}
+    </div>;
+  }
+
+  // M and L: the Notes widget's two-pane shape — the list on the left, the
+  // idea you picked open on the right, where it can be read and edited in
+  // full instead of inside a cramped row.
+  // the idea being ticked stays listed for the length of its animation
+  const base = showDone ? completed : active;
+  const strayPulse = pulseId && !base.some((idea) => idea.id === pulseId)
+    ? ideas.find((idea) => idea.id === pulseId) ?? null
+    : null;
+  const visible = strayPulse
+    ? [...base, strayPulse].sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    : base;
+  const selected = visible.find((idea) => idea.id === selectedId) ?? visible[0] ?? null;
+  const isLarge = size === "L";
+
+  return (
+    <div style={{ display: "flex", gap: 0, height: "100%", minHeight: 0 }}>
+      <style>{FEEDBACK_STYLES}</style>
+
+      <aside
+        style={{
+          borderRight: "1px solid var(--border)",
+          display: "flex",
+          flexDirection: "column",
+          gap: 6,
+          minHeight: 0,
+          minWidth: 0,
+          paddingRight: 10,
+          width: isLarge ? "42%" : "46%",
+        }}
+      >
+        {isLarge && (
+          <div style={{ display: "flex", flex: "0 0 auto", gap: 6 }}>
+            <button aria-pressed={!showDone} onClick={() => setShowDone(false)} style={tabStyle(!showDone)} type="button">
+              Active · {active.length}
+            </button>
+            <button aria-pressed={showDone} onClick={() => setShowDone(true)} style={tabStyle(showDone)} type="button">
+              Done · {completed.length}
+            </button>
+          </div>
+        )}
+
+        <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 4, minHeight: 0, overflowY: "auto", paddingRight: 4 }}>
+          {visible.length === 0
+            ? emptyNote(showDone ? "Implemented ideas will appear here." : "Nothing waiting - add the first thought.")
+            : visible.map((idea) => {
+              const isSelected = selected?.id === idea.id;
+              return (
+                <div className={strayPulse?.id === idea.id ? "ii-leave" : undefined} key={idea.id} style={paneRowStyle(isSelected)}>
+                  {doneButton(idea)}
+                  <button
+                    aria-pressed={isSelected}
+                    onClick={() => setSelectedId(idea.id)}
+                    style={{
+                      background: "transparent", border: 0, color: "var(--text-primary)", cursor: "pointer",
+                      flex: 1, minWidth: 0, padding: 0, textAlign: "left",
+                    }}
+                    type="button"
+                  >
+                    <span
+                      style={{
+                        ...monoStyle, display: "block", fontSize: "0.72rem", fontWeight: isSelected ? 700 : 500,
+                        overflow: "hidden", textDecoration: idea.completedAt ? "line-through" : "none",
+                        textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      }}
+                    >
+                      {idea.title}
+                    </span>
+                  </button>
+                  <span style={{ ...monoStyle, color: "var(--text-muted)", flex: "0 0 auto", fontSize: "0.58rem" }}>
+                    {formatDate(idea.completedAt ?? idea.createdAt)}
+                  </span>
+                </div>
+              );
+            })}
+        </div>
+
+        {!showDone && addForm(isLarge ? 72 : 56)}
+      </aside>
+
+      <section style={{ display: "flex", flexDirection: "column", gap: 7, minHeight: 0, minWidth: 0, paddingLeft: 12, width: isLarge ? "58%" : "54%" }}>
+        <div
+          style={{
+            background: "var(--bg-card)", border: "1.5px solid var(--border)", borderRadius: 8,
+            flex: "1 1 auto", minHeight: 0, overflow: "hidden", padding: "9px 10px",
+          }}
+        >
+          {selected ? (
+            <textarea
+              aria-label="selected idea"
+              defaultValue={selected.title}
+              key={selected.id}
+              onBlur={(event) => {
+                const text = event.currentTarget.value.trim();
+                if (!text) {
+                  event.currentTarget.value = selected.title;
+                  return;
+                }
+                if (text !== selected.title) {
+                  setIdeas((current) => current.map((idea) => (idea.id === selected.id ? { ...idea, title: text } : idea)));
+                }
+              }}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") event.currentTarget.blur();
+              }}
+              spellCheck={false}
+              style={{
+                ...monoStyle, background: "transparent", border: 0, color: "var(--text-primary)", display: "block",
+                fontSize: "0.76rem", height: "100%", lineHeight: 1.35, minHeight: 0, outline: "none", padding: 0,
+                resize: "none", scrollbarColor: "var(--border) transparent", scrollbarWidth: "thin", width: "100%",
+              }}
+            />
+          ) : (
+            emptyNote(showDone ? "No finished ideas yet." : "Add an idea to get started.")
+          )}
+        </div>
+
+        <div style={{ alignItems: "center", display: "flex", flex: "0 0 auto", gap: 6, minWidth: 0 }}>
+          <span style={{ ...monoStyle, color: "var(--text-muted)", flex: 1, fontSize: "0.58rem", minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {selected
+              ? selected.completedAt ? `Done ${formatDate(selected.completedAt)}` : `Added ${formatDate(selected.createdAt)}`
+              : ""}
+          </span>
+          {selected && copyButton(selected, isLarge)}
+          {selected && doneButton(selected)}
+          {selected && (
+            <button aria-label={`Delete ${selected.title}`} onClick={() => deleteIdea(selected.id)} style={iconButtonStyle} title="Delete" type="button">
+              <Trash2 {...iconProps} />
+            </button>
+          )}
+          {isLarge && toolbar(visible, { allowComplete: !showDone })}
+        </div>
+      </section>
     </div>
-    {!showDone && addForm(96)}
-    <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-      {visible.length
-        ? visible.map((idea) => row(idea))
-        : emptyNote(showDone ? "Implemented ideas will appear here." : "Nothing waiting--add the first thought.")}
-    </div>
-  </div>;
+  );
 }
