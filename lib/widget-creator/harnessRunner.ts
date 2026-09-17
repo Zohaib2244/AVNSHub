@@ -205,9 +205,30 @@ export function runHarness(
         ];
       }
     } else if (adapter.id === "codex") {
+      // -C/--cd is codex's own working root. Passing cwd to spawn is not
+      // enough for every CLI (opencode has --dir for the same reason): a
+      // harness that resolves paths against something other than the process
+      // cwd would write into the live tree instead of the workbench.
+      const root = opts?.cwd ? ["-C", opts.cwd] : [];
       args = isResume
-        ? ["exec", "--sandbox", "workspace-write", "resume", "--json", ...modelArgs(adapter.id, choice), opts!.sessionId!, "-"]
-        : [...adapter.args, ...modelArgs(adapter.id, choice)];
+        ? ["exec", "--sandbox", "workspace-write", ...root, "resume", "--json", ...modelArgs(adapter.id, choice), opts!.sessionId!, "-"]
+        : [...adapter.args, ...root, ...modelArgs(adapter.id, choice)];
+    } else if (adapter.id === "opencode") {
+      // --dir is opencode's working root (see the codex note above)
+      const root = opts?.cwd ? ["--dir", opts.cwd] : [];
+      args = [...adapter.args, ...root, sendablePrompt];
+      if (process.platform === "win32") {
+        try {
+          const promptFile = windowsPromptFileArg(sendablePrompt);
+          tempPromptPath = promptFile.promptPath;
+          args = [...adapter.args, ...root, promptFile.arg];
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          sendEvent(write, "error", { message: `Failed to prepare ${adapter.id} prompt file: ${message}` });
+          resolve({ status: "error" });
+          return;
+        }
+      }
     } else if (adapter.promptViaArg) {
       if (process.platform === "win32") {
         // Plain NutBot chat's opencode path has the same promptViaArg bug

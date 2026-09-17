@@ -216,6 +216,22 @@ function resetOwnedFromLive(tree: string, slug: string): Hashes {
   return ownedHashes(REPO_ROOT, slug);
 }
 
+/** Pristine copies of the widget's live files as of prepare — the only way to
+    put the live tree back if a harness writes into it directly (some CLIs
+    resolve paths against their own project root, and a model can always type
+    an absolute path). Cheap: a widget is a handful of small files. */
+function saveBaseCopies(dir: string, tree: string, base: Hashes): void {
+  const baseDir = join(dir, "base");
+  rmSync(baseDir, { recursive: true, force: true });
+  for (const rel of Object.keys(base)) {
+    const from = join(tree, rel);
+    if (!existsSync(from)) continue;
+    const dest = join(baseDir, rel);
+    mkdirSync(dirname(dest), { recursive: true });
+    copyFileSync(from, dest);
+  }
+}
+
 function readState(dir: string): WorkbenchState | null {
   try {
     const state = JSON.parse(readFileSync(join(dir, "state.json"), "utf-8")) as WorkbenchState;
@@ -294,6 +310,7 @@ export async function prepareWorkbench(slug: string): Promise<Workbench> {
   }
 
   writeState(dir, { repo: REPO_ROOT, base });
+  saveBaseCopies(dir, tree, base);
   return { slug, tree, created, discardedDraft };
 }
 
@@ -324,6 +341,42 @@ export function revertOutsideChanges(ws: Workbench, before: Hashes): string[] {
     if (!rel.startsWith("config/custom")) reported.push(rel);
   }
   return reported.sort();
+}
+
+export type LiveEscape = { rel: string; savedTo: string | null };
+
+/** Undo writes a harness made straight into the live tree during a run.
+    Anything that changed there since prepare is put back from the pristine
+    base copy — after the harness's version is kept aside under the workbench's
+    `escaped/` folder, so nothing it wrote is lost. Returns what it undid. */
+export function restoreLiveEscapes(ws: Workbench): LiveEscape[] {
+  const dir = workbenchDir(ws.slug);
+  const base = readState(dir)?.base ?? {};
+  const live = ownedHashes(REPO_ROOT, ws.slug);
+  const escapes: LiveEscape[] = [];
+  for (const rel of new Set([...Object.keys(base), ...Object.keys(live)])) {
+    if (live[rel] === base[rel]) continue;
+    let savedTo: string | null = null;
+    if (live[rel]) {
+      savedTo = join(dir, "escaped", rel);
+      mkdirSync(dirname(savedTo), { recursive: true });
+      copyFileSync(join(REPO_ROOT, rel), savedTo);
+    }
+    const baseCopy = join(dir, "base", rel);
+    if (existsSync(baseCopy)) {
+      const dest = join(REPO_ROOT, rel);
+      mkdirSync(dirname(dest), { recursive: true });
+      const tmp = `${dest}.${randomBytes(4).toString("hex")}.wbtmp`;
+      copyFileSync(baseCopy, tmp);
+      renameSync(tmp, dest);
+    } else {
+      // the file didn't exist before this run — the harness created it live
+      rmSync(join(REPO_ROOT, rel), { force: true });
+      removeEmptyParents(REPO_ROOT, rel);
+    }
+    escapes.push({ rel, savedTo });
+  }
+  return escapes;
 }
 
 /** true when the draft has changes not yet applied to the live tree */
@@ -411,7 +464,9 @@ export function applyDeletes(plan: ApplyPlan): void {
 /** record the draft as the new agreed base (call after a successful apply) */
 export function commitBase(ws: Workbench): void {
   const dir = workbenchDir(ws.slug);
-  writeState(dir, { repo: REPO_ROOT, base: ownedHashes(ws.tree, ws.slug) });
+  const base = ownedHashes(ws.tree, ws.slug);
+  writeState(dir, { repo: REPO_ROOT, base });
+  saveBaseCopies(dir, ws.tree, base);
 }
 
 /** Throw away the widget's draft: its owned files in the tree go back to

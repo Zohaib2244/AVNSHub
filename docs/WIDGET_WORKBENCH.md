@@ -63,6 +63,9 @@ content hashes instead of `git status`.
   `app/api/<slug>/`. Only these are ever applied back.
 - Symlinked (never copied): `node_modules`, `lib/generated`, `next-env.d.ts`,
   `wallpaper/node_modules` — whichever exist.
+- `base/` — pristine copies of the widget's live files as of prepare, used to
+  undo a harness that writes into the live tree. `escaped/` — what such a
+  harness wrote, kept rather than discarded.
 - Mirrored file list: `git ls-files -co --exclude-standard` when git is
   available (respects `.gitignore`, so `.env*` secrets never enter the
   workbench); otherwise a walker with a fixed exclude list.
@@ -87,8 +90,12 @@ content hashes instead of `git status`.
 2. **snapshot** every workbench file's hash.
 3. **run** the harness chain with `cwd` = workbench tree.
 4. **diff** against the snapshot. Changes outside the owned paths are reverted
-   to the live version and reported (the existing `audit` event). The live-tree
-   `git status` tripwire stays as a check for absolute-path writes.
+   to the live version and reported (the existing `audit` event). The live tree
+   is checked too: any of the widget's live files that changed during the run
+   were written by a harness that escaped its workbench, so they are restored
+   from the pristine base copies taken at prepare (the harness's version is
+   kept under the workbench's `escaped/` folder) and reported. The live-tree
+   `git status` tripwire stays as a second check.
 5. **gate** (only when the harness finished cleanly): a component module must
    exist; `tsc --noEmit` runs in the workbench, and only diagnostics inside the
    widget's owned paths count (unrelated broken widgets no longer fail this
@@ -168,4 +175,22 @@ file, a crash, a closed tab — is visible to the live dashboard anymore.
   restored from git). Consider protecting folders that have a workbench.
 - The client's "restore to canvas" UI for edit-hidden widgets is now dead code
   (edits no longer hide the widget) and can be removed.
+
+## Escapes from the workbench (2026-09-17)
+
+`cwd` on the spawned process is not enough: **codex** takes its working root
+from `-C/--cd` and **opencode** from `--dir`, and any model can type an
+absolute path. A claude → codex → opencode edit of `idea-inbox` ended with a
+harness rewriting the *live* file (smart punctuation ASCII-ified per the build
+spec, plus two stray `}` in JSX), which 500'd the dashboard — the workbench's
+own draft was clean and untouched. Fixed in two layers:
+
+1. `-C <workbench>` for codex and `--dir <workbench>` for opencode, alongside
+   the process cwd.
+2. `restoreLiveEscapes()` after every run: the widget's live files must be
+   byte-identical to what they were at prepare, or they are put back from
+   `base/` and the harness's version is preserved in `escaped/`.
+
+Note: opencode on this machine currently refuses to run at all — its provider
+returns "OpenCode 1.18.0 or newer is required to use the free tier".
 

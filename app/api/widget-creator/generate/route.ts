@@ -23,6 +23,7 @@ import {
   commitBase,
   planApply,
   prepareWorkbench,
+  restoreLiveEscapes,
   revertOutsideChanges,
   runWorkbenchTsc,
   snapshotTree,
@@ -441,6 +442,19 @@ export async function POST(req: Request) {
       // Keep the mirror faithful: anything written outside the widget's own
       // folders is put back and reported, never applied.
       const outsideWorkbench = revertOutsideChanges(ws, treeBefore);
+
+      // A harness that wrote straight into the live tree (a CLI resolving
+      // paths against its own project root, or a model typing an absolute
+      // path) is undone here: the live files go back to what they were when
+      // this run started, with the harness's version kept under the
+      // workbench's escaped/ folder. Without this a broken write reaches
+      // Turbopack and 500s the dashboard — the whole point of the workbench.
+      const escapes = restoreLiveEscapes(ws);
+      if (escapes.length > 0) {
+        sendEvent(write, "notice", {
+          text: `the harness wrote directly into your live widget files instead of its workbench (${escapes.map((e) => e.rel).join(", ")}). Those writes were undone; a copy is kept at ${escapes[0].savedTo?.replace(/\/[^/]+$/, "") ?? "the workbench"}. Nothing broken reached your dashboard.`,
+        });
+      }
       if (outcome !== "aborted") {
         const gitAfter = await snapshotGitStatus();
         const escaped = unexpectedChanges(gitBefore, gitAfter, [".nutbot-ideate/"]);

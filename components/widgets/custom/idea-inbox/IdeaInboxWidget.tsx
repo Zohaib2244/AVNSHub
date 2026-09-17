@@ -1,6 +1,7 @@
 "use client";
 
 import { type CSSProperties, type KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Check, CheckCheck, Copy, Pencil, Trash2 } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 
 type Idea = {
@@ -11,20 +12,25 @@ type Idea = {
 };
 
 const storageKey = "nutmag-idea-inbox";
+const iconProps = { size: 14, strokeWidth: 1.75 };
 
 const monoStyle: CSSProperties = { fontFamily: "var(--font-jetbrains-mono), monospace" };
 const buttonStyle: CSSProperties = {
+  alignItems: "center",
   background: "var(--bg-nested)",
   border: "1.5px solid var(--border)",
   borderRadius: 12,
   boxShadow: "2px 2px 0 var(--shadow)",
   color: "var(--text-primary)",
   cursor: "pointer",
+  display: "flex",
   flex: "0 0 auto",
   fontFamily: "var(--font-dot-gothic), monospace",
   fontSize: "0.62rem",
+  gap: 4,
   padding: "4px 7px",
 };
+const iconButtonStyle: CSSProperties = { ...buttonStyle, padding: "4px 6px" };
 const textareaStyle: CSSProperties = {
   ...monoStyle,
   background: "var(--bg-card)",
@@ -54,6 +60,19 @@ function createIdeaId() {
 
 function formatDate(date: string) {
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(date));
+}
+
+function formatIdeaList(list: Idea[]) {
+  return list.map((idea, index) => `${index + 1}. ${idea.title}`).join("\n");
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Textarea that wraps long text and grows with its content up to `maxHeight`,
@@ -101,6 +120,8 @@ export function IdeaInboxWidget() {
   const [editingTitle, setEditingTitle] = useState("");
   const [showDone, setShowDone] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copiedAll, setCopiedAll] = useState(false);
 
   useEffect(() => {
     try {
@@ -147,18 +168,69 @@ export function IdeaInboxWidget() {
   const deleteIdea = (id: string) => {
     if (window.confirm("Delete this idea? This cannot be undone.")) setIdeas((current) => current.filter((idea) => idea.id !== id));
   };
+  const copyIdea = async (idea: Idea) => {
+    if (!(await copyText(idea.title))) return;
+    setCopiedId(idea.id);
+    window.setTimeout(() => setCopiedId((current) => (current === idea.id ? null : current)), 1200);
+  };
+  const copyAll = async (list: Idea[]) => {
+    if (!list.length || !(await copyText(formatIdeaList(list)))) return;
+    setCopiedAll(true);
+    window.setTimeout(() => setCopiedAll(false), 1200);
+  };
+  const completeAll = () => {
+    const now = new Date().toISOString();
+    setIdeas((current) => current.map((idea) => (idea.completedAt ? idea : { ...idea, completedAt: now })));
+  };
 
   const addForm = (maxHeight: number) => (
     <form onSubmit={(event) => { event.preventDefault(); addIdea(); }} style={{ alignItems: "flex-end", display: "flex", flex: "0 0 auto", gap: 6, minWidth: 0 }}>
-      <AutoTextarea label="Add an idea" maxHeight={maxHeight} onChange={setDraft} onSubmit={addIdea} placeholder="Add an idea…" value={draft} />
+      <AutoTextarea label="Add an idea" maxHeight={maxHeight} onChange={setDraft} onSubmit={addIdea} placeholder="Add an idea..." value={draft} />
       <button style={buttonStyle} type="submit">Add</button>
     </form>
   );
+  const toolbar = (list: Idea[], { allowComplete }: { allowComplete: boolean }) => (
+    <div style={{ display: "flex", flex: "0 0 auto", gap: 6 }}>
+      <button
+        aria-label="Copy all as a numbered list"
+        disabled={!list.length}
+        onClick={() => copyAll(list)}
+        style={{ ...buttonStyle, opacity: list.length ? 1 : 0.5 }}
+        type="button"
+      >
+        {copiedAll ? <Check {...iconProps} /> : <Copy {...iconProps} />} All
+      </button>
+      {allowComplete && <button
+        aria-label="Mark all active ideas complete"
+        disabled={!list.length}
+        onClick={completeAll}
+        style={{ ...buttonStyle, opacity: list.length ? 1 : 0.5 }}
+        type="button"
+      >
+        <CheckCheck {...iconProps} /> All
+      </button>}
+    </div>
+  );
   const row = (idea: Idea, { clamp = false, actions = true } = {}) => {
     const isEditing = editingId === idea.id;
+    const isDone = Boolean(idea.completedAt);
     return (
       <div className="more-row" key={idea.id} style={{ alignItems: "flex-start", background: "var(--bg-nested)", border: "1.5px solid var(--border)", borderRadius: 12, display: "flex", flex: "0 0 auto", gap: 7, minWidth: 0, padding: "6px 7px" }}>
-        <input aria-label={idea.completedAt ? `Restore ${idea.title}` : `Mark ${idea.title} done`} checked={Boolean(idea.completedAt)} onChange={(event) => toggleDone(idea.id, event.target.checked)} style={{ accentColor: "var(--accent-orange)", flex: "0 0 auto", marginTop: 3 }} type="checkbox" />
+        <button
+          aria-label={isDone ? `Restore ${idea.title}` : `Mark ${idea.title} done`}
+          aria-pressed={isDone}
+          onClick={() => toggleDone(idea.id, !isDone)}
+          style={{
+            ...iconButtonStyle,
+            background: isDone ? "var(--accent-orange)" : "var(--bg-nested)",
+            borderColor: isDone ? "var(--accent-orange)" : "var(--border)",
+            color: isDone ? "var(--bg-card)" : "var(--text-primary)",
+            marginTop: 1,
+          }}
+          type="button"
+        >
+          <Check {...iconProps} />
+        </button>
         <div style={{ flex: 1, minWidth: 0 }}>
           {isEditing ? (
             <form onSubmit={(event) => { event.preventDefault(); saveEdit(); }} style={{ alignItems: "flex-end", display: "flex", gap: 4, minWidth: 0 }}>
@@ -172,16 +244,23 @@ export function IdeaInboxWidget() {
           }}>{idea.title}</div>}
           <div className="more-meta" style={{ ...monoStyle, color: "var(--text-muted)", fontSize: "0.58rem", marginTop: 3 }}>{idea.completedAt ? `Done ${formatDate(idea.completedAt)}` : `Added ${formatDate(idea.createdAt)}`}</div>
         </div>
-        {!isEditing && actions && <div style={{ display: "flex", flex: "0 0 auto", gap: 4 }}>
-          <button aria-label={`Edit ${idea.title}`} onClick={() => { setEditingId(idea.id); setEditingTitle(idea.title); }} style={buttonStyle} type="button">Edit</button>
-          <button aria-label={`Delete ${idea.title}`} onClick={() => deleteIdea(idea.id)} style={buttonStyle} type="button">Del</button>
+        {!isEditing && <div style={{ display: "flex", flex: "0 0 auto", gap: 4 }}>
+          <button aria-label={`Copy ${idea.title}`} onClick={() => copyIdea(idea)} style={iconButtonStyle} type="button">
+            {copiedId === idea.id ? <Check {...iconProps} /> : <Copy {...iconProps} />}
+          </button>
+          {actions && <button aria-label={`Edit ${idea.title}`} onClick={() => { setEditingId(idea.id); setEditingTitle(idea.title); }} style={iconButtonStyle} type="button">
+            <Pencil {...iconProps} />
+          </button>}
+          {actions && <button aria-label={`Delete ${idea.title}`} onClick={() => deleteIdea(idea.id)} style={iconButtonStyle} type="button">
+            <Trash2 {...iconProps} />
+          </button>}
         </div>}
       </div>
     );
   };
   const emptyNote = (text: string) => <div className="block-sub" style={{ color: "var(--text-muted)", padding: "4px 0" }}>{text}</div>;
 
-  // S: next idea + quick add. No done section.
+  // S: next idea + quick add. No done section, no toolbar - there's no room to spare.
   if (size === "S") {
     const next = active[0];
     return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
@@ -190,12 +269,13 @@ export function IdeaInboxWidget() {
     </div>;
   }
 
-  // M: one add form + active list. No done section.
+  // M: one add form + active list, with a Copy All / Complete All toolbar. No done section.
   if (size === "M") {
     return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
       {addForm(64)}
+      {toolbar(active, { allowComplete: true })}
       <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-        {active.length ? active.map((idea) => row(idea)) : emptyNote("Nothing waiting—add the first thought.")}
+        {active.length ? active.map((idea) => row(idea)) : emptyNote("Nothing waiting--add the first thought.")}
       </div>
     </div>;
   }
@@ -207,16 +287,20 @@ export function IdeaInboxWidget() {
     boxShadow: on ? "none" : buttonStyle.boxShadow,
     color: on ? "var(--accent-orange)" : "var(--text-muted)",
   });
+  const visible = showDone ? completed : active;
   return <div style={{ display: "flex", flexDirection: "column", gap: 6, height: "100%", minHeight: 0 }}>
-    <div style={{ alignItems: "center", display: "flex", flex: "0 0 auto", gap: 6 }}>
-      <button aria-pressed={!showDone} onClick={() => setShowDone(false)} style={tabStyle(!showDone)} type="button">Active · {active.length}</button>
-      <button aria-pressed={showDone} onClick={() => setShowDone(true)} style={tabStyle(showDone)} type="button">Done · {completed.length}</button>
+    <div style={{ alignItems: "center", display: "flex", flex: "0 0 auto", flexWrap: "wrap", gap: 6, justifyContent: "space-between" }}>
+      <div style={{ display: "flex", gap: 6 }}>
+        <button aria-pressed={!showDone} onClick={() => setShowDone(false)} style={tabStyle(!showDone)} type="button">Active · {active.length}</button>
+        <button aria-pressed={showDone} onClick={() => setShowDone(true)} style={tabStyle(showDone)} type="button">Done · {completed.length}</button>
+      </div>
+      {toolbar(visible, { allowComplete: !showDone })}
     </div>
     {!showDone && addForm(96)}
     <div style={{ display: "flex", flex: 1, flexDirection: "column", gap: 6, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
-      {showDone
-        ? (completed.length ? completed.map((idea) => row(idea)) : emptyNote("Implemented ideas will appear here."))
-        : (active.length ? active.map((idea) => row(idea)) : emptyNote("Nothing waiting—add the first thought."))}
+      {visible.length
+        ? visible.map((idea) => row(idea))
+        : emptyNote(showDone ? "Implemented ideas will appear here." : "Nothing waiting--add the first thought.")}
     </div>
   </div>;
 }
