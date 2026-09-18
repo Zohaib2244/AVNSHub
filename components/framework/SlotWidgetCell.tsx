@@ -29,6 +29,37 @@ const DIRECTIONS: Direction[] = ["n", "s", "e", "w"];
     left/top/width/height transition in globals.css */
 const FLIP_DURATION_MS = 400;
 
+/** Origin that `position: fixed` actually resolves against for `el`.
+    A fixed element is only viewport-positioned while no ancestor creates a
+    containing block — and the canvas .frame carries a backdrop-filter, which
+    does exactly that. Without subtracting this origin the popped-out widget
+    lands offset by the frame's own position: shifted down-right, clipping the
+    canvas edge on one side and leaving a gap on the other. */
+function fixedOrigin(el: HTMLElement): { x: number; y: number } {
+  for (let node = el.parentElement; node; node = node.parentElement) {
+    const cs = getComputedStyle(node);
+    if (
+      cs.transform !== "none" ||
+      cs.perspective !== "none" ||
+      cs.filter !== "none" ||
+      cs.backdropFilter !== "none" ||
+      /transform|filter|perspective/.test(cs.willChange) ||
+      /paint|layout|strict|content/.test(cs.contain)
+    ) {
+      const rect = node.getBoundingClientRect();
+      // fixed resolves against that ancestor's *padding* box
+      return { x: rect.left + parseFloat(cs.borderLeftWidth || "0"), y: rect.top + parseFloat(cs.borderTopWidth || "0") };
+    }
+  }
+  return { x: 0, y: 0 };
+}
+
+/** a viewport rect expressed in the coordinates `position: fixed` uses here */
+function fixedBox(cell: HTMLElement, target: DOMRect) {
+  const origin = fixedOrigin(cell);
+  return { left: target.left - origin.x, top: target.top - origin.y, width: target.width, height: target.height };
+}
+
 type DragState = {
   mode: "move" | "resize";
   direction?: Direction;
@@ -199,15 +230,14 @@ export function SlotWidgetCell({
     if (!cell) return;
 
     if (focused) {
-      const rect = cell.getBoundingClientRect();
-      const resting = { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+      const resting = fixedBox(cell, cell.getBoundingClientRect());
       restingRectRef.current = resting;
       setFocusBox(resting);
       focusRafRef.current = requestAnimationFrame(() => {
         focusRafRef.current = null;
         const frame = cell.closest(".slot-frame")?.getBoundingClientRect();
         if (!frame) return;
-        setFocusBox({ left: frame.left, top: frame.top, width: frame.width, height: frame.height });
+        setFocusBox(fixedBox(cell, frame));
       });
     } else if (restingRectRef.current) {
       // animate home, then hand the card back to the grid
@@ -229,7 +259,7 @@ export function SlotWidgetCell({
     const onResize = () => {
       const cell = cellRef.current;
       const frame = cell?.closest(".slot-frame")?.getBoundingClientRect();
-      if (frame) setFocusBox({ left: frame.left, top: frame.top, width: frame.width, height: frame.height });
+      if (cell && frame) setFocusBox(fixedBox(cell, frame));
     };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
