@@ -20,7 +20,14 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
   try {
-    const { sanitizeComponentMap } = await import("@/lib/widget-creator/customRegistry");
+    const { purgeParkedWidgets, sanitizeComponentMap } = await import("@/lib/widget-creator/customRegistry");
+    // Finish deletes that were parked to spare open pages a reload (see the
+    // delete route) — nothing is connected yet, so dropping their imports now
+    // costs nothing.
+    const purged = purgeParkedWidgets();
+    if (purged.length > 0) {
+      console.log(`[avnhub] purged ${purged.length} deleted custom widget${purged.length > 1 ? "s" : ""}: ${purged.join(", ")}`);
+    }
     const stale = sanitizeComponentMap();
     if (stale.length > 0) {
       console.warn(

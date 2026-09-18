@@ -12,6 +12,7 @@ import {
   registerCustomWidget,
   syncComponentMapEntry,
   isValidCustomWidgetId,
+  listParkedWidgetIds,
 } from "@/lib/widget-creator/customRegistry";
 import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
 import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
@@ -21,6 +22,8 @@ import {
   applyDeletes,
   applyWrites,
   commitBase,
+  discardDraft,
+  listWorkbenchSlugs,
   planApply,
   prepareWorkbench,
   restoreLiveEscapes,
@@ -407,7 +410,15 @@ export async function POST(req: Request) {
       // Prepare (or refresh) this widget's workbench under the lock, then build
       // the prompt from its draft — on a fix turn that's the harness's own
       // previous attempt, not the live version.
+      const freshWorkbench = !listWorkbenchSlugs().includes(targetId);
       const ws = await prepareWorkbench(targetId);
+      // Re-creating the slug of a widget that was deleted but not yet purged
+      // (its folder is parked until the next boot — see the delete route):
+      // start from an empty folder, not the deleted widget's files. Only on
+      // the first run; a fix turn keeps its draft.
+      if (!existedBeforeThisRun && freshWorkbench && listParkedWidgetIds().includes(targetId)) {
+        discardDraft(ws, { keepApi: false });
+      }
       const wbCustomDir = workbenchCustomDir(ws);
       if (ws.discardedDraft) {
         sendEvent(write, "notice", {
@@ -526,8 +537,11 @@ export async function POST(req: Request) {
                 failRun(`the widget's files were applied but registration failed: ${wired.error}`);
                 ok = false;
               }
-              syncComponentMapEntry(targetId);
             }
+            // Also covers a parked slug being re-created: its map line still
+            // points at the deleted widget's component, which the deletes below
+            // may remove. No-op for an id that isn't in the map.
+            syncComponentMapEntry(targetId);
             applyDeletes(applied.plan);
             commitBase(ws);
           }

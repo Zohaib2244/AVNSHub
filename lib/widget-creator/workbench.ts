@@ -485,6 +485,20 @@ export function discardDraft(ws: Workbench, opts: { keepApi?: boolean } = {}): v
   }
 }
 
+/** slugs that currently have a workbench for THIS repo — i.e. widgets with
+    live creator/import work mirrored outside the tree. The orphan prune treats
+    them as protected: a widget mid-edit has files on disk but may not have a
+    registry entry yet, and sweeping its folder throws the draft away. */
+export function listWorkbenchSlugs(): string[] {
+  try {
+    return readdirSync(join(workbenchRoot(), repoKey()), { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+
 export function removeWorkbench(slug: string): void {
   try {
     rmSync(workbenchDir(slug), { recursive: true, force: true });

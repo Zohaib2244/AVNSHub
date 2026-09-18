@@ -5,7 +5,7 @@
 // 2. A settings gear that opens canvas appearance, prefs, and layout controls.
 // 3. A widget manager tab that opens add/remove controls.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Camera,
@@ -90,6 +90,7 @@ import {
   getServerSlotLayout,
   importSlotLayout,
   placeWidget,
+  placeWidgetAuto,
   removeWidget as removeSlotWidget,
   resetSlotLayout,
   setRegionDims,
@@ -709,8 +710,22 @@ function WidgetImportBar() {
       const body = new FormData();
       body.append("file", file);
       const res = await fetch("/api/widget-creator/import", { method: "POST", body });
-      const data = (await res.json().catch(() => ({}))) as { id?: string; error?: string; updated?: boolean; note?: string };
-      if (res.ok) {
+      const data = (await res.json().catch(() => ({}))) as {
+        id?: string;
+        error?: string;
+        updated?: boolean;
+        note?: string;
+        imported?: string[];
+        failed?: { id: string; error?: string }[];
+      };
+      if (res.ok && data.imported) {
+        // a multi-widget bundle: some may have failed on their own
+        const failed = data.failed ?? [];
+        const msg = `imported ${data.imported.length} widget${data.imported.length === 1 ? "" : "s"} ✓${
+          failed.length ? ` · ${failed.length} failed: ${failed.map((f) => f.id).join(", ")}` : ""
+        }${data.note ? ` (${data.note})` : ""}`;
+        setStatus({ kind: failed.length ? "error" : "ok", msg });
+      } else if (res.ok) {
         const verb = data.updated ? "updated" : "imported";
         setStatus({ kind: "ok", msg: `${verb} ${data.id ?? ""} ✓${data.note ? ` (${data.note})` : ""}` });
       }
@@ -824,6 +839,12 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
   const [addingId, setAddingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  // bulk selection — see BulkBar below for why it exists
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkNote, setBulkNote] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const customIds = new Set(Object.keys(CUSTOM_WIDGETS));
   const query = search.trim().toLowerCase();
   const allPlacedRows = slotLayout.widgets
@@ -843,27 +864,101 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
     ? "no available widgets match search"
     : widgetEmptyText(filter, "all widgets are placed", "all system widgets are placed", "no custom widgets available");
 
+  // only ever act on widgets that still exist and are currently listed
+  const visibleIds = [...placedRows.map((row) => row.id), ...availableIds];
+  const selectedIds = selected.filter((id) => getManifest(id));
+  const selectedSet = new Set(selectedIds);
+  const selectedPlaced = selectedIds.filter((id) => placedIds.has(id));
+  const selectedUnplaced = selectedIds.filter((id) => !placedIds.has(id));
+  const selectedCustom = selectedIds.filter((id) => customIds.has(id));
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedSet.has(id));
+
+  function toggleSelected(id: string) {
+    setBulkNote(null);
+    setConfirmDelete(false);
+    setSelected((current) => (current.includes(id) ? current.filter((x) => x !== id) : [...current, id]));
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false);
+    setSelected([]);
+    setBulkNote(null);
+    setConfirmDelete(false);
+  }
+
+  async function deleteWidgets(ids: string[]) {
+    // One request for the whole set: a single registry write, which open
+    // pages hot-update in place — no reload (see the delete route).
+    const res = await fetch("/api/widget-creator/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(ids.length === 1 ? { id: ids[0] } : { ids }),
+    });
+    if (!res.ok) {
+      const payload = (await res.json().catch(() => null)) as { error?: string } | null;
+      return payload?.error ?? `failed to delete ${ids.join(", ")}`;
+    }
+    // fully remove the matching creator projects (chat/brief history and all)
+    // so none lingers pointing at a widget that no longer exists
+    for (const id of ids) syncDeletedWidget(id);
+    return null;
+  }
+
   async function deleteCustomWidget(id: string) {
     if (!customIds.has(id) || deletingId) return;
     setDeletingId(id);
     setDeleteError(null);
     removeSlotWidget(id);
     try {
-      const res = await fetch("/api/widget-creator/delete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) {
-        const payload = await res.json().catch(() => null) as { error?: string } | null;
-        setDeleteError(payload?.error ?? `failed to delete ${id}`);
-      } else {
-        // fully remove the matching creator project (chat/brief history and
-        // all) so it doesn't linger pointing at a widget that no longer exists
-        syncDeletedWidget(id);
-      }
+      setDeleteError(await deleteWidgets([id]));
     } finally {
       setDeletingId(null);
+    }
+  }
+
+  function bulkAdd() {
+    let added = 0;
+    const noRoom: string[] = [];
+    for (const id of selectedUnplaced) {
+      if (placeWidgetAuto(id)) added += 1;
+      else noRoom.push(id);
+    }
+    setBulkNote(
+      noRoom.length > 0
+        ? `added ${added} · no room for ${noRoom.join(", ")}`
+        : `added ${added} to the canvas`,
+    );
+  }
+
+  function bulkRemove() {
+    for (const id of selectedPlaced) removeSlotWidget(id);
+    setBulkNote(`removed ${selectedPlaced.length} from the canvas`);
+  }
+
+  function bulkExport() {
+    // assign(), not location.href = — a plain assignment reads as a mutation
+    window.location.assign(`/api/widget-creator/export?ids=${encodeURIComponent(selectedCustom.join(","))}`);
+    setBulkNote(`downloading ${selectedCustom.length} widget${selectedCustom.length === 1 ? "" : "s"}`);
+  }
+
+  async function bulkDelete() {
+    if (selectedCustom.length === 0 || bulkBusy) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setConfirmDelete(false);
+    setBulkBusy(true);
+    setDeleteError(null);
+    setBulkNote(`deleting ${selectedCustom.length}…`);
+    for (const id of selectedCustom) removeSlotWidget(id);
+    try {
+      const error = await deleteWidgets(selectedCustom);
+      setDeleteError(error);
+      setBulkNote(error ? null : `deleted ${selectedCustom.length} widget${selectedCustom.length === 1 ? "" : "s"}`);
+      setSelected((current) => current.filter((id) => !selectedCustom.includes(id)));
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -871,14 +966,87 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
     if (placeWidget(id, region)) setAddingId(null);
   }
 
+  const selectProps = selectMode
+    ? { selectable: true, isSelected: (id: string) => selectedSet.has(id), onToggleSelect: toggleSelected }
+    : {};
+
   return (
     <div className="hub-widget-panel">
+      {selectMode ? (
+        <div className="hub-widget-bulkbar">
+          <div className="hub-widget-bulk-head">
+            <button
+              type="button"
+              className="hub-widget-bulk-link"
+              onClick={() => {
+                setBulkNote(null);
+                setSelected(allVisibleSelected ? [] : [...new Set([...selectedIds, ...visibleIds])]);
+              }}
+            >
+              {allVisibleSelected ? "none" : "all"}
+            </button>
+            <span className="hub-widget-bulk-count">{selectedIds.length} selected</span>
+            <button type="button" className="hub-widget-bulk-link" onClick={exitSelectMode}>
+              done
+            </button>
+          </div>
+          <div className="hub-widget-bulk-actions">
+            <button
+              type="button"
+              className="hub-widget-bulk-btn"
+              disabled={selectedUnplaced.length === 0}
+              onClick={bulkAdd}
+              title="add every selected widget to the first region with room"
+            >
+              <Plus size={11} strokeWidth={2} />
+              add
+            </button>
+            <button
+              type="button"
+              className="hub-widget-bulk-btn"
+              disabled={selectedPlaced.length === 0}
+              onClick={bulkRemove}
+              title="take the selected widgets off the canvas (they stay installed)"
+            >
+              <Minus size={11} strokeWidth={2} />
+              remove
+            </button>
+            <button
+              type="button"
+              className="hub-widget-bulk-btn"
+              disabled={selectedCustom.length === 0}
+              onClick={bulkExport}
+              title="download the selected custom widgets as one .zip"
+            >
+              <Download size={11} strokeWidth={1.75} />
+              export
+            </button>
+            <button
+              type="button"
+              className={`hub-widget-bulk-btn danger${confirmDelete ? " confirm" : ""}`}
+              disabled={selectedCustom.length === 0 || bulkBusy}
+              onClick={bulkDelete}
+              title="delete the selected custom widgets permanently"
+            >
+              <Trash2 size={11} strokeWidth={1.75} />
+              {confirmDelete ? `delete ${selectedCustom.length}?` : "delete"}
+            </button>
+          </div>
+          {bulkNote && <div className="hub-widget-bulk-note">{bulkNote}</div>}
+        </div>
+      ) : (
+        <button type="button" className="hub-widget-bulk-toggle" onClick={() => setSelectMode(true)}>
+          <Check size={11} strokeWidth={2.5} />
+          select multiple
+        </button>
+      )}
       {deleteError && <div className="hub-core-io-error">{deleteError}</div>}
       <HubWidgetList
         heading={`placed · ${placedRows.length}`}
         ids={placedRows.map((row) => row.id)}
         metaFor={(id) => placedRows.find((row) => row.id === id)?.location}
         empty={placedEmpty}
+        {...selectProps}
         actionFor={(id) => (
           <HubWidgetActions
             id={id}
@@ -897,6 +1065,7 @@ function SlotWidgetControls({ filter, search }: { filter: WidgetFilter; search: 
         heading={`available · ${availableIds.length}`}
         ids={availableIds}
         empty={availableEmpty}
+        {...selectProps}
         actionFor={(id) => {
           const fitRegions = getRegionsThatFitWidget(id, slotLayout);
           const open = addingId === id;
@@ -950,12 +1119,20 @@ function HubWidgetList({
   actionFor,
   empty,
   metaFor,
+  selectable = false,
+  isSelected,
+  onToggleSelect,
 }: {
   heading: string;
   ids: string[];
   actionFor: (id: string) => ReactNode;
   empty: string;
   metaFor?: (id: string) => string | undefined;
+  /** in select mode the row itself is the control: the per-row buttons step
+      aside for a checkbox and the whole row toggles */
+  selectable?: boolean;
+  isSelected?: (id: string) => boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   return (
     <div className="hub-widget-list-section">
@@ -969,8 +1146,32 @@ function HubWidgetList({
             if (!manifest) return null;
             const Icon = manifest.icon;
             const meta = metaFor?.(id);
+            const checked = selectable && (isSelected?.(id) ?? false);
+            const toggle = () => onToggleSelect?.(id);
             return (
-              <div className="hub-widget-item" key={id}>
+              <div
+                className={`hub-widget-item${selectable ? " selectable" : ""}${checked ? " selected" : ""}`}
+                key={id}
+                {...(selectable
+                  ? {
+                      role: "checkbox",
+                      "aria-checked": checked,
+                      tabIndex: 0,
+                      onClick: toggle,
+                      onKeyDown: (e: ReactKeyboardEvent<HTMLDivElement>) => {
+                        if (e.key === " " || e.key === "Enter") {
+                          e.preventDefault();
+                          toggle();
+                        }
+                      },
+                    }
+                  : {})}
+              >
+                {selectable && (
+                  <span className={`hub-widget-check${checked ? " on" : ""}`} aria-hidden>
+                    {checked && <Check size={9} strokeWidth={3} />}
+                  </span>
+                )}
                 <Icon className="hub-widget-icon" size={14} strokeWidth={1.75} />
                 <div className="hub-widget-text">
                   <span className="hub-widget-title">{manifest.title}</span>
@@ -979,7 +1180,7 @@ function HubWidgetList({
                     {meta && <> · {meta}</>}
                   </span>
                 </div>
-                {actionFor(id)}
+                {!selectable && actionFor(id)}
               </div>
             );
           })}

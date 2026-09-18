@@ -66,11 +66,19 @@ export function upsertRegistryEntry(id: string, entry: RegistryEntry): void {
 }
 
 export function removeRegistryEntry(id: string): void {
+  removeRegistryEntries([id]);
+}
+
+/** Remove many entries in ONE read-modify-write, so a bulk delete is a single
+    JSON change (which connected pages hot-update in place). Returns the ids
+    that were actually present. */
+export function removeRegistryEntries(ids: string[]): string[] {
   const registry = readRegistry();
-  if (id in registry) {
-    delete registry[id];
-    writeRegistry(registry);
-  }
+  const removed = ids.filter((id) => id in registry);
+  if (removed.length === 0) return [];
+  for (const id of removed) delete registry[id];
+  writeRegistry(registry);
+  return removed;
 }
 
 export function removeCustomWidgetFiles(id: string): boolean {
@@ -132,6 +140,19 @@ export async function pruneOrphanCustomWidgetFiles(): Promise<string[]> {
   const protectedProjectIds = await readProtectedProjectSlugs();
   if (protectedProjectIds) {
     for (const id of protectedProjectIds) keepIds.add(id);
+  }
+  // A deleted widget is parked: its lazy import stays in customComponentMap.tsx
+  // until the next boot (see purgeParkedWidgets), so its folder is still part
+  // of the module graph. Sweeping it now would leave that import pointing at a
+  // missing file and take the whole dashboard down.
+  for (const id of listComponentMapIds()) keepIds.add(id);
+  // a widget with a workbench is being edited/imported right now — its folder
+  // is not an orphan even before it has a registry entry
+  try {
+    const { listWorkbenchSlugs } = await import("@/lib/widget-creator/workbench");
+    for (const slug of listWorkbenchSlugs()) keepIds.add(slug);
+  } catch {
+    // no workbenches configured/readable — nothing extra to protect
   }
   const removed: string[] = [];
 
@@ -273,7 +294,12 @@ function mapEntryLine(id: string): string {
     `mod` defaults to the detected module, falling back to the conventional name. */
 export function addToComponentMap(id: string, mod?: ComponentModule): { ok: boolean; error?: string } {
   let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  if (content.includes(`const ${localVar(id)} =`)) return { ok: true }; // already registered
+  if (content.includes(`const ${localVar(id)} =`)) {
+    // already wired — a repeat edit, or a parked (deleted, not yet purged) id
+    // being re-created, whose line may still point at the old component file
+    syncComponentMapEntry(id);
+    return { ok: true };
+  }
   // Without both markers String.replace silently no-ops and the widget would
   // "register" without ever being wired in — fail loudly instead.
   if (!content.includes("// --- custom-components end ---") || !content.includes("// --- custom-map end ---")) {
@@ -382,15 +408,53 @@ export function syncComponentMapEntry(id: string): void {
 /** remove this widget's declaration + map entry by id — line-based so it works
     regardless of which file/export the declaration happened to point at */
 export function removeFromComponentMap(id: string): void {
+  removeManyFromComponentMap([id]);
+}
+
+/** same, for many ids at once — one file write, so one recompile */
+export function removeManyFromComponentMap(ids: string[]): void {
+  if (ids.length === 0) return;
   const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  const v = localVar(id);
-  const declPrefix = `const ${v} = `;
+  const declPrefixes = ids.map((id) => `const ${localVar(id)} = `);
   // handle both quoted ("id": v) and bare (id: v) key formats
+  const mapLines = new Set(ids.flatMap((id) => [`  "${id}": ${localVar(id)},`, `  ${id}: ${localVar(id)},`]));
   const lines = content.split("\n");
-  const kept = lines
-    .filter((line) => !line.startsWith(declPrefix) && line !== `  "${id}": ${v},` && line !== `  ${id}: ${v},`);
+  const kept = lines.filter(
+    (line) => !declPrefixes.some((prefix) => line.startsWith(prefix)) && !mapLines.has(line),
+  );
   if (kept.length === lines.length) return;
   writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
+}
+
+/** ids that have a lazy declaration in customComponentMap.tsx */
+export function listComponentMapIds(): string[] {
+  const ids: string[] = [];
+  for (const line of readFileSync(COMPONENT_MAP_PATH, "utf-8").split("\n")) {
+    const m = line.match(/^const \w+ = lazy\(\(\) => import\("@\/components\/widgets\/custom\/([^/]+)\//);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
+
+/** Deleted widgets whose map line and files are still in place: wired into
+    customComponentMap.tsx but no longer in the registry. See the delete route
+    for why deletion stops short of removing them. */
+export function listParkedWidgetIds(): string[] {
+  const registry = readRegistry();
+  return listComponentMapIds().filter((id) => !(id in registry));
+}
+
+/** Finish the deletes that were parked: drop their map lines, then their
+    files. Removing a lazy import from the map is the one change a connected
+    page can't hot-swap (it full-reloads), so this only runs at server boot,
+    when every page reconnects to a fresh server anyway. */
+export function purgeParkedWidgets(): string[] {
+  const parked = listParkedWidgetIds();
+  if (parked.length === 0) return [];
+  // map first, then files — the map never points at a missing module
+  removeManyFromComponentMap(parked);
+  for (const id of parked) removeCustomWidgetFiles(id);
+  return parked;
 }
 
 /** Scan customComponentMap.tsx for lazy imports pointing to files that no longer
