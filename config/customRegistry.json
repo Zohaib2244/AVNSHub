@@ -167,55 +167,6 @@
       }
     ]
   },
-  "cookie-clicker": {
-    "title": "cookie clicker",
-    "iconName": "Globe",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "clickPower",
-        "label": "click power",
-        "type": "number",
-        "default": 1,
-        "min": 1,
-        "max": 1000
-      },
-      {
-        "key": "showUpgrades",
-        "label": "show upgrades",
-        "type": "toggle",
-        "default": true
-      }
-    ]
-  },
-  "office-game-dev": {
-    "title": "office game dev",
-    "iconName": "Zap",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": []
-  },
   "quick-links": {
     "title": "quick-links",
     "iconName": "Server",
@@ -327,23 +278,6 @@
         "max": 20
       }
     ]
-  },
-  "ambient-data": {
-    "title": "ambient data",
-    "iconName": "Server",
-    "sizes": [
-      "M",
-      "L",
-      "S"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": []
   },
   "verlet-sim": {
     "title": "verlet sim",
@@ -501,82 +435,6 @@
         "placeholder": "optional, falls back to env"
       }
     ]
-  },
-  "office-time-tracker": {
-    "title": "office time tracker",
-    "iconName": "Clock",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [],
-    "flags": {
-      "hasApiRoute": false
-    }
-  },
-  "pomodoro-timer": {
-    "title": "Pomodoro Timer",
-    "iconName": "Timer",
-    "sizes": [
-      "S",
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [
-      {
-        "key": "focusDuration",
-        "label": "focus duration (min)",
-        "type": "number",
-        "default": 25,
-        "min": 1,
-        "max": 120
-      },
-      {
-        "key": "breakDuration",
-        "label": "break duration (min)",
-        "type": "number",
-        "default": 5,
-        "min": 1,
-        "max": 60
-      }
-    ],
-    "flags": {
-      "hasApiRoute": false
-    }
-  },
-  "publishing-email-builder": {
-    "title": "Publishing Email Builder",
-    "iconName": "ClipboardCheck",
-    "sizes": [
-      "M",
-      "L"
-    ],
-    "orientations": [
-      "h"
-    ],
-    "defaults": {
-      "size": "M",
-      "orientation": "h"
-    },
-    "settings": [],
-    "flags": {
-      "hasApiRoute": false
-    }
   },
   "weather-updated": {
     "title": "Weather",

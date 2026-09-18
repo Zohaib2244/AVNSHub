@@ -12,16 +12,10 @@ import type { ComponentType } from "react";
 // --- custom-components start ---
 const _cube_timer = lazy(() => import("@/components/widgets/custom/cube-timer/CubeTimerWidget").then((m) => ({ default: m.CubeTimerWidget })));
 const _glyph_matrix = lazy(() => import("@/components/widgets/custom/glyph-matrix/GlyphMatrixWidget").then((m) => ({ default: m.GlyphMatrixWidget })));
-const _cookie_clicker = lazy(() => import("@/components/widgets/custom/cookie-clicker/CookieClickerWidget").then((m) => ({ default: m.CookieClickerWidget })));
-const _office_game_dev = lazy(() => import("@/components/widgets/custom/office-game-dev/OfficeGameDevWidget").then((m) => ({ default: m.OfficeGameDevWidget })));
 const _quick_links = lazy(() => import("@/components/widgets/custom/quick-links/QuickLinksWidget").then((m) => ({ default: m.QuickLinksWidget })));
-const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
 const _verlet_sim = lazy(() => import("@/components/widgets/custom/verlet-sim/VerletSimWidget").then((m) => ({ default: m.VerletSimWidget })));
 const _world_clock = lazy(() => import("@/components/widgets/custom/world-clock/WorldClockWidget").then((m) => ({ default: m.WorldClockWidget })));
 const _spotify_visualizer = lazy(() => import("@/components/widgets/custom/spotify-visualizer/SpotifyVisualizerWidget").then((m) => ({ default: m.SpotifyVisualizerWidget })));
-const _office_time_tracker = lazy(() => import("@/components/widgets/custom/office-time-tracker/OfficeTimeTrackerWidget").then((m) => ({ default: m.OfficeTimeTrackerWidget })));
-const _pomodoro_timer = lazy(() => import("@/components/widgets/custom/pomodoro-timer/PomodoroTimerWidget").then((m) => ({ default: m.PomodoroTimerWidget })));
-const _publishing_email_builder = lazy(() => import("@/components/widgets/custom/publishing-email-builder/PublishingEmailBuilderWidget").then((m) => ({ default: m.PublishingEmailBuilderWidget })));
 const _weather_updated = lazy(() => import("@/components/widgets/custom/weather-updated/WeatherUpdatedWidget").then((m) => ({ default: m.WeatherUpdatedWidget })));
 const _idea_inbox = lazy(() => import("@/components/widgets/custom/idea-inbox/IdeaInboxWidget").then((m) => ({ default: m.IdeaInboxWidget })));
 // --- custom-components end ---
@@ -30,16 +24,10 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
 // --- custom-map start ---
   "cube-timer": _cube_timer,
   "glyph-matrix": _glyph_matrix,
-  "cookie-clicker": _cookie_clicker,
-  "office-game-dev": _office_game_dev,
   "quick-links": _quick_links,
-  "ambient-data": _ambient_data,
   "verlet-sim": _verlet_sim,
   "world-clock": _world_clock,
   "spotify-visualizer": _spotify_visualizer,
-  "office-time-tracker": _office_time_tracker,
-  "pomodoro-timer": _pomodoro_timer,
-  "publishing-email-builder": _publishing_email_builder,
   "weather-updated": _weather_updated,
   "idea-inbox": _idea_inbox,
 // --- custom-map end ---
