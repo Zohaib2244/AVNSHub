@@ -22,6 +22,8 @@ import {
   type LayoutState,
 } from "@/lib/layout";
 import { HubDialog } from "@/components/framework/HubDialog";
+import { CommandPalette } from "@/components/dashboard/CommandPalette";
+import type { CanvasSettingsSection } from "@/config/hubSettings";
 
 export type HubCoreTab = "settings" | "widgets";
 
@@ -59,6 +61,14 @@ type LayoutContextValue = {
   /** Allows widgets/tools to open Hub Core to a specific tab. */
   hubCoreTab: HubCoreTab | null;
   setHubCoreTab: Dispatch<SetStateAction<HubCoreTab | null>>;
+  /** the settings section shown when the settings tab is open — held here,
+      not in HubCorePanel, so the command palette can open straight to one */
+  settingsSection: CanvasSettingsSection;
+  setSettingsSection: Dispatch<SetStateAction<CanvasSettingsSection>>;
+  /** Ctrl/Cmd+K command palette. Surfaces that also handle Escape read this
+      and stand down while it is open, so one key press closes one thing. */
+  paletteOpen: boolean;
+  setPaletteOpen: Dispatch<SetStateAction<boolean>>;
 };
 
 const LayoutContext = createContext<LayoutContextValue | null>(null);
@@ -71,6 +81,8 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
   const [isInstalling, setInstalling] = useState(false);
   const [keyboardFocusWidgetId, setKeyboardFocusWidgetId] = useState<string | null>(null);
   const [hubCoreTab, setHubCoreTab] = useState<HubCoreTab | null>(null);
+  const [settingsSection, setSettingsSection] = useState<CanvasSettingsSection>("theme");
+  const [paletteOpen, setPaletteOpen] = useState(false);
 
   // Escape clears keyboard focus (lets widgets release keyboard capture)
   useEffect(() => {
@@ -83,10 +95,14 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [keyboardFocusWidgetId]);
 
-  // entering edit mode always exits focus mode — can't do both at once
+  // entering edit mode always exits focus mode — can't do both at once — and
+  // closes whichever Hub Core tab is open: the settings/widgets panel covers
+  // the canvas you just asked to rearrange, and the edit button sits inside
+  // the panel's own outside-click boundary so it would otherwise stay open
   const startEdit = useCallback(() => {
     setFocusWidgetId(null);
     setKeyboardFocusWidgetId(null);
+    setHubCoreTab(null);
     setEditMode(true);
   }, []);
   // leaving edit mode hides every gear/add affordance — drop any open popover
@@ -120,9 +136,14 @@ export function LayoutProvider({ children }: { children: ReactNode }) {
         setKeyboardFocusWidgetId,
         hubCoreTab,
         setHubCoreTab,
+        settingsSection,
+        setSettingsSection,
+        paletteOpen,
+        setPaletteOpen,
       }}
     >
       {children}
+      <CommandPalette />
       <HubDialog />
     </LayoutContext.Provider>
   );

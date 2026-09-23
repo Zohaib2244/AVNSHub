@@ -1,10 +1,11 @@
 "use client";
 import "./NowPlaying.css";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
+import { emitDelight } from "@/lib/nutbotSignal";
 import { timeAgo } from "@/lib/format";
 import { useWidget } from "@/components/framework/WidgetContext";
 import type { NowPlaying as NowPlayingData, PlayerAction, SpotifyCreds } from "@/lib/spotify";
@@ -87,6 +88,17 @@ export function NowPlaying() {
   const notConfigured = !!polled && "notConfigured" in polled;
   const data = notConfigured ? undefined : (polled as NowPlayingData | undefined);
   const [controlError, setControlError] = useState<string | null>(null);
+
+  // a track change while something is actually playing gives NutBot something
+  // to be pleased about; the first observed track is not a change
+  const seenTrack = useRef<string | null>(null);
+  const playingTrack = data?.isPlaying ? data.trackName : null;
+  useEffect(() => {
+    if (!playingTrack) return;
+    const previous = seenTrack.current;
+    seenTrack.current = playingTrack;
+    if (previous !== null && previous !== playingTrack) emitDelight("new track");
+  }, [playingTrack]);
 
   async function control(action: PlayerAction) {
     setControlError(null);

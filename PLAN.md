@@ -34,12 +34,12 @@ Fix once the real username is known:
 
 Replace with real URLs (or remove entries that don't apply).
 
-## 4. GlyphStrip vs. "no neon glow" rule
+## 4. GlyphStrip vs. "no neon glow" rule — RESOLVED (removed 2026-09-20)
 
-`components/GlyphStrip.tsx` has a glow/box-shadow pulse animation that may
-conflict with the Chunky Blocks design rule of "no neon glow, no CRT
-scanlines/grain". Re-check against `DESIGN_VARIATIONS.md` and restyle or
-remove if needed.
+`components/dashboard/GlyphStrip.tsx` was a 3px pulsing bar down the left edge
+mirroring homelab up/down status. It conflicted with the Chunky Blocks "no neon
+glow" rule, duplicated what the uptime widget already says, and read as chrome
+with no meaning. Deleted, along with its `/api/homelab` poll.
 
 ---
 

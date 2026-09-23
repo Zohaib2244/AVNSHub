@@ -32,6 +32,7 @@ import {
   type SettingsField,
   type SettingsValues,
   type WidgetManifest,
+  type WidgetSize,
 } from "@/config/widgets";
 import type { WidgetInstance } from "@/lib/layout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -150,9 +151,16 @@ export function WidgetSettingsPopover({
   // name/icon at all and the headerStyle control would do nothing — drop it
   // rather than offer a dead three-way toggle. plainChrome widgets (the
   // namecard) still get it: they skip the card chrome but not the header.
-  const frameworkFields = manifest.flags?.customHeader
-    ? FRAMEWORK_SETTINGS.filter((f) => f.key !== "headerStyle")
-    : FRAMEWORK_SETTINGS;
+  //
+  // layoutSize offers only the sizes this widget actually has (plus auto),
+  // and disappears for a single-size widget, where every choice is the same.
+  const frameworkFields = FRAMEWORK_SETTINGS.filter(
+    (f) => !(f.key === "headerStyle" && manifest.flags?.customHeader) && !(f.key === "layoutSize" && manifest.sizes.length < 2),
+  ).map((f) =>
+    f.key === "layoutSize" && (f.type === "segment" || f.type === "select")
+      ? { ...f, options: f.options.filter((o) => o.value === "auto" || manifest.sizes.includes(o.value as WidgetSize)) }
+      : f,
+  );
   const widgetFields = !hideWidgetSettings ? manifest.settings ?? [] : [];
 
   const [draft, setDraft] = useState<SettingsValues>({});

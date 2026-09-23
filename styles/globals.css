@@ -1047,14 +1047,15 @@ html[data-backdrop="glass"] .frame {
    content), then Left, then Right — with each cell ignoring its rect and
    taking a full-width, content-height row. Desktop (≥1024px) is untouched. */
 @media (max-width: 1023px) {
-  /* the Hub Core edge dock sits translateX(100%) past the frame's right edge
-     (28px wide). Reserve a right gutter wide enough for it so it doesn't hang
-     off-screen and trigger horizontal scroll; trim the now-unneeded left
-     gutter to keep the frame roughly centred. */
+  /* the right gutter that used to be reserved here for the edge dock (which
+     hung translateX(100%) past the frame) is gone with the dock itself — Hub
+     Core is the bottom-centred control deck now and never leaves the frame's
+     box horizontally. */
   .slot-page {
     padding-left: 12px;
-    padding-right: 38px;
+    padding-right: 12px;
   }
+
 
   .slot-frame {
     display: flex;
@@ -1800,114 +1801,325 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   position: relative;
 }
 
-.hub-core.hub-core-slot {
+/* ─── Hub Core: the control deck ─────────────────────────────────────────
+   Slot Layout's Hub Core is one horizontal sticker bar centred on the bottom
+   of the CANVAS — not the window — replacing the old right-edge tab column
+   (which was icon-only tabs that grew taller on hover to reveal vertical
+   text; horizontal labels just fit, so that mechanic is gone).
+
+   It auto-hides. At rest it is .hub-core-stub — three dots straddling the
+   frame's bottom border — and expands into .hub-core-bar on approach, click
+   or focus. Never a squeezed in-between: you get a stub, or a whole deck.
+   Timings and pinning live in lib/useDeckAutoHide.ts; the interaction model
+   was prototyped in public/proto/control-deck.html.
+
+   .hub-core-deck itself paints nothing: it is a transparent anchor layer over
+   the frame's padding box, so the bar, the stub and the panel can each be
+   centred independently of one another. pointer-events: none on the layer
+   (and auto on each real control) keeps it from eating clicks meant for the
+   widgets underneath. */
+
+.hub-core.hub-core-deck {
   position: absolute;
-  top: 10px;
+  inset: 0;
+  z-index: 100;
+  display: block;
+  pointer-events: none;
+}
+
+/* centred with auto margins rather than left: 50% + translateX(-50%): for an
+   absolutely positioned box, `left: 50%` also halves the width available to
+   lay out in, so the bar started wrapping at half the room it actually had.
+   left/right: 0 gives it the whole frame to measure against, margin-inline
+   centres it, and the transform is then free for the collapse animation. */
+.hub-core-bar {
+  position: absolute;
+  left: 0;
   right: 0;
-  transform: translateX(100%);
-  flex-direction: column;
-  gap: 3px;
-  padding-left: 2px;
-}
-
-.hub-core.hub-core-slot .hub-core-btn {
-  width: 28px;
-  height: 32px;
-  border-radius: 0 6px 6px 0;
-  border-left: none;
+  bottom: 10px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  display: flex;
+  align-items: center;
+  /* wraps rather than overflowing the frame when there are many canvases or
+     the frame is narrow. Wrapping, not scrolling: overflow: auto here would
+     clip the canvas rename flyout, an absolutely positioned descendant — the
+     same trap noted on .canvas-pill-list. */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  row-gap: 4px;
+  padding: 6px;
+  pointer-events: auto;
   background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.33, 1, 0.68, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-/* panel opens to the LEFT of the slot tabs */
-.hub-core.hub-core-slot .hub-core-panel {
-  top: 0;
-  right: calc(100% + 8px);
-  left: auto;
+/* collapsed — the bar hands over to the stub rather than shrinking into a
+   squashed lip of itself */
+.hub-core-deck:not(.deck-open) .hub-core-bar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px) scale(0.9);
 }
 
-/* ─── edge-dock hover-expand (wrench/settings/widgets + AVN Hub Canvases) ───
-   every button in the right-edge column shares this: icon-only and 28×32 at
-   rest, grows taller on hover/focus to reveal a vertical text label without
-   widening the dock. Height is the only thing animated so the column's
-   width — and its translateX(100%) attachment to the frame edge — never
-   moves. */
-
-.hub-core.hub-core-slot .hub-core-btn.edge-btn {
-  flex-direction: column;
-  justify-content: flex-start;
-  padding-top: 7px;
-  gap: 3px;
-  overflow: hidden;
-  transition: height 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), color 0.15s ease, border-color 0.15s ease,
-    background-color 0.15s ease;
+.hub-core-deck[data-edit="true"] .hub-core-bar {
+  border-color: var(--accent-orange);
 }
 
-/* the icon itself must never shrink/get squeezed by the label below it —
-   without this, the label's intrinsic vertical-text height (taller than the
-   collapsed 32px box) can pressure flex-shrink on BOTH children at once and
-   the icon ends up rendered at ~0px, which read as "icons aren't showing" */
-.hub-core.hub-core-slot .hub-core-btn.edge-btn > svg {
+/* deck buttons: the base .hub-core-btn is a 32×30 icon square — in the bar
+   they size to their label instead */
+.hub-core-bar .hub-core-btn {
+  width: auto;
+  height: 32px;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.hub-core-bar .hub-core-btn.icon-only {
+  width: 32px;
+  padding: 0;
+}
+
+.hub-core-bar .hub-core-btn > svg {
   flex-shrink: 0;
 }
 
-.hub-core.hub-core-slot .hub-core-btn.edge-btn:hover,
-.hub-core.hub-core-slot .hub-core-btn.edge-btn:focus-visible,
-.hub-core.hub-core-slot .hub-core-btn.edge-btn.active {
-  height: 76px;
+/* the transparent resting border above is as specific as the base
+   .hub-core-btn:hover / .active rules and comes later in the file, so the
+   accent border has to be restated here or it never shows */
+.hub-core-bar .hub-core-btn:hover,
+.hub-core-bar .hub-core-btn:focus-visible,
+.hub-core-bar .hub-core-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.hub-core-bar .hub-core-btn.active {
+  background: color-mix(in srgb, var(--accent-orange) 10%, transparent);
 }
 
 .edge-btn-label {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
   font-family: var(--font-jetbrains-mono), monospace;
   font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: lowercase;
   white-space: nowrap;
   color: inherit;
-  opacity: 0;
-  /* explicit clamp (not just opacity) so the label deterministically takes
-     ~0 space at rest regardless of its intrinsic vertical-text height —
-     see the flex-shrink note above */
-  max-height: 0;
+  /* a canvas can be named anything — one long name must not stretch the deck
+     past the frame */
+  max-width: 96px;
   overflow: hidden;
-  flex-shrink: 0;
-  transition: opacity 0.15s ease, max-height 0.22s ease;
-}
-
-.hub-core-btn.edge-btn:hover .edge-btn-label,
-.hub-core-btn.edge-btn:focus-visible .edge-btn-label,
-.hub-core-btn.edge-btn.active .edge-btn-label {
-  opacity: 1;
-  max-height: 44px;
+  text-overflow: ellipsis;
 }
 
 .hub-core-divider {
-  width: 28px;
-  margin: 2px 0;
-  border-top: 1px solid var(--border);
+  width: 0;
+  height: 20px;
+  margin: 0 3px;
+  border-left: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+/* ─── view | edit: one control, two legible states ───────────────────────
+   The old wrench-then-padlock tab showed the state you were NOT in, which
+   read as "is this locked or is that button the lock?". Both states are
+   spelled out here and the knob says which one you are in. */
+
+.deck-switch {
+  /* one knob-width, used by both halves and by the knob's travel — they must
+     never disagree or the knob stops short of the label it is under */
+  --switch-half: 58px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-nested);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.deck-switch-state {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: var(--switch-half);
+  height: 100%;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--text-muted-dim);
+  transition: color 0.2s ease;
+}
+
+.deck-switch-knob {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 3px;
+  width: var(--switch-half);
+  height: calc(100% - 6px);
+  border-radius: 6px;
+  background: var(--accent-cyan);
+  transition: transform 0.24s cubic-bezier(0.34, 1.3, 0.64, 1), background-color 0.2s ease;
+}
+
+/* whichever half the knob is under takes the knob's contrast colour */
+.deck-switch-state[data-state="view"] {
+  color: var(--badge-text);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-knob {
+  transform: translateX(var(--switch-half));
+  background: var(--accent-orange);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-state[data-state="view"] {
+  color: var(--text-muted-dim);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-state[data-state="edit"] {
+  color: var(--badge-text);
+}
+
+/* Known trade below 1023px, where Slot Layout collapses to a tall stacked
+   scroll: the deck stays anchored to the canvas, so it sits at the end of
+   that scroll rather than floating at the bottom of the window. It is NOT
+   fixable with `position: fixed` here — the canvas's blur/glass backdrop
+   modes put a `backdrop-filter` on .frame, which makes .frame the containing
+   block for fixed descendants, so the deck would escape the frame on `solid`
+   and not on `blur`. Moving it out of .frame instead would drop it out of the
+   `inert` the widget-install lock puts on .frame (see .installing-overlay),
+   which is the one thing that really locks these controls. Reaching it needs
+   a portal plus its own inert handling; worth doing only if the phone layout
+   becomes something people drive rather than read. */
+
+/* phones: the frame is narrower than the deck's labelled width, so the deck
+   drops to icons (the one exception is the view|edit switch, where the words
+   are the whole point of it) and is allowed to wrap onto a second row rather
+   than overflow the frame and give the page a horizontal scrollbar. Wrapping
+   rather than scrolling on purpose: .hub-core-bar can't take overflow: auto
+   without clipping the canvas rename flyout, which is an absolutely
+   positioned descendant — the same trap noted on .canvas-pill-list. */
+@media (max-width: 640px) {
+  .hub-core-bar .hub-core-btn {
+    width: 32px;
+    padding: 0;
+  }
+
+  .hub-core-bar .edge-btn-label {
+    display: none;
+  }
+
+  .deck-switch {
+    --switch-half: 46px;
+  }
+}
+
+/* ─── the stub — Hub Core at rest ────────────────────────────────────────
+   Centred on the frame's bottom BORDER rather than sitting inside the
+   canvas, so at rest Hub Core covers no widget at all. An absolutely
+   positioned child resolves against its containing block's PADDING box,
+   which already includes .frame's 16px padding — the border's midline is
+   only 0.75px below `bottom: 0`, so the offset is half the stub's height
+   plus that, not half the height plus the padding.
+
+   It is a real button, not a hover trap — click it or tab to it. Hover is
+   the accelerator, not the only way in. */
+
+.hub-core-stub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -13px;
+  width: fit-content;
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 11px;
+  pointer-events: auto;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition: opacity 0.16s ease, transform 0.22s cubic-bezier(0.33, 1, 0.68, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hub-core-deck.deck-open .hub-core-stub {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px) scale(0.72);
+}
+
+/* the dots are not decoration: one per canvas, the active one lit, so a
+   put-away deck still reports which canvas you are on */
+.hub-core-stub-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text-muted-dim);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.hub-core-stub-dot.active {
+  background: var(--accent-cyan);
+}
+
+.hub-core-stub:hover,
+.hub-core-stub:focus-visible {
+  border-color: var(--accent-orange);
+}
+
+.hub-core-stub:hover .hub-core-stub-dot {
+  transform: translateY(-1px);
+}
+
+.hub-core-stub:hover .hub-core-stub-dot:nth-child(2) {
+  transform: translateY(-2px);
+}
+
+/* edit mode stays visible with the deck put away */
+.hub-core-deck[data-edit="true"] .hub-core-stub {
+  border-color: var(--accent-orange);
+}
+
+.hub-core-deck[data-edit="true"] .hub-core-stub-dot:not(.active) {
+  background: color-mix(in srgb, var(--accent-orange) 70%, transparent);
 }
 
 /* ─── AVN Hub Canvases (canvas switcher) ────────────────────────── */
 
-.canvas-edge-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
 .canvas-pill-list {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 4px;
   /* deliberately no `overflow: hidden` here (even axis-split clip/auto
      combinations still clip absolutely-positioned descendants) — the
      rename/delete flyout (.canvas-manage-panel) is an absolutely-positioned
-     descendant that escapes to the left and must not be clipped. The
-     height: 0 -> auto collapse transition just shows pills a little early
-     instead of cleanly clipping them; an acceptable trade for a working
-     flyout. */
+     descendant that escapes upward out of the deck and must not be clipped */
 }
 
 .canvas-pill-wrap {
@@ -1930,10 +2142,13 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   color: inherit;
 }
 
+/* opens upward out of its pill, like every other Hub Core surface now does,
+   and is left-aligned to the pill so a rename on the leftmost canvas can't
+   escape past the frame */
 .canvas-manage-panel {
   position: absolute;
-  top: 0;
-  right: calc(100% + 8px);
+  bottom: calc(100% + 8px);
+  left: 0;
   z-index: 5;
   width: 196px;
   display: flex;
@@ -2070,12 +2285,21 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   letter-spacing: 0.06em;
 }
 
+/* opens UPWARD out of the deck (`bottom`, not `top`) and centred on it, so
+   the canvas you are changing stays visible instead of being covered by a
+   panel over its right third. Centred with auto margins so framer is free to
+   own the transform (it writes the whole thing — a CSS translateX(-50%) here
+   would be clobbered by the enter animation). */
 .hub-core-panel {
   position: absolute;
-  top: calc(100% + 8px);
+  left: 0;
   right: 0;
+  bottom: 56px;
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  pointer-events: auto;
   width: 250px;
-  max-height: calc(100vh - 60px);
+  max-height: min(58vh, 430px);
   overflow-y: auto;
   padding: 12px 14px;
   background: var(--bg-card);
@@ -2090,6 +2314,25 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   width: 280px;
   overflow: hidden;
 }
+
+/* wide enough for the rail plus a body that doesn't wrap its controls.
+   The height cap and the scrolling move INSIDE, onto .hub-settings-scroll:
+   the panel's height is tweened by AutoHeight to the scroller's rendered
+   size, so the panel itself must neither cap nor scroll a second time. */
+.hub-core-panel-settings {
+  width: 400px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.hub-settings-scroll {
+  /* the panel's own cap, less its 12px top + bottom padding */
+  max-height: calc(min(58vh, 430px) - 24px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 
 .hub-core-tab-content {
   display: flex;
@@ -2135,35 +2378,90 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 999px;
 }
 
-.hub-core-section + .hub-core-section {
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-  padding-top: 8px;
-}
+/* ─── settings: rail + one section ───────────────────────────────────────
+   Replaces the accordion column, where four section headers and whichever
+   body was open all stacked into one 250px-wide scroll. The rail names the
+   six groups down the left, the body shows exactly one of them, and the
+   panel is wide enough that the controls inside don't have to wrap. */
 
-.hub-core-section-head {
+.hub-settings-split {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+}
+
+.hub-settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  width: 104px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+
+.hub-settings-rail-btn {
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.hub-core-chevron {
   color: var(--text-muted);
-  transition: transform 0.2s ease;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.hub-core-chevron.open {
-  transform: rotate(180deg);
+.hub-settings-rail-btn:hover {
+  color: var(--accent-orange);
 }
 
-.hub-core-section-body {
-  margin-top: 8px;
+.hub-settings-rail-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 9%, transparent);
+}
+
+.hub-settings-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* the height-tweening wrapper around the settings split (AutoHeight in
+   HubCorePanel) — clips while it is shorter than its content mid-animation */
+.hub-autoheight {
+  overflow: hidden;
+}
+
+/* at phone width the rail would leave the body too narrow to use — it
+   becomes a wrapping row of chips above the section instead. Kept directly
+   after the rail's own rules: these overrides are no more specific than the
+   base rules, so they only win on source order. */
+@media (max-width: 640px) {
+  .hub-core-panel-settings {
+    width: calc(100vw - 32px);
+    max-width: 400px;
+  }
+
+  .hub-settings-split {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hub-settings-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: auto;
+    padding-right: 0;
+    padding-bottom: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 .hub-appearance-panel {
@@ -2785,6 +3083,198 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-region-btn:hover {
   color: var(--accent-cyan);
   border-color: var(--accent-cyan);
+}
+
+/* ── command palette (Ctrl/Cmd+K) ────────────────────────────────────────────
+   components/dashboard/CommandPalette.tsx. Fixed to the viewport and outside
+   .frame (mounted by LayoutProvider), so the canvas's backdrop-filter can't
+   become its containing block. z-index 500: above the deck (100) and its
+   panels (200), below the install cover (8000) and HubDialog (9000) — both
+   modal, and the palette refuses to open over either anyway. Sticker chrome
+   like everything else: hard offset shadow, no blur on the card itself. */
+
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: min(18vh, 160px) 16px 16px;
+  background: color-mix(in srgb, var(--bg-page) 72%, transparent);
+}
+
+.cmdk {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(70vh, 520px);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 5px 5px 0 var(--shadow);
+  overflow: hidden;
+}
+
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted-dim);
+}
+
+.cmdk-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+}
+
+.cmdk-input::placeholder {
+  color: var(--text-muted-dim);
+}
+
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.cmdk-group {
+  padding: 10px 10px 4px;
+  color: var(--text-muted-dim);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.cmdk-item.selected {
+  color: var(--text-primary);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 10%, transparent);
+}
+
+.cmdk-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex: none;
+  color: var(--text-muted-dim);
+}
+
+.cmdk-item.selected .cmdk-item-icon {
+  color: var(--accent-orange);
+}
+
+.cmdk-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the current state ("on", "current") reads as state, not as a second label */
+.cmdk-item-hint {
+  flex: none;
+  color: var(--accent-cyan);
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cmdk-item-enter {
+  flex: none;
+  color: var(--accent-orange);
+}
+
+.cmdk-empty {
+  padding: 18px 10px;
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+  text-align: center;
+}
+
+.cmdk-foot {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+}
+
+.cmdk-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cmdk-kbd,
+.deck-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-nested);
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+/* on the deck the key cap IS the button, so it takes the button's hover */
+.hub-core-bar .deck-kbd-btn {
+  padding: 0 6px;
+}
+
+.hub-core-bar .deck-kbd-btn:hover .deck-kbd,
+.hub-core-bar .deck-kbd-btn.active .deck-kbd {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+/* phones: no keyboard, so neither the chord nor the footer's key hints mean
+   anything — and every deck action is already one tap away on the bar. The
+   key-cap button and the footer go; the palette itself still works if a
+   hardware keyboard is attached. */
+@media (max-width: 640px) {
+  .cmdk-foot,
+  .hub-core-bar .deck-kbd-btn,
+  .hub-core-bar .deck-kbd-divider {
+    display: none;
+  }
 }
 
 /* ── Widget-install lock overlay ─────────────────────────────────────────────

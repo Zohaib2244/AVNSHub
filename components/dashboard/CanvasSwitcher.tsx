@@ -1,17 +1,18 @@
 "use client";
 
-// AVN Hub Canvases — vertical pill buttons stacked on the right edge,
-// directly below HubCorePanel's wrench/settings/widgets buttons (rendered
-// there, not here — see HubCorePanel.tsx). Mirrors that component's
-// "hub-core-btn" sizing/edge-attachment so the whole column reads as one
-// continuous dock. Each pill is icon-width by default and grows taller on
-// hover to reveal its full name (vertical text) — same hover-expand
-// mechanic as the three control buttons above it. The whole canvas list
-// collapses behind a chevron toggle to save edge space when there are many.
+// AVN Hub Canvases — the pill row at the left end of Hub Core's control deck
+// (rendered there, not here — see HubCorePanel.tsx). Mirrors that component's
+// "hub-core-btn" sizing so the whole bar reads as one object. Each pill shows
+// its glyph and its name side by side; the deck is horizontal, so names are
+// simply visible rather than revealed by a hover-expand.
+//
+// There is no collapse toggle any more: it existed to save room on the narrow
+// right edge, and Hub Core now hides itself wholesale (lib/useDeckAutoHide.ts)
+// rather than asking the canvas list to make itself small.
 
 import { useState, useSyncExternalStore } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import {
   createCanvas,
   deleteCanvas,
@@ -41,12 +42,28 @@ export function CanvasGlyph({ canvas }: { canvas: Canvas }) {
   return <span className="canvas-pill-glyph">{abbreviate(canvas.name)}</span>;
 }
 
-const CREATE_POPOVER_KEY = "canvas-create";
+/** activePopover key for the new-canvas flyout — exported so the command
+    palette can open the same flyout rather than a second create flow */
+export const CREATE_POPOVER_KEY = "canvas-create";
+
+/** switch canvas, but ask first if a widget build is running — switching
+    cancels it. Shared by the pills and the command palette. */
+export function requestCanvasSwitch(id: string) {
+  if (getWorkingProjectId() !== null) {
+    showHubDialog({
+      title: "switch canvas?",
+      body: "Switching canvas will stop the current widget generation. The active build will be cancelled.",
+      confirmLabel: "switch canvas",
+      onConfirm: () => switchCanvas(id),
+    });
+  } else {
+    switchCanvas(id);
+  }
+}
 
 export function CanvasSwitcher() {
   const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
   const { activePopover, setActivePopover } = useLayout();
-  const [collapsed, setCollapsed] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftIcon, setDraftIcon] = useState<string | undefined>(undefined);
 
@@ -54,9 +71,20 @@ export function CanvasSwitcher() {
     return `canvas-manage:${id}`;
   }
 
+  // seed the draft whenever the create flyout opens, however it was opened —
+  // the + button here or "new canvas…" in the command palette. Done during
+  // render off the popover transition (React's derive-from-props pattern),
+  // not in an effect, so the flyout never paints one frame with a stale name.
+  const [prevPopover, setPrevPopover] = useState(activePopover);
+  if (activePopover !== prevPopover) {
+    setPrevPopover(activePopover);
+    if (activePopover === CREATE_POPOVER_KEY) {
+      setDraftName(`canvas ${canvases.length + 1}`);
+      setDraftIcon(undefined);
+    }
+  }
+
   function handleAdd() {
-    setDraftName(`canvas ${canvases.length + 1}`);
-    setDraftIcon(undefined);
     setActivePopover(CREATE_POPOVER_KEY);
   }
 
@@ -67,99 +95,64 @@ export function CanvasSwitcher() {
   }
 
   return (
-    <div className="canvas-edge-group">
-      <button
-        type="button"
-        className="hub-core-btn edge-btn canvas-collapse-btn"
-        onClick={() => setCollapsed((c) => !c)}
-        aria-label={collapsed ? "show canvases" : "hide canvases"}
-        title={collapsed ? "show canvases" : "hide canvases"}
-      >
-        {collapsed ? <ChevronUp size={13} strokeWidth={1.75} /> : <ChevronDown size={13} strokeWidth={1.75} />}
-        <span className="edge-btn-label">canvases</span>
-      </button>
+    <div className="canvas-pill-list">
+      {canvases.map((canvas) => (
+        <CanvasPill
+          key={canvas.id}
+          canvas={canvas}
+          active={canvas.id === activeId}
+          deletable={canvases.length > 1}
+          managing={activePopover === manageKeyFor(canvas.id)}
+          onSwitch={() => requestCanvasSwitch(canvas.id)}
+          onOpenManage={() => setActivePopover(manageKeyFor(canvas.id))}
+          onCloseManage={() => setActivePopover(null)}
+        />
+      ))}
+      <div className="canvas-pill-wrap">
+        <button
+          type="button"
+          className="hub-core-btn edge-btn icon-only canvas-add-btn"
+          onClick={handleAdd}
+          aria-label="add canvas"
+          title="add canvas"
+        >
+          <Plus size={13} strokeWidth={2} />
+        </button>
 
-      <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.div
-            className="canvas-pill-list"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-          >
-            {canvases.map((canvas) => (
-              <CanvasPill
-                key={canvas.id}
-                canvas={canvas}
-                active={canvas.id === activeId}
-                deletable={canvases.length > 1}
-                managing={activePopover === manageKeyFor(canvas.id)}
-                onSwitch={() => {
-                  if (getWorkingProjectId() !== null) {
-                    showHubDialog({
-                      title: "switch canvas?",
-                      body: "Switching canvas will stop the current widget generation. The active build will be cancelled.",
-                      confirmLabel: "switch canvas",
-                      onConfirm: () => switchCanvas(canvas.id),
-                    });
-                  } else {
-                    switchCanvas(canvas.id);
-                  }
+        <AnimatePresence>
+          {activePopover === CREATE_POPOVER_KEY && (
+            <motion.div
+              className="canvas-manage-panel"
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 6 }}
+              transition={{ duration: 0.15, ease: "easeOut" }}
+            >
+              <input
+                className="canvas-manage-input"
+                autoFocus
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") confirmCreate();
+                  if (e.key === "Escape") setActivePopover(null);
                 }}
-                onOpenManage={() => setActivePopover(manageKeyFor(canvas.id))}
-                onCloseManage={() => setActivePopover(null)}
+                aria-label="new canvas name"
+                placeholder="canvas name"
               />
-            ))}
-            <div className="canvas-pill-wrap">
-              <button
-                type="button"
-                className="hub-core-btn edge-btn canvas-add-btn"
-                onClick={handleAdd}
-                aria-label="add canvas"
-                title="add canvas"
-              >
-                <Plus size={13} strokeWidth={2} />
-                <span className="edge-btn-label">new</span>
-              </button>
-
-              <AnimatePresence>
-                {activePopover === CREATE_POPOVER_KEY && (
-                  <motion.div
-                    className="canvas-manage-panel"
-                    initial={{ opacity: 0, x: 6 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 6 }}
-                    transition={{ duration: 0.15, ease: "easeOut" }}
-                  >
-                    <input
-                      className="canvas-manage-input"
-                      autoFocus
-                      value={draftName}
-                      onChange={(e) => setDraftName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") confirmCreate();
-                        if (e.key === "Escape") setActivePopover(null);
-                      }}
-                      aria-label="new canvas name"
-                      placeholder="canvas name"
-                    />
-                    <CanvasIconPicker value={draftIcon} onChange={(icon) => setDraftIcon(icon ?? undefined)} />
-                    <div className="canvas-manage-actions">
-                      <button type="button" className="hub-core-io-btn" onClick={confirmCreate}>
-                        create
-                      </button>
-                      <button type="button" className="hub-widget-btn" onClick={() => setActivePopover(null)}>
-                        x
-                      </button>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <CanvasIconPicker value={draftIcon} onChange={(icon) => setDraftIcon(icon ?? undefined)} />
+              <div className="canvas-manage-actions">
+                <button type="button" className="hub-core-io-btn" onClick={confirmCreate}>
+                  create
+                </button>
+                <button type="button" className="hub-widget-btn" onClick={() => setActivePopover(null)}>
+                  x
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
@@ -218,9 +211,9 @@ function CanvasPill({
         {managing && (
           <motion.div
             className="canvas-manage-panel"
-            initial={{ opacity: 0, x: 6 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 6 }}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 6 }}
             transition={{ duration: 0.15, ease: "easeOut" }}
           >
             <input

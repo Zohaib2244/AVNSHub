@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RotateCcw, Send, Square } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
 import { clearSignal, emitThinking, emitSpeaking, emitBrowsing, emitError } from "@/lib/nutbotSignal";
+import { pulseSpeech, resetSpeech } from "@/lib/nutbotSense";
 import { showHubDialog } from "@/lib/hubDialog";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs, type ChatBackend } from "@/lib/prefs";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
@@ -280,6 +281,7 @@ export function NutBotChat() {
       }
       if (frame.type === "done") {
         finalizeStreaming();
+        resetSpeech();
         clearSignal();
       }
     } else if (frame.type === "token") {
@@ -288,6 +290,9 @@ export function NutBotChat() {
         emitSpeaking();
       }
       const text = String(frame.data ?? "");
+      // feeds NutBot's mouth — a non-reactive channel on purpose, a render per
+      // token would be a render per frame
+      pulseSpeech(text.length);
       setMessages((prev) => {
         const idx = assistantIdxRef.current;
         if (idx === -1 || prev[idx]?.role !== "assistant") {

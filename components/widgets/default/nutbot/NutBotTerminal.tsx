@@ -27,7 +27,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.4 ready",
+  "[info] nutbot v2.6 ready",
 ];
 
 type MainTab = "log" | "chat" | "shells" | "creator";
@@ -257,7 +257,7 @@ export function NutBotTerminal() {
         <div className="term-toolbar">
           <div className="term-identity">
             <div className="nutbot-v2-scale nutbot-v2-scale-nano" aria-hidden="true"><NutBotFaceV2 compact /></div>
-            <span className="term-title">NUTBOT <span className="term-version">v2.4</span></span>
+            <span className="term-title">NUTBOT <span className="term-version">v2.6</span></span>
           </div>
           <div className="term-actions">
             <ModelSettings />

@@ -87,6 +87,10 @@ widgets freely, and `size` is picked from the cell's **real pixel box**
 - **L**: at least 600x250 OR 400x400.
 - `orientation` is `"v"` when the box is taller than wide, else `"h"`.
 
+The user can also pin a widget to any size it declares ("layout size" in its
+settings), which overrides the box. So any layout may occasionally render in a
+box smaller than its range above: it must clip cleanly, never break or spill.
+
 Within one size the box still varies a lot, so layouts must **flex to the
 space**, never assume exact pixels. Rules that follow from this:
 

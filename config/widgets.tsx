@@ -43,6 +43,10 @@ import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
 ──────────────────────────────────────────────────────────────────── */
 
 export type WidgetSize = "S" | "M" | "L";
+
+export function isWidgetSize(value: unknown): value is WidgetSize {
+  return value === "S" || value === "M" || value === "L";
+}
 export type Orientation = "h" | "v";
 
 export type SettingsField =
@@ -95,6 +99,23 @@ export const FRAMEWORK_SETTINGS: SettingsField[] = [
       { value: "both", label: "both" },
       { value: "width", label: "width" },
       { value: "height", label: "height" },
+    ],
+  },
+  {
+    // pins which S/M/L layout this widget renders, whatever box it sits in.
+    // "auto" picks from the box (lib/grid/sizeClass.ts); S/M/L force that
+    // layout. The popover only offers the sizes the widget's manifest
+    // declares, and a stored size the widget no longer supports falls back
+    // to auto (SlotWidgetCell), so a stale override can't break a widget.
+    key: "layoutSize",
+    label: "layout size",
+    type: "segment",
+    default: "auto",
+    options: [
+      { value: "auto", label: "auto" },
+      { value: "S", label: "S" },
+      { value: "M", label: "M" },
+      { value: "L", label: "L" },
     ],
   },
   {
@@ -280,7 +301,7 @@ export const WIDGETS = {
   },
   nutbot: {
     id: "nutbot",
-    title: "nutbot v2.4",
+    title: "nutbot v2.6",
     icon: SquareTerminal,
     component: NutBotFaceWidget,
     sizes: ["S", "M", "L"],

@@ -1,16 +1,23 @@
 "use client";
 
-// AVN Hub Core Settings — a fixed top-right area with tab controls:
-// 1. A persistent edit-mode toggle (wrench/lock) — always visible, one click.
-// 2. A settings gear that opens canvas appearance, prefs, and layout controls.
-// 3. A widget manager tab that opens add/remove controls.
+// AVN Hub Core — the control deck. One horizontal sticker bar centred on the
+// bottom of the CANVAS (not the window), holding everything global: the
+// canvas switcher, a two-state view/edit switch, canvas settings, the widget
+// manager and the snapshot button. It replaces the old right-edge tab column.
+//
+// It auto-hides. At rest it is a stub — three dots straddling the frame's
+// bottom border, one per canvas with the active one lit — so Hub Core costs
+// no canvas at all until you reach for it; approach, click or focus expands
+// the stub into the whole bar. Timings and the pinning rules that stop it
+// vanishing mid-task live in lib/useDeckAutoHide.ts. Panels open UPWARD out
+// of the bar, so the canvas you are changing stays visible while you change
+// it. Prototype this came from: public/proto/control-deck.html.
 
 import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Camera,
   Check,
-  ChevronDown,
   Download,
   Droplets,
   EyeOff,
@@ -38,6 +45,9 @@ import {
 import { getHeaderStyle, getServerHeaderStyle, setHeaderStyle, subscribeHeaderStyle } from "@/lib/headerStyle";
 import { type HeaderStyle } from "@/config/widgets";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { useDeckAutoHide } from "@/lib/useDeckAutoHide";
+import { snapshotCanvas } from "@/lib/snapshotCanvas";
+import { SETTINGS_SECTIONS } from "@/config/hubSettings";
 import { CanvasGlyph, CanvasSwitcher } from "@/components/dashboard/CanvasSwitcher";
 import { CanvasIconPicker } from "@/components/dashboard/CanvasIconPicker";
 import {
@@ -100,7 +110,13 @@ import { REGION_DIMS_BOUNDS, REGION_GRID, REGION_LABELS, type RegionDims, type S
 import { syncDeletedWidget } from "@/lib/widget-creator/projectStore";
 
 const REGION_IDS = Object.keys(REGION_GRID) as SlotRegionId[];
-type CanvasSettingsSection = "appearance" | "general" | "layout" | "canvases";
+// Settings used to be one accordion column: four headers plus whichever body
+// was open, all stacked in a 250px-wide panel, with "appearance" alone
+// carrying six unrelated groups. Same controls, split by what they act on and
+// reached from a rail instead — one section is visible at a time, so the
+// panel is never a single long menu you have to read to the end of. The
+// section list lives in config/hubSettings.ts; the selected section lives in
+// LayoutProvider so the command palette can open straight to one.
 type WidgetFilter = "all" | "system" | "custom";
 
 const THEME_OPTIONS: { mode: ThemeMode; Icon: typeof Sun }[] = [
@@ -114,6 +130,59 @@ const WIDGET_FILTER_OPTIONS: { filter: WidgetFilter; label: string }[] = [
   { filter: "system", label: "system" },
   { filter: "custom", label: "custom" },
 ];
+
+/** Animates its own height to follow its content, so the settings panel
+    grows and shrinks smoothly between sections instead of snapping to the new
+    size. The content is measured with a ResizeObserver and `height` itself is
+    tweened — deliberately not framer's `layout` prop, which animates size
+    with a scale transform and visibly squashes the text mid-resize. The
+    observer also catches size changes inside one section (an icon picker
+    opening, a wallpaper being added), so those ease too.
+
+    What it measures is the VISIBLE height: `innerClassName` is the panel's
+    capped scroller, so the measurement already includes the section rail's
+    floor and the max-height ceiling. Measuring the raw section content
+    instead tweened through a range the panel mostly clamped away (e.g.
+    206→489px for a visible 254→430px), so the part you could see went by in
+    a frame or two and still read as a snap. */
+function AutoHeight({ children, innerClassName }: { children: ReactNode; innerClassName?: string }) {
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | "auto">("auto");
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    const el = innerRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setHeight(entry.borderBoxSize?.[0]?.blockSize ?? el.offsetHeight);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <motion.div
+      className="hub-autoheight"
+      initial={false}
+      animate={{ height }}
+      // ease-in-out rather than ease-out: a strong ease-out spends most of
+      // its distance in the first few frames, which is exactly the snap
+      transition={reduceMotion ? { duration: 0 } : { duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
+    >
+      <div ref={innerRef} className={innerClassName}>
+        {children}
+      </div>
+    </motion.div>
+  );
+}
+
+/** label the palette key cap for the platform actually in use. Read through
+    useSyncExternalStore with a `false` server snapshot, so the server render
+    and the first client render agree and a Mac doesn't hydrate-mismatch. */
+function isMacLike() {
+  return /Mac|iPhone|iPad/.test(navigator.platform);
+}
+const noopSubscribe = () => () => {};
 
 function registryIds() {
   const ids: string[] = [];
@@ -148,44 +217,95 @@ function matchesWidgetSearch(id: string, query: string, meta?: string) {
 
 export function HubCorePanel() {
   // accordion: only one settings section open at a time
-  const [openSection, setOpenSection] = useState<CanvasSettingsSection | null>("appearance");
   const panelRef = useRef<HTMLDivElement>(null);
   const [snapState, setSnapState] = useState<"idle" | "busy" | "done">("idle");
 
-  const { editMode, startEdit, lockLayout, hubCoreTab: activeTab, setHubCoreTab: setActiveTab } = useLayout();
+  const {
+    editMode,
+    startEdit,
+    lockLayout,
+    hubCoreTab: activeTab,
+    setHubCoreTab: setActiveTab,
+    activePopover,
+    settingsSection: openSection,
+    setSettingsSection: setOpenSection,
+    paletteOpen,
+    setPaletteOpen,
+  } = useLayout();
+
+  // the deck stays out while a tab is open, while the layout is being
+  // rearranged, or while a popover it owns (the canvas rename/create flyout)
+  // is up — it must never disappear mid-task
+  const deckPinned = activeTab !== null || editMode || activePopover !== null;
+  const { open: deckOpen, show: showDeck, hide: hideDeck, peek: peekDeck } = useDeckAutoHide(panelRef, deckPinned);
+  const macLike = useSyncExternalStore(noopSubscribe, isMacLike, () => false);
+
+  const activeCanvasId = useSyncExternalStore(
+    subscribeCanvases,
+    () => getCanvases().activeId,
+    () => getServerCanvases().activeId,
+  );
+  const canvasCount = useSyncExternalStore(
+    subscribeCanvases,
+    () => getCanvases().canvases.length,
+    () => getServerCanvases().canvases.length,
+  );
+  const activeCanvasIndex = useSyncExternalStore(
+    subscribeCanvases,
+    () => getCanvases().canvases.findIndex((c) => c.id === getCanvases().activeId),
+    () => 0,
+  );
+
+  // a canvas switched from anywhere else (the widget creator, a dialog)
+  // still shows its result: the deck peeks so the dots can be seen moving
+  const firstCanvasRender = useRef(true);
+  useEffect(() => {
+    if (firstCanvasRender.current) {
+      firstCanvasRender.current = false;
+      return;
+    }
+    peekDeck();
+  }, [activeCanvasId, peekDeck]);
 
   async function handleSnapshot() {
     if (snapState !== "idle") return;
-    const el = document.querySelector<HTMLElement>(".frame-inner");
-    if (!el) return;
     setSnapState("busy");
-    try {
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(el, {
-        pixelRatio: window.devicePixelRatio ?? 1,
-        skipFonts: false,
-      });
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    if (await snapshotCanvas()) {
       setSnapState("done");
       window.setTimeout(() => setSnapState("idle"), 2000);
-    } catch {
+    } else {
       setSnapState("idle");
     }
   }
 
-  function toggleSettingsSection(section: CanvasSettingsSection) {
-    setOpenSection((open) => (open === section ? null : section));
+  function renderSettingsSection() {
+    switch (openSection) {
+      case "theme":
+        return <ThemeSettings />;
+      case "canvas":
+        return <CanvasBackdropSettings />;
+      case "widgets":
+        return <WidgetStyleSettings />;
+      case "layout":
+        return <LayoutSettings />;
+      case "canvases":
+        return <CanvasesSettings />;
+      case "system":
+        return <SystemSettings />;
+    }
   }
 
   useEffect(() => {
     if (!activeTab) return;
+    // .hub-core-deck is a transparent anchor layer over the whole frame, so
+    // `contains` would count every canvas click as inside it — test the
+    // actual controls instead
     function onDown(e: PointerEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setActiveTab(null);
+      const el = e.target as Element | null;
+      if (!el?.closest(".hub-core-bar, .hub-core-panel, .hub-core-stub")) setActiveTab(null);
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setActiveTab(null);
+      if (e.key === "Escape" && !paletteOpen) setActiveTab(null);
     }
     document.addEventListener("pointerdown", onDown);
     document.addEventListener("keydown", onKey);
@@ -193,98 +313,164 @@ export function HubCorePanel() {
       document.removeEventListener("pointerdown", onDown);
       document.removeEventListener("keydown", onKey);
     };
-  }, [activeTab, setActiveTab]);
+  }, [activeTab, setActiveTab, paletteOpen]);
+
+  // Escape with nothing open puts the deck itself away — one key walks back
+  // out of Hub Core entirely (panel first, then the deck)
+  useEffect(() => {
+    if (!deckOpen || activeTab || paletteOpen) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") hideDeck(true);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [deckOpen, activeTab, paletteOpen, hideDeck]);
+
+  // the stub's dots are one per canvas with the active one lit, so a put-away
+  // deck still reports where you are. Past five they would be slivers, so it
+  // falls back to three plain dots.
+  const stubDots = canvasCount > 5 ? [-1, -1, -1] : Array.from({ length: Math.max(canvasCount, 1) }, (_, i) => i);
 
   return (
-    <div ref={panelRef} className="hub-core hub-core-slot">
+    <div
+      ref={panelRef}
+      className={`hub-core hub-core-deck${deckOpen ? " deck-open" : ""}`}
+      data-edit={editMode ? "true" : undefined}
+    >
       <button
         type="button"
-        className={`hub-core-btn edge-btn${editMode ? " active" : ""}`}
-        onClick={editMode ? lockLayout : startEdit}
-        aria-label={editMode ? "exit edit mode" : "enter edit mode"}
-        title={editMode ? "exit edit mode" : "enter edit mode"}
+        className="hub-core-stub"
+        aria-expanded={deckOpen}
+        aria-label="show hub core controls"
+        title="hub core — click, or move to the bottom edge of the canvas"
+        onPointerEnter={showDeck}
+        onClick={showDeck}
       >
-        {editMode ? <Lock size={14} strokeWidth={1.75} /> : <Wrench size={14} strokeWidth={1.75} />}
-        <span className="edge-btn-label">{editMode ? "lock" : "edit"}</span>
-      </button>
-      <button
-        type="button"
-        className={`hub-core-btn edge-btn${activeTab === "settings" ? " active" : ""}`}
-        onClick={() => setActiveTab((tab) => (tab === "settings" ? null : "settings"))}
-        aria-label={activeTab === "settings" ? "close avn hub core settings" : "open avn hub core settings"}
-        title="avn hub core settings"
-      >
-        <Settings size={14} strokeWidth={1.75} />
-        <span className="edge-btn-label">settings</span>
-      </button>
-      <button
-        type="button"
-        className={`hub-core-btn edge-btn${activeTab === "widgets" ? " active" : ""}`}
-        onClick={() => setActiveTab((tab) => (tab === "widgets" ? null : "widgets"))}
-        aria-label={activeTab === "widgets" ? "close widget manager" : "open widget manager"}
-        title="widget manager"
-      >
-        <LayoutGrid size={14} strokeWidth={1.75} />
-        <span className="edge-btn-label">widgets</span>
-      </button>
-      <button
-        type="button"
-        className={`hub-core-btn edge-btn${snapState === "done" ? " active" : ""}`}
-        onClick={handleSnapshot}
-        disabled={snapState === "busy"}
-        aria-label="copy canvas snapshot to clipboard"
-        title="snapshot canvas"
-      >
-        {snapState === "done" ? <Check size={14} strokeWidth={1.75} /> : <Camera size={14} strokeWidth={1.75} />}
-        <span className="edge-btn-label">{snapState === "done" ? "copied" : "snap"}</span>
+        {stubDots.map((canvasIndex, i) => (
+          <span
+            key={i}
+            className={`hub-core-stub-dot${canvasIndex === activeCanvasIndex ? " active" : ""}`}
+            aria-hidden
+          />
+        ))}
       </button>
 
-      <div className="hub-core-divider" aria-hidden />
-      <CanvasSwitcher />
+      <div className="hub-core-bar" onPointerLeave={() => hideDeck()}>
+        <CanvasSwitcher />
+
+        <div className="hub-core-divider" aria-hidden />
+
+        {/* one control, two legible states — a wrench alone reads as "locked?" */}
+        <button
+          type="button"
+          className="deck-switch"
+          onClick={editMode ? lockLayout : startEdit}
+          aria-label={editMode ? "exit edit mode" : "enter edit mode"}
+          aria-pressed={editMode}
+          title={editMode ? "exit edit mode" : "enter edit mode"}
+        >
+          <span className="deck-switch-knob" aria-hidden />
+          {/* named rather than positional: the knob is the switch's first
+              <span>, so :first-of-type never matched the "view" label */}
+          <span className="deck-switch-state" data-state="view">
+            <Lock size={12} strokeWidth={1.75} />
+            view
+          </span>
+          <span className="deck-switch-state" data-state="edit">
+            <Wrench size={12} strokeWidth={1.75} />
+            edit
+          </span>
+        </button>
+
+        <div className="hub-core-divider" aria-hidden />
+
+        <button
+          type="button"
+          className={`hub-core-btn edge-btn${activeTab === "settings" ? " active" : ""}`}
+          onClick={() => setActiveTab((tab) => (tab === "settings" ? null : "settings"))}
+          aria-label={activeTab === "settings" ? "close avn hub core settings" : "open avn hub core settings"}
+          title="avn hub core settings"
+        >
+          <Settings size={14} strokeWidth={1.75} />
+          <span className="edge-btn-label">settings</span>
+        </button>
+        <button
+          type="button"
+          className={`hub-core-btn edge-btn${activeTab === "widgets" ? " active" : ""}`}
+          onClick={() => setActiveTab((tab) => (tab === "widgets" ? null : "widgets"))}
+          aria-label={activeTab === "widgets" ? "close widget manager" : "open widget manager"}
+          title="widget manager"
+        >
+          <LayoutGrid size={14} strokeWidth={1.75} />
+          <span className="edge-btn-label">widgets</span>
+        </button>
+        <button
+          type="button"
+          className={`hub-core-btn edge-btn icon-only${snapState === "done" ? " active" : ""}`}
+          onClick={handleSnapshot}
+          disabled={snapState === "busy"}
+          aria-label="copy canvas snapshot to clipboard"
+          title={snapState === "done" ? "copied" : "snapshot canvas"}
+        >
+          {snapState === "done" ? <Check size={14} strokeWidth={1.75} /> : <Camera size={14} strokeWidth={1.75} />}
+        </button>
+
+        <div className="hub-core-divider deck-kbd-divider" aria-hidden />
+
+        {/* the palette reaches everything on this bar and more — the key cap
+            is the button, so the shortcut is learnt by looking at it */}
+        <button
+          type="button"
+          className={`hub-core-btn edge-btn deck-kbd-btn${paletteOpen ? " active" : ""}`}
+          onClick={() => setPaletteOpen(true)}
+          aria-label="open command palette"
+          title="command palette"
+        >
+          <kbd className="deck-kbd">{macLike ? "⌘K" : "ctrl k"}</kbd>
+        </button>
+      </div>
 
       <AnimatePresence>
         {activeTab && (
           <motion.div
-            className={`hub-core-panel${activeTab === "widgets" ? " hub-core-panel-widgets" : ""}`}
-            initial={{ opacity: 0, y: -10, scale: 0.97 }}
+            className={`hub-core-panel${activeTab === "widgets" ? " hub-core-panel-widgets" : " hub-core-panel-settings"}`}
+            initial={{ opacity: 0, y: 10, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.97 }}
+            exit={{ opacity: 0, y: 10, scale: 0.97 }}
             transition={{ duration: 0.18, ease: "easeOut" }}
           >
             {activeTab === "settings" ? (
-              <>
-                <CoreSection
-                  title="appearance"
-                  open={openSection === "appearance"}
-                  onToggle={() => toggleSettingsSection("appearance")}
-                >
-                  <AppearanceSettings />
-                </CoreSection>
-
-                <CoreSection
-                  title="general"
-                  open={openSection === "general"}
-                  onToggle={() => toggleSettingsSection("general")}
-                >
-                  <GeneralSettings />
-                </CoreSection>
-
-                <CoreSection
-                  title="layout"
-                  open={openSection === "layout"}
-                  onToggle={() => toggleSettingsSection("layout")}
-                >
-                  <DefaultModeSettings />
-                </CoreSection>
-
-                <CoreSection
-                  title="canvases"
-                  open={openSection === "canvases"}
-                  onToggle={() => toggleSettingsSection("canvases")}
-                >
-                  <CanvasesSettings />
-                </CoreSection>
-              </>
+              <AutoHeight innerClassName="hub-settings-scroll">
+                <div className="hub-settings-split">
+                  <div className="hub-settings-rail" role="tablist" aria-orientation="vertical">
+                    {SETTINGS_SECTIONS.map((section) => (
+                      <button
+                        key={section.id}
+                        type="button"
+                        role="tab"
+                        aria-selected={openSection === section.id}
+                        className={`hub-settings-rail-btn${openSection === section.id ? " active" : ""}`}
+                        onClick={() => setOpenSection(section.id)}
+                      >
+                        {section.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hub-settings-body" role="tabpanel">
+                    <AnimatePresence mode="wait" initial={false}>
+                      <motion.div
+                        key={openSection}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.13, ease: "easeOut" }}
+                      >
+                        {renderSettingsSection()}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                </div>
+              </AutoHeight>
             ) : (
               <WidgetManagerTab />
             )}
@@ -477,18 +663,27 @@ function ParallaxToggle({ canvasId }: { canvasId: string }) {
   );
 }
 
-function AppearanceSettings() {
-  const { activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+/* theme — what the whole hub is coloured with */
+function ThemeSettings() {
   return (
     <div className="hub-appearance-panel">
       <div className="hub-setting-stack">
-        <span className="hub-setting-label">theme</span>
+        <span className="hub-setting-label">mode</span>
         <ThemeModeRow />
       </div>
       <div className="hub-setting-stack">
         <span className="hub-setting-label">palette</span>
         <PaletteRow />
       </div>
+    </div>
+  );
+}
+
+/* canvas — the surface the widgets sit on: its wallpaper and its own backdrop */
+function CanvasBackdropSettings() {
+  const { activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+  return (
+    <div className="hub-appearance-panel">
       <div className="hub-setting-stack">
         <span className="hub-setting-label">wallpaper</span>
         <WallpaperPicker canvasId={activeId} />
@@ -502,6 +697,18 @@ function AppearanceSettings() {
           setMode={(mode) => setBackdropMode(activeId, mode)}
         />
       </div>
+    </div>
+  );
+}
+
+/* widget style — the per-card defaults every widget inherits. Separate from
+   `canvas` because the two backdrop dials are independent (the widget one is
+   a global default, it does not cascade from the canvas one) and sitting them
+   next to each other under one "appearance" heading read as if it did. */
+function WidgetStyleSettings() {
+  const { activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+  return (
+    <div className="hub-appearance-panel">
       <div className="hub-setting-stack">
         <span className="hub-setting-label">widget backdrop</span>
         <BackdropModeRow
@@ -603,14 +810,9 @@ function CanvasSettingsRow({ canvas, active, deletable }: { canvas: Canvas; acti
   );
 }
 
-function GeneralSettings() {
+/* system — hub-wide behaviour, nothing to do with how the canvas looks */
+function SystemSettings() {
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
-  const { resetLayout } = useLayout();
-
-  function resetAll() {
-    resetLayout();
-    resetSlotLayout();
-  }
 
   return (
     <>
@@ -638,10 +840,6 @@ function GeneralSettings() {
           onChange={(e) => setPrefs({ bootChime: e.target.checked })}
         />
       </label>
-      <button type="button" className="wset-hide-btn hub-reset" onClick={resetAll}>
-        <RotateCcw size={12} strokeWidth={1.75} />
-        reset layout & widget config
-      </button>
     </>
   );
 }
@@ -756,44 +954,19 @@ function WidgetImportBar() {
   );
 }
 
-function CoreSection({
-  title,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  open: boolean;
-  onToggle: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <div className="hub-core-section">
-      <button type="button" className="hub-core-section-head" onClick={onToggle} aria-expanded={open}>
-        <span className="wset-title">{title}</span>
-        <ChevronDown size={13} strokeWidth={1.75} className={`hub-core-chevron${open ? " open" : ""}`} />
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            className="hub-core-section-body"
-            initial={{ opacity: 0, y: -4 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -4 }}
-            transition={{ duration: 0.15, ease: "easeOut" }}
-          >
-            {children}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function DefaultModeSettings() {
+/* layout — region sizes, plus the two things that replace a layout wholesale
+   (import, and reset). The reset lived under "general", a section away from
+   the layout it throws out. */
+function LayoutSettings() {
   const slotLayout = useSyncExternalStore(subscribeSlotLayout, getSlotLayout, getServerSlotLayout);
+  const { resetLayout } = useLayout();
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  function resetAll() {
+    resetLayout();
+    resetSlotLayout();
+  }
 
   function handleImport(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -830,6 +1003,10 @@ function DefaultModeSettings() {
         <input ref={fileInputRef} type="file" accept=".json,application/json" style={{ display: "none" }} onChange={handleImport} />
       </div>
       {importError && <div className="hub-core-io-error">{importError}</div>}
+      <button type="button" className="wset-hide-btn hub-reset" onClick={resetAll}>
+        <RotateCcw size={12} strokeWidth={1.75} />
+        reset layout & widget config
+      </button>
     </>
   );
 }

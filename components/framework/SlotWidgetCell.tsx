@@ -11,7 +11,7 @@
 import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Move, Settings2, X } from "lucide-react";
-import { getManifest } from "@/config/widgets";
+import { getManifest, isWidgetSize } from "@/config/widgets";
 import { minFootprint } from "@/config/slotLayout";
 import { getSlotLayout, removeWidget, setWidgetRect, updateWidgetSettings, type SlotWidgetInstance } from "@/lib/slotLayout";
 import type { WidgetInstance } from "@/lib/layout";
@@ -298,13 +298,21 @@ export function SlotWidgetCell({
         height: contentRect.rowSpan * trackMetrics.trackHeight + Math.max(0, contentRect.rowSpan - 1) * trackMetrics.gap,
       }
     : null;
-  const { size, orientation } = sizeClassForFootprint(
+  const auto = sizeClassForFootprint(
     { colSpan: contentRect.colSpan, rowSpan: contentRect.rowSpan },
     regionDims,
     manifest.sizes,
     manifest.orientations,
     contentPx,
   );
+  // the user's "layout size" override beats the box-derived pick — including
+  // the fill-the-region "largest variant" rule, since it is an explicit
+  // choice. Only honoured for a size the widget declares; a stale value (the
+  // manifest dropped that size) quietly falls back to auto. Orientation is
+  // always derived from the box.
+  const override = instance.settings?.layoutSize;
+  const size = isWidgetSize(override) && manifest.sizes.includes(override) ? override : auto.size;
+  const orientation = auto.orientation;
   const settingsInstance: WidgetInstance = {
     id: instance.id,
     size,

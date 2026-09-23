@@ -243,6 +243,13 @@ frame-ratio drag:
 - **M** — everything in between (typically 2x2)
 - orientation `"v"` when the box is taller than wide
 
+The user can also **pin** a widget's layout from its gear popover
+(*layout size*: `auto · S · M · L`, only the sizes the manifest declares).
+A pinned size wins over the box — so a user may put your L layout in a small
+cell. Don't make a layout depend on a minimum box to stay usable: let it clip
+cleanly (the card already clips; keep controls from spilling past it) rather
+than break.
+
 A widget filling its whole region still gets its largest size. In edit mode
 each cell shows an `S · 2×1` badge that updates live while resizing. Within a
 tier the box still varies, so keep layouts resilient:

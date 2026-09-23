@@ -95,7 +95,7 @@ export function ModelSettings() {
     {(open || closing) && createPortal(<dialog ref={dialog} className={`model-settings-dialog${closing ? " closing" : ""}`} onCancel={(e) => { e.preventDefault(); closeMenu(); }} aria-labelledby="model-settings-title"
       onPointerDown={(e) => { pressedBackdrop.current = isBackdropPoint(e); }}
       onClick={(e) => { if (pressedBackdrop.current && isBackdropPoint(e)) { pressedBackdrop.current = false; closeMenu(); } }}>
-      <div className="model-settings-head"><h2 id="model-settings-title">Model settings <span className="model-version">v2.4</span></h2><button type="button" onClick={closeMenu} aria-label="close model settings">×</button></div>
+      <div className="model-settings-head"><h2 id="model-settings-title">Model settings <span className="model-version">v2.6</span></h2><button type="button" onClick={closeMenu} aria-label="close model settings">×</button></div>
       <div className="model-settings-tabs" role="tablist" aria-label="Model settings">
         {(["defaults", "usage"] as const).map((id) => <button key={id} type="button" role="tab" id={`${tabId}-${id}-tab`} aria-controls={`${tabId}-${id}-panel`} aria-selected={tab === id} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)} onKeyDown={(event) => {
           if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;

@@ -1,9 +1,10 @@
 "use client";
 import "./GitHubActivity.css";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy, Github, GitCommitHorizontal } from "lucide-react";
 import { usePolling } from "@/lib/usePolling";
+import { emitSurprise } from "@/lib/nutbotSignal";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { timeAgo } from "@/lib/format";
 import type { GitHubActivity as GitHubActivityData, GitHubConfig, GitHubRepos } from "@/lib/github";
@@ -26,6 +27,17 @@ function githubConfigFrom(settings: Record<string, string | number | boolean>): 
 export function GitHubActivity() {
   const { settings } = useWidget();
   const { data } = usePolling<GitHubActivityData>(POLL_URL, POLL_MS, githubConfigFrom(settings));
+
+  // NutBot looks up when a commit lands while the hub is open. The first
+  // sample is not news — it's just whatever was already there on load.
+  const seenCommit = useRef<string | null>(null);
+  const latestKey = data?.latest ? `${data.latest.repo}@${data.latest.committedAt}` : null;
+  useEffect(() => {
+    if (!latestKey) return;
+    const previous = seenCommit.current;
+    seenCommit.current = latestKey;
+    if (previous !== null && previous !== latestKey) emitSurprise("new commit");
+  }, [latestKey]);
 
   return (
     <>

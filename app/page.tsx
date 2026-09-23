@@ -1,6 +1,5 @@
 "use client";
 
-import { GlyphStrip } from "@/components/dashboard/GlyphStrip";
 import { BootSequence } from "@/components/dashboard/BootSequence";
 import { LayoutProvider } from "@/components/dashboard/LayoutProvider";
 import { SlotDashboard } from "@/components/dashboard/SlotDashboard";
@@ -13,7 +12,6 @@ export default function Home() {
       <ThemeRuntimeSync />
       <WallpaperLayer />
       <BootSequence />
-      <GlyphStrip />
 
       <LayoutProvider>
         <SlotDashboard />

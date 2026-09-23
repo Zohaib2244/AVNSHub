@@ -1,14 +1,31 @@
-/* ─── NutBot v2.4 — SVG robot face ───────────────────────────────────── */
+/* ─── NutBot v2.6 — SVG robot face ───────────────────────────────────── */
 
-/* ── Body + animations ───────────────────────────────────────────────── */
+/* v2.6: the chassis LEDs and screen glow read from the palette tokens instead
+   of hardcoded reef-cyan/ember-orange, so NutBot changes colour with the theme
+   pack like everything else on the canvas. --nb-error / --nb-love are the two
+   colours with no token of their own; a palette can override them.
+   --nb-float-dur and --nb-load are written by the RAF loop from machine load:
+   a busy server visibly makes him breathe faster. */
 .nutbot-v2-body {
+  --nb-error: #ff4040;
+  --nb-love: #ff6b8a;
+  --nb-float-dur: 3.2s;
+  --nb-load: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  filter: drop-shadow(6px 6px 0 #070604);
-  animation: nutbot-v2-float 3.2s ease-in-out infinite;
+  filter: drop-shadow(6px 6px 0 var(--shadow, #070604));
+  animation: nutbot-v2-float var(--nb-float-dur) ease-in-out infinite;
 }
 @keyframes nutbot-v2-float  { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-9px)} }
+
+/* talking — a small nod on the beat of the reply */
+.nutbot-v2-body.talk   { animation: nutbot-v2-talk 1.1s ease-in-out infinite; }
+@keyframes nutbot-v2-talk   { 0%,100%{transform:translateY(-2px) rotate(-.6deg)} 50%{transform:translateY(-7px) rotate(.6deg)} }
+
+/* dozing — slower, heavier float than idle, and he sinks a little */
+.nutbot-v2-body.doze   { animation: nutbot-v2-doze 6.5s ease-in-out infinite; }
+@keyframes nutbot-v2-doze   { 0%,100%{transform:translateY(3px) rotate(-1.5deg)} 50%{transform:translateY(-2px) rotate(1.5deg)} }
 
 .nutbot-v2-body.bounce { animation: nutbot-v2-bounce .38s ease-in-out infinite; }
 @keyframes nutbot-v2-bounce { 0%,100%{transform:translateY(0) rotate(-2deg)} 50%{transform:translateY(-14px) rotate(2deg)} }
@@ -21,6 +38,16 @@
 
 .nutbot-v2-body.pulse  { animation: nutbot-v2-pulse 1.4s ease-in-out infinite; }
 @keyframes nutbot-v2-pulse  { 0%,100%{transform:translateY(-4px) scale(1)} 50%{transform:translateY(-9px) scale(1.03)} }
+
+/* prefers-reduced-motion: keep him present but still — the face's own RAF
+   loop separately damps its jitter (see `jit()` in NutBotFaceV2.tsx) */
+.nutbot-v2-body.reduced,
+.nutbot-v2-body.reduced.bounce,
+.nutbot-v2-body.reduced.tilt,
+.nutbot-v2-body.reduced.shake,
+.nutbot-v2-body.reduced.pulse,
+.nutbot-v2-body.reduced.talk,
+.nutbot-v2-body.reduced.doze { animation: none; transform: none; }
 
 /* click boop — quick squish + tilt, overrides the idle float for 280ms */
 .nutbot-v2-body.boop  { animation: nutbot-v2-boop 0.26s ease-out forwards; }
@@ -65,6 +92,15 @@
 .ear-l { left:  -11px; }
 .ear-r { right: -11px; }
 
+/* idle micro-life: an occasional single-ear flick, also fired on a poke */
+.nutbot-v2-ear.twitch { animation: nutbot-v2-twitch .42s ease-out; }
+@keyframes nutbot-v2-twitch {
+  0%   { transform: translateY(-50%) rotate(0deg)   scaleY(1); }
+  30%  { transform: translateY(-58%) rotate(-7deg)  scaleY(1.12); }
+  60%  { transform: translateY(-46%) rotate(5deg)   scaleY(.94); }
+  100% { transform: translateY(-50%) rotate(0deg)   scaleY(1); }
+}
+
 /* ── Screen ──────────────────────────────────────────────────────────── */
 .nutbot-v2-screen {
   width: 100%; height: 122px;
@@ -76,10 +112,19 @@
   box-shadow: inset 0 0 30px rgba(0,180,200,.05);
   transition: box-shadow .35s;
 }
-.nutbot-v2-screen.gc { box-shadow: inset 0 0 30px rgba(0,180,200,.14); }
-.nutbot-v2-screen.go { box-shadow: inset 0 0 30px rgba(255,107,43,.18); }
-.nutbot-v2-screen.gr { box-shadow: inset 0 0 30px rgba(255,50,50,.24); }
-.nutbot-v2-screen.gp { box-shadow: inset 0 0 30px rgba(255,107,138,.18); }
+.nutbot-v2-screen.gc { box-shadow: inset 0 0 30px color-mix(in srgb, var(--accent-cyan) 16%, transparent); }
+.nutbot-v2-screen.go { box-shadow: inset 0 0 30px color-mix(in srgb, var(--accent-orange) 20%, transparent); }
+.nutbot-v2-screen.gr { box-shadow: inset 0 0 30px color-mix(in srgb, var(--nb-error) 26%, transparent); }
+.nutbot-v2-screen.gp { box-shadow: inset 0 0 30px color-mix(in srgb, var(--nb-love) 20%, transparent); }
+
+/* expression swap — a one-shot brightness kick under the SVG morph, so a
+   change of face reads as the screen changing what it displays */
+.nutbot-v2-screen.swap { animation: nutbot-v2-swap .22s ease-out; }
+@keyframes nutbot-v2-swap {
+  0%   { filter: brightness(1.55) contrast(1.1); }
+  40%  { filter: brightness(1.12); }
+  100% { filter: brightness(1); }
+}
 
 /* ── Monitor foot ────────────────────────────────────────────────────── */
 .nutbot-v2-mfoot {
@@ -92,6 +137,8 @@
   width: 13px; height: 4px;
   background: #9c907e; border-radius: 2px;
   box-shadow: inset 0 1px 0 rgba(0,0,0,.2);
+  /* under load the vents take on a warm glow — the fans are working */
+  border-bottom: 1px solid color-mix(in srgb, var(--accent-orange) calc(var(--nb-load) * 100%), transparent);
 }
 .nutbot-v2-model-tag {
   font-size: var(--fs-micro); letter-spacing: .18em; color: #9c907e;
@@ -100,13 +147,13 @@
 }
 .nutbot-v2-mled {
   width: 8px; height: 8px; border-radius: 50%;
-  background: #00b4c8; box-shadow: 0 0 6px #00b4c8;
+  background: var(--accent-cyan); box-shadow: 0 0 6px var(--accent-cyan);
   transition: background .3s, box-shadow .3s; flex-shrink: 0;
 }
 .nutbot-v2-mled.off   { background: #2a2418; box-shadow: none; }
-.nutbot-v2-mled.red   { background: #ff4040; box-shadow: 0 0 6px #ff4040; }
-.nutbot-v2-mled.amber { background: #ff8800; box-shadow: 0 0 6px #ff8800; }
-.nutbot-v2-mled.pink  { background: #ff6b8a; box-shadow: 0 0 6px #ff6b8a; }
+.nutbot-v2-mled.red   { background: var(--nb-error); box-shadow: 0 0 6px var(--nb-error); }
+.nutbot-v2-mled.amber { background: var(--accent-orange); box-shadow: 0 0 6px var(--accent-orange); }
+.nutbot-v2-mled.pink  { background: var(--nb-love); box-shadow: 0 0 6px var(--nb-love); }
 
 /* ── Neck ────────────────────────────────────────────────────────────── */
 .nutbot-v2-neck {
@@ -141,7 +188,15 @@
 }
 .nutbot-v2-bleds { margin-left: auto; display: flex; flex-direction: column; gap: 5px; }
 .nutbot-v2-bled  { width: 6px; height: 6px; border-radius: 50%; background: #2a2418; transition: background .3s, box-shadow .3s; }
-.nutbot-v2-bled.c { background: #00b4c8; box-shadow: 0 0 4px #00b4c8; }
-.nutbot-v2-bled.o { background: #ff6b2b; box-shadow: 0 0 4px #ff6b2b; }
-.nutbot-v2-bled.r { background: #ff4040; box-shadow: 0 0 4px #ff4040; }
-.nutbot-v2-bled.p { background: #ff6b8a; box-shadow: 0 0 4px #ff6b8a; }
+.nutbot-v2-bled.c { background: var(--accent-cyan); box-shadow: 0 0 4px var(--accent-cyan); }
+.nutbot-v2-bled.o { background: var(--accent-orange); box-shadow: 0 0 4px var(--accent-orange); }
+.nutbot-v2-bled.r { background: var(--nb-error); box-shadow: 0 0 4px var(--nb-error); }
+.nutbot-v2-bled.p { background: var(--nb-love); box-shadow: 0 0 4px var(--nb-love); }
+
+/* the base LEDs idle-pulse, and pulse faster the busier the machine is */
+.nutbot-v2-bled.c, .nutbot-v2-bled.o {
+  animation: nutbot-v2-bled-pulse calc(2.6s - var(--nb-load) * 1.4s) ease-in-out infinite;
+}
+.nutbot-v2-bled.o { animation-delay: .5s; }
+@keyframes nutbot-v2-bled-pulse { 0%,100%{opacity:1} 50%{opacity:.45} }
+.nutbot-v2-body.reduced .nutbot-v2-bled { animation: none; }
