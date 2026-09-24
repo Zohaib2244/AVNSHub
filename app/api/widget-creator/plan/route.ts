@@ -7,6 +7,7 @@ import { streamHarnessChat } from "@/lib/nutbot/chatHarness";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { isSkillAvailable } from "@/lib/widget-creator/skillCheck";
 import { buildWidgetCatalogSection } from "@/lib/widget-creator/widgetCatalog";
+import { QUESTION_FORMAT } from "@/lib/widget-creator/question";
 
 export const dynamic = "force-dynamic";
 
@@ -53,7 +54,9 @@ ${buildWidgetCatalogSection()}
 
 When the user asks for suggestions ("what widget could I add?"), propose 2-4 concrete, novel ideas that aren't already covered by the list above — you already have everything you need to do this from the list, no exploration required.
 
-When the idea is vague, ask 1–2 focused questions — what data would it show, how often they'd glance at it, what size feels right (S = small badge/counter, M = medium data card, L = detailed panel).
+When the idea is vague, ask 1–2 focused questions — what data would it show, how often they'd glance at it, what size feels right (S = small badge/counter, M = medium data card, L = detailed panel). Ask them as a \`nutbot-question\` block (below) rather than as prose, so the user can answer with a click.
+
+${QUESTION_FORMAT}
 
 When the concept is specific, produce a structured brief in this exact format — only valid JSON inside the backtick block:
 

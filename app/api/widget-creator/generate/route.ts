@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
+import { parseQuestions, QUESTION_PROTOCOL } from "@/lib/widget-creator/question";
 import {
   readRegistry,
   componentName,
@@ -192,6 +193,8 @@ ${settings.designReferenceHtml}
 ## User prompt
 
 ${userPrompt}
+
+${QUESTION_PROTOCOL}
 
 ## Required output
 
@@ -443,7 +446,7 @@ export async function POST(req: Request) {
       const sessionId = ws.created ? undefined : incomingSessionId;
       const resumePrompt = sessionId ? promptWithImages : undefined;
 
-      const { outcome, sessionId: outSessionId, harness: completedHarness } = await runHarnessChain(
+      const { outcome, sessionId: outSessionId, harness: completedHarness, lastText } = await runHarnessChain(
         corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
         { sessionId: (body.sessionHarness ?? "claude") === requestedHarness ? sessionId : undefined, resumePrompt, stage: repairErrors.length ? "fix" : "build", cwd: ws.tree }, targetId,
       );
@@ -473,7 +476,13 @@ export async function POST(req: Request) {
         if (unexpected.length > 0) sendEvent(write, "audit", { unexpectedFiles: unexpected });
       }
 
-      if (outcome === "done") {
+      // A turn that ends in a question is paused, not finished: the draft stays
+      // in the workbench unchecked and unapplied, and the answer resumes it.
+      const questions = outcome === "done" ? parseQuestions(lastText ?? "") : null;
+      if (questions) {
+        finishRun(runId, targetId, "question", { message: "waiting for your answer" });
+        sendEvent(write, "question", { questions, slug: targetId });
+      } else if (outcome === "done") {
         let ok = true;
         if (!findComponentModule(targetId, wbCustomDir)) {
           failRun(`no component .tsx file was written in components/widgets/custom/${targetId}/ — nothing was applied`);

@@ -7,6 +7,8 @@ import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import { useEffect } from "react";
 import { useStickToBottom } from "@/lib/widget-creator/useStickToBottom";
 import { ActivityLine, formatElapsed, useTicker } from "./RunProgress";
+import { QuestionCard } from "./QuestionCard";
+import { isQuestionStreaming, parseQuestions, stripQuestions } from "@/lib/widget-creator/question";
 import {
   updateProject,
   setWorkingProjectId,
@@ -32,6 +34,7 @@ type Message =
 function planActivity(text: string): string {
   if (!text) return "thinking";
   if (text.includes("```widget-brief")) return "drafting the widget brief";
+  if (isQuestionStreaming(text)) return "writing a question";
   return "replying";
 }
 
@@ -116,10 +119,10 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
     removeProjectBlob(msgsKey);
   }
 
-  async function send() {
-    if (!prompt.trim() || isLoading || readOnly) return;
-    const userText = prompt.trim();
-    setPrompt("");
+  async function send(answer?: string) {
+    const userText = (answer ?? prompt).trim();
+    if (!userText || isLoading || readOnly) return;
+    if (answer === undefined) setPrompt("");
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setIsLoading(true);
     const requestStartedAt = Date.now();
@@ -287,11 +290,19 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
           }
 
           if (msg.role === "assistant") {
-            const displayText = stripBrief(msg.text);
+            const displayText = stripQuestions(stripBrief(msg.text));
+            const questions = msg.streaming ? null : parseQuestions(msg.text);
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <pre className="wc-code">{displayText}</pre>
+                {displayText && <pre className="wc-code">{displayText}</pre>}
                 {msg.streaming && <span className="wc-cursor">▍</span>}
+                {questions && (
+                  <QuestionCard
+                    questions={questions}
+                    active={!isLoading && !readOnly && !messages.slice(i + 1).some((m) => m.role === "user")}
+                    onAnswer={(text) => void send(text)}
+                  />
+                )}
               </div>
             );
           }
@@ -349,7 +360,7 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
         <button
           type="button"
           className={`wc-send-btn${isLoading ? " stop" : ""}`}
-          onClick={isLoading ? stop : send}
+          onClick={isLoading ? stop : () => void send()}
           aria-label={isLoading ? "stop" : "send"}
           disabled={readOnly || (!isLoading && !prompt.trim())}
         >

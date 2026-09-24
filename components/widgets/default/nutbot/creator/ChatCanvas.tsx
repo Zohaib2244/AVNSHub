@@ -30,6 +30,8 @@ import {
 } from "@/lib/widget-creator/projectStore";
 import { MockupLightbox } from "./MockupLightbox";
 import { renderMessageText } from "./ToolChipLine";
+import { QuestionCard } from "./QuestionCard";
+import { stripQuestions, type HarnessQuestion } from "@/lib/widget-creator/question";
 import {
   RunActivity,
   RunSteps,
@@ -63,6 +65,7 @@ function isPhaseRunning(phase: Phase): boolean {
 type Message =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
+  | { role: "question"; questions: HarnessQuestion[] }
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
   | { role: "audit"; files: string[] }
@@ -125,7 +128,7 @@ type ServerRun = {
   startedAt: number;
   stageStartedAt: number;
   finishedAt?: number;
-  outcome?: "done" | "error" | "aborted";
+  outcome?: "done" | "error" | "aborted" | "question";
   failedStage?: "preparing" | "writing" | "checking" | "applying";
   message?: string;
   registered?: boolean;
@@ -395,6 +398,12 @@ export function ChatCanvas({
       setRun(runViewFromServer(r, skew));
       if (r.outcome === "done") {
         onRunDone(r.slug, Boolean(r.registered), null, (r.harness as HarnessId) ?? null);
+      } else if (r.outcome === "question") {
+        // asked in another tab — its transcript (with the question) is in the project blob
+        setRun(null);
+        setPhase({ id: "idle" });
+        const remote = await pullProjectBlob<Message[]>(MESSAGES_KEY);
+        if (!cancelled && Array.isArray(remote)) setMessages((current) => (remote.length > current.length ? remote : current));
       } else if (r.outcome === "aborted") {
         setPhase({ id: "idle" });
         setMessages((prev) => [...prev, {
@@ -461,9 +470,10 @@ export function ChatCanvas({
     }
   }
 
-  async function generate() {
+  /** `answer`: a reply to the harness's question card, sent instead of the typed prompt */
+  async function generate(answer?: string) {
     const inFlight = isPhaseRunning(phase) || runActive;
-    const promptText = prompt.trim();
+    const promptText = (answer ?? prompt).trim();
     if ((!promptText && !hasDesignReference) || inFlight) return;
 
     const validationError = validateSettings(settings);
@@ -472,11 +482,13 @@ export function ChatCanvas({
       return;
     }
 
-    const imagesForRequest = attachedImages;
+    const imagesForRequest = answer === undefined ? attachedImages : [];
     const userText = (promptText || "(build from the finalized design reference)")
       + (imagesForRequest.length ? `  [+${imagesForRequest.length} image${imagesForRequest.length > 1 ? "s" : ""}]` : "");
-    setPrompt("");
-    setAttachedImages([]);
+    if (answer === undefined) {
+      setPrompt("");
+      setAttachedImages([]);
+    }
 
     // the last type-check result: errors are sent along so the harness fixes them
     const lastValidation = messages.findLast((m) => m.role === "tsc_errors" || (m.role === "ok" && (m.text.includes("widget updated") || m.text.includes("widget written"))));
@@ -495,6 +507,14 @@ export function ChatCanvas({
     if (buildSession && buildSession.forSlug !== currentTarget) {
       updateProject(projectId, { buildSession: undefined });
     }
+
+    // Without a session to resume (opencode, or an expired one) the harness
+    // starts fresh from the full prompt, so an answer alone would lose the
+    // request it answers.
+    const askedFor = answer !== undefined && !sessionForRequest
+      ? messages.findLast((m): m is Extract<Message, { role: "user" }> => m.role === "user" && !m.text.startsWith("Answers to your question"))?.text
+      : undefined;
+    const requestPrompt = askedFor ? `${askedFor}\n\n${promptText}` : promptText;
 
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
@@ -517,7 +537,7 @@ export function ChatCanvas({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings,
-          prompt: promptText,
+          prompt: requestPrompt,
           harness: activeHarness,
           harnessChain,
           sessionId: sessionForRequest ?? undefined,
@@ -594,6 +614,14 @@ export function ChatCanvas({
               updated[idx] = { ...msg, text: msg.text + text };
               return updated;
             });
+          } else if (event === "question") {
+            // the run paused for an answer: nothing was checked or applied
+            settled = true;
+            setRun(null);
+            setPhase({ id: "idle" });
+            clearSignal();
+            setWorkingProjectId(null);
+            setMessages((prev) => [...prev, { role: "question", questions: payload.questions as HarnessQuestion[] }]);
           } else if (event === "session") {
             updateProject(projectId, { buildSession: { id: payload.sessionId as string, forSlug: payload.slug as string | null, harness: payload.harness as HarnessId } });
           } else if (event === "switch_required") {
@@ -899,8 +927,19 @@ export function ChatCanvas({
           if (msg.role === "assistant") {
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <div className="wc-code">{renderMessageText(msg.text)}</div>
+                <div className="wc-code">{renderMessageText(stripQuestions(msg.text))}</div>
                 {msg.streaming && <span className="wc-cursor">▍</span>}
+              </div>
+            );
+          }
+          if (msg.role === "question") {
+            return (
+              <div key={i} className="wc-msg wc-msg-assistant">
+                <QuestionCard
+                  questions={msg.questions}
+                  active={!isGenerating && !messages.slice(i + 1).some((m) => m.role === "user")}
+                  onAnswer={(text) => void generate(text)}
+                />
               </div>
             );
           }
@@ -1073,7 +1112,7 @@ export function ChatCanvas({
         <button
           type="button"
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
-          onClick={isGenerating ? stop : generate}
+          onClick={isGenerating ? stop : () => void generate()}
           aria-label={isGenerating ? "stop" : "generate"}
           // a run streamed by another tab can only be stopped from that tab
           disabled={(!isGenerating && !prompt.trim() && !hasDesignReference) || Boolean(run?.remote && runActive)}

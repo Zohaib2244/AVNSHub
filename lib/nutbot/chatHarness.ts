@@ -1,12 +1,16 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { randomUUID } from "crypto";
+import { homedir } from "os";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 
 import { modelArgs, type ModelChoice } from "@/lib/widget-creator/models";
 import { saveUsage, saveSession } from "@/lib/widget-creator/runStore";
 import { EMPTY_USAGE, parseUsage, type UsageRun } from "@/lib/widget-creator/usage";
 
+export type ChatMode = "chill" | "work";
+
 type StreamHarnessChatOptions = {
+  mode?: ChatMode;
   modelChoice?: ModelChoice;
   stage?: "chat" | "plan";
   harness: HarnessId;
@@ -21,9 +25,15 @@ type Invocation = {
   prompt: string;
   promptViaArg?: boolean;
   initialConversationId?: string;
+  cwd?: string;
 };
 
 const REPO_ROOT = process.cwd();
+// Work mode runs where an ssh session would land, so the CLI loads the user's
+// global CLAUDE.md + memory for this host rather than the repo's. Resumes must
+// use the same cwd — claude keys its session transcripts by project dir.
+const WORK_ROOT = homedir();
+const TOOL_LINE_RE = /(\[tool: [^\]]+\][^\n]*\n?)/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SESSION_KEYS = new Set(["session_id", "sessionId", "conversation_id", "conversationId", "thread_id", "threadId"]);
 
@@ -44,6 +54,68 @@ Reply as NutBot in plain chat mode. Do not edit files, run shell commands, brows
 ${recent ? `Recent conversation:\n${recent}\n\n` : ""}
 User message:
 ${message}`;
+}
+
+function workPrompt(persona: string, message: string, history: Array<{ role: "user" | "assistant"; text: string }> = []) {
+  const recent = history
+    .slice(-8)
+    .map((entry) => `${entry.role === "assistant" ? "NutBot" : "User"}: ${entry.text}`)
+    .join("\n");
+
+  return `${persona ? `${persona}\n\n` : ""}${recent ? `Recent conversation:\n${recent}\n\n` : ""}User request:
+${message}`;
+}
+
+// Full agent turn: tools on, no permission prompts (a -p run has nobody to
+// answer them), host-wide filesystem. The approval gate for state changes is
+// conversational — NUTBOT_WORK_PROMPT makes the agent stop and ask. The chat
+// route has no auth of its own; the hub is meant to sit behind a login proxy.
+function buildWorkInvocation(
+  harness: HarnessId,
+  message: string,
+  sessionId: string | null | undefined,
+  persona: string,
+  history: Array<{ role: "user" | "assistant"; text: string }> = [],
+): Invocation {
+  if (harness === "claude") {
+    const conversationId = sessionId ?? randomUUID();
+    // --append-system-prompt is not part of the saved session, so it rides on
+    // every turn, resumes included
+    const args = [
+      "-p",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--permission-mode",
+      "bypassPermissions",
+      "--append-system-prompt",
+      persona,
+      ...(sessionId ? ["--resume", sessionId] : ["--session-id", conversationId]),
+    ];
+    return {
+      args,
+      prompt: sessionId ? message : workPrompt("", message, history),
+      initialConversationId: conversationId,
+      cwd: WORK_ROOT,
+    };
+  }
+
+  if (harness === "codex") {
+    const baseArgs = ["exec", "--json", "--sandbox", "danger-full-access", "--skip-git-repo-check", "-C", WORK_ROOT];
+    const args = sessionId ? [...baseArgs, "resume", sessionId, "-"] : [...baseArgs, "-"];
+    return {
+      args,
+      prompt: sessionId ? message : workPrompt(persona, message, history),
+      cwd: WORK_ROOT,
+    };
+  }
+
+  return {
+    args: ["run", "--format", "json", "--dir", WORK_ROOT, workPrompt(persona, message, history)],
+    prompt: "",
+    promptViaArg: true,
+    cwd: WORK_ROOT,
+  };
 }
 
 function buildInvocation(
@@ -141,7 +213,8 @@ function stderrSummary(stderr: string) {
 
 export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableStream<Uint8Array> {
   const adapter = HARNESS_ADAPTERS[options.harness];
-  const invocation = buildInvocation(
+  const work = options.mode === "work";
+  const invocation = (work ? buildWorkInvocation : buildInvocation)(
     options.harness,
     options.message,
     options.sessionId,
@@ -201,15 +274,27 @@ export function streamHarnessChat(options: StreamHarnessChatOptions): ReadableSt
         }
 
         const text = adapter.parseChunk(line);
-        if (!text || text.trim().startsWith("[tool:")) return;
-        sawToken = true;
-        emit("token", text);
+        if (!text) return;
+        // chill mode has no tools, so a tool line there is noise; in work
+        // mode each one becomes its own frame so the UI can show what the
+        // agent is actually running between bursts of prose
+        for (const part of text.split(TOOL_LINE_RE)) {
+          if (!part) continue;
+          const tool = part.match(/^\[tool: ([^\]]+)\]\s*([^\n]*)/);
+          if (tool) {
+            if (work) emit("tool", { name: tool[1], detail: tool[2] });
+            continue;
+          }
+          if (!part.trim() && !sawToken) continue;
+          sawToken = true;
+          emit("token", part);
+        }
       };
 
       emit("status", `starting ${adapter.label}`);
 
       child = spawn(adapter.command, invocation.args, {
-        cwd: REPO_ROOT,
+        cwd: invocation.cwd ?? REPO_ROOT,
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env },
         shell: process.platform === "win32",

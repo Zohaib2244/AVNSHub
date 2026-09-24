@@ -7,7 +7,7 @@
 // SlotPlacementPopover for picking an unplaced widget.
 
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import type { RegionDims, SlotRegionId } from "@/config/slotLayout";
+import type { FrameRatios, RegionDims, SlotRegionId } from "@/config/slotLayout";
 import type { SlotWidgetInstance } from "@/lib/slotLayout";
 import type { Direction, Rect } from "@/lib/grid/occupancy";
 import { buildOccupancy } from "@/lib/grid/occupancy";
@@ -41,12 +41,17 @@ export function SlotRegion({
   region,
   instances,
   dims,
+  frameRatios,
   entranceDelays,
   inFocusMode,
 }: {
   region: SlotRegionId;
   instances: SlotWidgetInstance[];
   dims: RegionDims;
+  /** the canvas's persisted frame ratios — SSR-safe (from SlotDashboard's
+      useSyncExternalStore snapshot), forwarded to SlotWidgetCell so it never
+      falls back to reading localStorage directly during render */
+  frameRatios: FrameRatios;
   /** widget id -> seconds before its mount fade+scale-in plays, forwarded to
       each SlotWidgetCell — see WidgetShell's entranceDelay prop comment */
   entranceDelays?: Record<string, number>;
@@ -346,6 +351,8 @@ export function SlotRegion({
         <SlotWidgetCell
           key={instance.id}
           instance={instance}
+          dims={dims}
+          frameRatios={frameRatios}
           hoverEffect={activeHoverPreview?.effects[instance.id]}
           hoverMetrics={activeHoverMetrics ?? undefined}
           trackMetrics={trackMetrics ?? undefined}

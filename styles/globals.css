@@ -669,6 +669,31 @@ html[data-backdrop="glass"] .frame {
   cursor: grab;
 }
 
+/* live "card · 2x3" readout while an edge handle is dragged — which size
+   preset (docs/WIDGET_SIZE_PRESETS.md) the footprint lands in, so crossing
+   into another layout is visible. Centred on the bottom edge and drawn over
+   the resize handles (z-index 25): a corner placement still collided with the
+   centred s handle in narrow cells, and the handle being dragged doesn't need
+   to be seen. pointer-events: none so it never takes the pointer from it. */
+.slot-preset-tag {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  padding: 1px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: var(--bg-card);
+  color: var(--accent-cyan);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .slot-move-btn:active {
   cursor: grabbing;
 }
@@ -2589,6 +2614,38 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 8px;
   overflow: hidden;
   border: 1.5px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.wallpaper-preview:hover,
+.wallpaper-preview.dragging {
+  border-color: var(--accent-orange);
+}
+
+.wallpaper-change {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wallpaper-preview:hover .wallpaper-change,
+.wallpaper-preview.dragging .wallpaper-change {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
 }
 
 .wallpaper-thumb {

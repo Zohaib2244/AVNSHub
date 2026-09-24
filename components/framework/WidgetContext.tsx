@@ -8,6 +8,7 @@
 import { createContext, useContext } from "react";
 import type { Orientation, SettingsValues, WidgetSize } from "@/config/widgets";
 import type { RegionId } from "@/config/slotLayout";
+import type { PresetId } from "@/config/sizePresets";
 
 export type WidgetCtx = {
   id: string;
@@ -15,6 +16,16 @@ export type WidgetCtx = {
       S/M/L layouts (the framework's primary per-widget customization lever) */
   size: WidgetSize;
   orientation: Orientation;
+  /** Slot Layout only — the size preset that applies to this cell
+      (docs/WIDGET_SIZE_PRESETS.md). Computed but not yet driving layout:
+      keep branching on `size` until the preset migration reaches your widget.
+      Undefined before the frame is measured and in Graph Layout. */
+  preset?: PresetId;
+  /** Slot Layout only — the cell's measured box in CSS px */
+  box?: { width: number; height: number };
+  /** Slot Layout only — true when the cell is smaller than every preset the
+      widget declares (small screens only) */
+  belowFloor?: boolean;
   /** manifest schema defaults merged with the user's stored values */
   settings: SettingsValues;
   /** true only while Slot Layout's transient Hover On Expand preview is active

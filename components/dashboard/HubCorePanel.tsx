@@ -13,7 +13,7 @@
 // of the bar, so the canvas you are changing stays visible while you change
 // it. Prototype this came from: public/proto/control-deck.html.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ChangeEvent, type DragEvent as ReactDragEvent, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   Camera,
@@ -603,37 +603,48 @@ function WallpaperPicker({ canvasId }: { canvasId: string }) {
     if (file && (file.type.startsWith("image/") || file.type.startsWith("video/"))) void setWallpaper(canvasId, file);
   }
 
+  // the preview and the empty drop zone take the same browse/drop input, so
+  // a new wallpaper replaces the current one directly (setWallpaper
+  // overwrites the stored file) instead of needing a remove first
+  const dropProps = {
+    onClick: () => inputRef.current?.click(),
+    onDragOver: (e: ReactDragEvent) => { e.preventDefault(); setDragging(true); },
+    onDragLeave: () => setDragging(false),
+    onDrop: (e: ReactDragEvent) => {
+      e.preventDefault();
+      setDragging(false);
+      handleFiles(e.dataTransfer.files);
+    },
+  };
+
   return (
     <div className="wallpaper-picker">
       {url ? (
-        <div className="wallpaper-preview">
+        <div className={`wallpaper-preview${dragging ? " dragging" : ""}`} title="click or drop to change" {...dropProps}>
           {kind === "video" ? (
             <video src={url} className="wallpaper-thumb" autoPlay loop muted playsInline />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt="canvas wallpaper" className="wallpaper-thumb" />
           )}
+          <span className="wallpaper-change">
+            <ImagePlus size={11} strokeWidth={1.75} />
+            change
+          </span>
           <button
             type="button"
             className="wallpaper-clear"
-            onClick={() => void clearWallpaper(canvasId)}
+            onClick={(e) => {
+              e.stopPropagation();
+              void clearWallpaper(canvasId);
+            }}
             aria-label="remove wallpaper"
           >
             <ImageOff size={11} strokeWidth={1.75} />
           </button>
         </div>
       ) : (
-        <div
-          className={`wallpaper-drop${dragging ? " dragging" : ""}`}
-          onClick={() => inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            handleFiles(e.dataTransfer.files);
-          }}
-        >
+        <div className={`wallpaper-drop${dragging ? " dragging" : ""}`} {...dropProps}>
           <ImagePlus size={12} strokeWidth={1.75} />
           <span>browse or drop an image/video</span>
         </div>
@@ -643,7 +654,11 @@ function WallpaperPicker({ canvasId }: { canvasId: string }) {
         type="file"
         accept="image/*,video/*"
         style={{ display: "none" }}
-        onChange={(e) => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          // reset so picking the same file again still fires onChange
+          e.target.value = "";
+        }}
       />
     </div>
   );
@@ -727,11 +742,20 @@ function WidgetStyleSettings() {
 
 function CanvasesSettings() {
   const { canvases, activeId } = useSyncExternalStore(subscribeCanvases, getCanvases, getServerCanvases);
+  // one icon menu at a time — opening another row's picker closes this one
+  const [pickingIconId, setPickingIconId] = useState<string | null>(null);
 
   return (
     <div className="hub-canvases-panel">
       {canvases.map((canvas) => (
-        <CanvasSettingsRow key={canvas.id} canvas={canvas} active={canvas.id === activeId} deletable={canvases.length > 1} />
+        <CanvasSettingsRow
+          key={canvas.id}
+          canvas={canvas}
+          active={canvas.id === activeId}
+          deletable={canvases.length > 1}
+          pickingIcon={pickingIconId === canvas.id}
+          onTogglePicker={() => setPickingIconId((id) => (id === canvas.id ? null : canvas.id))}
+        />
       ))}
       <button
         type="button"
@@ -745,9 +769,20 @@ function CanvasesSettings() {
   );
 }
 
-function CanvasSettingsRow({ canvas, active, deletable }: { canvas: Canvas; active: boolean; deletable: boolean }) {
+function CanvasSettingsRow({
+  canvas,
+  active,
+  deletable,
+  pickingIcon,
+  onTogglePicker,
+}: {
+  canvas: Canvas;
+  active: boolean;
+  deletable: boolean;
+  pickingIcon: boolean;
+  onTogglePicker: () => void;
+}) {
   const [name, setName] = useState(canvas.name);
-  const [pickingIcon, setPickingIcon] = useState(false);
 
   // stay in sync if this canvas is renamed elsewhere (e.g. the edge pill's
   // own rename flyout) while this row is mounted — adjusted during render
@@ -777,7 +812,7 @@ function CanvasSettingsRow({ canvas, active, deletable }: { canvas: Canvas; acti
         <button
           type="button"
           className={`hub-canvas-glyph-btn${pickingIcon ? " active" : ""}`}
-          onClick={() => setPickingIcon((p) => !p)}
+          onClick={onTogglePicker}
           title="change icon"
           aria-label={`change icon for ${canvas.name}`}
         >

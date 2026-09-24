@@ -9,7 +9,8 @@
 
 export type RunStage = "preparing" | "writing" | "checking" | "applying";
 
-export type RunOutcome = "done" | "error" | "aborted";
+/** "question": the harness paused to ask the user something; nothing was applied */
+export type RunOutcome = "done" | "error" | "aborted" | "question";
 
 export type RunRecord = {
   runId: string;
@@ -55,7 +56,7 @@ export function finishRun(
   if (!run || run.runId !== runId || run.finishedAt) return;
   run.finishedAt = Date.now();
   run.outcome = outcome;
-  if (outcome !== "done") run.failedStage = run.stage;
+  if (outcome === "error" || outcome === "aborted") run.failedStage = run.stage;
   run.message = extra.message;
   run.registered = extra.registered;
 }

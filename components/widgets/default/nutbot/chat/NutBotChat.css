@@ -122,6 +122,26 @@
   font-style: italic;
 }
 
+/* work mode: one compact line per command/tool the agent runs */
+.nb-msg-tool {
+  font-size: calc(0.66rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
+  border-left: 2px solid var(--accent-cyan);
+  border-radius: 0 4px 4px 0;
+  background: var(--bg-nested);
+  padding: 2px 7px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  animation-duration: 0.14s;
+}
+
+.nb-tool-name {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
 .nb-msg-error {
   border: 1px solid var(--status-down, #c0392b);
   border-left-width: 2px;
@@ -191,6 +211,32 @@
 .nb-toggle-btn.active {
   color: var(--accent-orange);
   border-color: var(--accent-orange);
+}
+
+.nb-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* chill | work — two joined toggles */
+.nb-mode-switch {
+  display: flex;
+  margin-right: 4px;
+}
+
+.nb-mode-switch .nb-toggle-btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.nb-mode-switch .nb-toggle-btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+.nb-mode-switch .nb-toggle-btn.active {
+  position: relative;
 }
 
 .nb-new-btn {

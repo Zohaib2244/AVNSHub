@@ -698,6 +698,145 @@
   color: var(--bg-card);
 }
 
+/* a harness's nutbot-question block, answerable with a click */
+.wc-question {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--accent-cyan);
+  border-left-width: 2px;
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--accent-cyan) 7%, transparent);
+}
+
+.wc-question.answered {
+  border-color: var(--border);
+  background: transparent;
+  opacity: 0.7;
+}
+
+.wc-question-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wc-question-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-cyan);
+}
+
+.wc-question.answered .wc-question-head {
+  color: var(--nb-muted, var(--text-muted));
+}
+
+.wc-question-chip,
+.wc-question-hint {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(0.6rem * var(--nb-scale, 1));
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.wc-question-hint {
+  color: var(--nb-muted, var(--text-muted));
+}
+
+.wc-question-text {
+  color: var(--text-primary);
+}
+
+.wc-question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.wc-question-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--nb-btn-bg, var(--bg-nested));
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.wc-question-opt:hover:not(:disabled),
+.wc-question-opt:focus-visible {
+  border-color: var(--accent-cyan);
+}
+
+.wc-question-opt.on {
+  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-cyan) 18%, var(--bg-nested));
+}
+
+.wc-question-opt:disabled {
+  cursor: default;
+}
+
+.wc-question-opt-desc {
+  color: var(--nb-muted, var(--text-muted));
+  font-size: calc(0.64rem * var(--nb-scale, 1));
+}
+
+.wc-question-other {
+  height: 26px;
+  padding: 0 7px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.7rem * var(--nb-scale, 1));
+}
+
+.wc-question-other:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+}
+
+.wc-question-send {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: var(--nb-btn-bg, var(--bg-nested));
+  color: var(--accent-cyan);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(0.6rem * var(--nb-scale, 1));
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.wc-question-send:hover:not(:disabled) {
+  background: var(--accent-cyan);
+  color: var(--bg-card);
+}
+
+.wc-question-send:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 /* write-audit warning — the harness touched files outside its lane */
 .wc-msg-audit {
   border: 1px solid var(--accent-orange);

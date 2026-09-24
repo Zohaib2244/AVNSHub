@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { NUTBOT_PERSONA, NUTBOT_PERSONA_NSFW, type PersonaPreset } from "@/lib/nutbot/persona";
-import { streamHarnessChat } from "@/lib/nutbot/chatHarness";
+import { NUTBOT_PERSONA, NUTBOT_PERSONA_NSFW, NUTBOT_WORK_PROMPT, type PersonaPreset } from "@/lib/nutbot/persona";
+import { streamHarnessChat, type ChatMode } from "@/lib/nutbot/chatHarness";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 
 import { readModelDefaults, resolveSession } from "@/lib/widget-creator/runStore";
@@ -101,6 +101,7 @@ export async function POST(request: Request) {
     nsfw?: boolean;
     searchEnabled?: boolean;
     backend?: "bonfire" | HarnessId;
+    mode?: ChatMode;
     history?: Array<{ role: "user" | "assistant"; text: string }>;
   };
 
@@ -109,6 +110,11 @@ export async function POST(request: Request) {
   }
 
   const backend = body.backend ?? "bonfire";
+  const mode: ChatMode = body.mode === "work" ? "work" : "chill";
+  // work mode is an agent with a shell — Bonfire's local model has no tools
+  if (mode === "work" && backend === "bonfire") {
+    return NextResponse.json({ error: "work mode needs a cli harness backend" }, { status: 400 });
+  }
   if (backend !== "bonfire") {
     if (!isHarnessId(backend)) {
       return NextResponse.json({ error: "invalid chat backend" }, { status: 400 });
@@ -117,11 +123,12 @@ export async function POST(request: Request) {
     const sessionId = await resolveSession(body.conversationId, backend, modelChoice.model);
     return new Response(
       streamHarnessChat({
+        mode,
         modelChoice,
         harness: backend,
         message: body.message,
         sessionId,
-        persona: NUTBOT_PERSONA.system_prompt,
+        persona: mode === "work" ? NUTBOT_WORK_PROMPT : NUTBOT_PERSONA.system_prompt,
         history: Array.isArray(body.history) ? body.history : [],
       }),
       { headers: { "Content-Type": "application/x-ndjson" } },

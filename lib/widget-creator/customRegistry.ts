@@ -8,6 +8,7 @@
 // brace-counting — the fragile part of the old single-file approach.
 import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, statSync } from "fs";
 import { join } from "path";
+import { isFillMode, isPresetId, normalizePresets, type FillMode, type PresetId } from "@/config/sizePresets";
 
 const ROOT = process.cwd();
 export const REGISTRY_PATH = join(ROOT, "config/customRegistry.json");
@@ -21,6 +22,10 @@ export type RegistryEntry = {
   orientations: string[];
   defaults: { size: string; orientation: string; hidden?: boolean };
   minPx?: { width: number; height: number };
+  /** size presets (config/sizePresets.ts); derived from sizes when absent */
+  presets?: PresetId[];
+  defaultPreset?: PresetId;
+  fill?: FillMode;
   settings?: unknown[];
   flags?: Record<string, unknown>;
 };
@@ -200,6 +205,9 @@ export function buildRegistryEntry(input: EntryInput, existing?: RegistryEntry):
     orientations: finalOris,
     defaults: { size: defaultSize, orientation: finalOris[0] },
     minPx: existing?.minPx,
+    presets: existing?.presets,
+    defaultPreset: existing?.defaultPreset,
+    fill: existing?.fill,
     settings: existing?.settings ?? [],
     flags: existing?.flags,
   };
@@ -238,6 +246,17 @@ export function mergeWidgetManifest(base: RegistryEntry, raw: unknown): Registry
     const valid = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 4000;
     if (valid(px.width) && valid(px.height)) out.minPx = { width: Math.round(px.width), height: Math.round(px.height) };
   }
+  if (Array.isArray(m.presets)) {
+    const presets = normalizePresets(m.presets);
+    if (presets.length) out.presets = presets;
+  }
+  if (isPresetId(m.defaultPreset) && (out.presets ?? []).includes(m.defaultPreset)) {
+    out.defaultPreset = m.defaultPreset;
+  } else if (out.defaultPreset && !(out.presets ?? []).includes(out.defaultPreset)) {
+    // keep the default consistent with possibly-narrowed presets
+    out.defaultPreset = undefined;
+  }
+  if (isFillMode(m.fill)) out.fill = m.fill;
   if (Array.isArray(m.settings)) out.settings = m.settings;
   if (m.flags && typeof m.flags === "object") out.flags = m.flags as Record<string, unknown>;
   return out;

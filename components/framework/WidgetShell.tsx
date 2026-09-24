@@ -24,6 +24,7 @@ import {
   type WidgetSize,
 } from "@/config/widgets";
 import type { RegionId } from "@/config/slotLayout";
+import type { PresetId } from "@/config/sizePresets";
 import { getHeaderStyle, getServerHeaderStyle, subscribeHeaderStyle } from "@/lib/headerStyle";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -86,6 +87,10 @@ export type ShellConfig = {
   hoverExpanded?: boolean;
   /** Slot Layout only — passed through to useWidget().slot, see WidgetContext */
   slot?: { region: RegionId; colSpan: number; rowSpan: number };
+  /** Slot Layout only — passed through to useWidget(), see WidgetContext */
+  preset?: PresetId;
+  box?: { width: number; height: number };
+  belowFloor?: boolean;
 };
 
 export function WidgetShell({
@@ -115,7 +120,18 @@ export function WidgetShell({
   const isFocused = keyboardFocusWidgetId === manifest.id;
 
   const hoverExpanded = config?.hoverExpanded ?? false;
-  const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot, isFocused };
+  const ctx = {
+    id: manifest.id,
+    size,
+    orientation,
+    preset: config?.preset,
+    box: config?.box,
+    belowFloor: config?.belowFloor,
+    settings,
+    hoverExpanded,
+    slot: config?.slot,
+    isFocused,
+  };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
   // "auto" inherits the global widget backdrop default (independent from the
@@ -198,6 +214,8 @@ export function WidgetShell({
       id={manifest.id}
       className="capsule"
       data-size={size}
+      data-preset={config?.preset}
+      data-below-floor={config?.belowFloor ? "true" : undefined}
       data-kb-widget={manifest.id}
       data-kb-focus={isFocused ? "true" : undefined}
       onPointerDown={() => setKeyboardFocusWidgetId(manifest.id)}

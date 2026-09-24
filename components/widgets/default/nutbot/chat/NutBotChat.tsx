@@ -14,8 +14,14 @@ import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAd
 type ChatMessage =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
+  | { role: "tool"; name: string; detail: string }
   | { role: "status"; text: string }
   | { role: "error"; text: string };
+
+/** chill = the original persona chat; work = a CLI agent with a real shell on
+    the host for maintenance/troubleshooting. Each mode keeps its own
+    conversation, so switching never resumes the other mode's session. */
+type ChatMode = "chill" | "work";
 
 type ConcreteBackend = "bonfire" | HarnessId;
 type HarnessStatus = { id: HarnessId; label: string; available: boolean };
@@ -31,8 +37,18 @@ const CONV_BACKEND_KEY = "nutmag-nutbot-conv-backend";
 const NSFW_KEY = "nutmag-nutbot-nsfw";
 const SEARCH_KEY = "nutmag-nutbot-search";
 const HISTORY_KEY = "nutmag-nutbot-history";
+const MODE_KEY = "nutmag-nutbot-mode";
 /** how many sent prompts the up-arrow recall keeps, oldest dropped first */
 const HISTORY_LIMIT = 100;
+
+// chill keeps the original keys so existing sessions survive the upgrade
+function modeKey(base: string, mode: ChatMode) {
+  return mode === "work" ? `${base}-work` : base;
+}
+
+// Switching modes remounts the pane (key={mode}); harness transcripts are not
+// stored server-side for hydration, so the other mode's messages wait here
+const messageStash: Record<ChatMode, ChatMessage[]> = { chill: [], work: [] };
 
 function readSession(key: string): string | null {
   if (typeof window === "undefined") return null;
@@ -58,8 +74,8 @@ function isHarnessId(value: unknown): value is HarnessId {
   return typeof value === "string" && value in HARNESS_ADAPTERS;
 }
 
-function readStoredBackend(): ConcreteBackend | null {
-  const stored = readSession(CONV_BACKEND_KEY);
+function readStoredBackend(mode: ChatMode): ConcreteBackend | null {
+  const stored = readSession(modeKey(CONV_BACKEND_KEY, mode));
   return stored === "bonfire" || isHarnessId(stored) ? stored : null;
 }
 
@@ -75,16 +91,31 @@ function availability(statuses: HarnessStatus[], id: HarnessId) {
 }
 
 export function NutBotChat() {
+  const [mode, setMode] = useState<ChatMode>(() => (readSession(MODE_KEY) === "work" ? "work" : "chill"));
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(MODE_KEY, mode);
+    } catch {}
+  }, [mode]);
+
+  return <ChatPane key={mode} mode={mode} onModeChange={setMode} />;
+}
+
+function ChatPane({ mode, onModeChange }: { mode: ChatMode; onModeChange: (mode: ChatMode) => void }) {
+  const work = mode === "work";
+  const convKey = modeKey(CONV_KEY, mode);
+  const convBackendKey = modeKey(CONV_BACKEND_KEY, mode);
   const prefs = useSyncExternalStore(subscribePrefs, getPrefs, getServerPrefs);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => messageStash[mode]);
   const [prompt, setPrompt] = useState("");
   const [sending, setSending] = useState(false);
   const [backendState, setBackendState] = useState<BackendState>(
     prefs.chatBackend === "off" ? { kind: "disabled" } : { kind: "checking", label: "checking backend" },
   );
   const [harnessStatuses, setHarnessStatuses] = useState<HarnessStatus[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(() => readSession(CONV_KEY));
-  const [conversationBackend, setConversationBackend] = useState<ConcreteBackend | null>(() => readStoredBackend());
+  const [conversationId, setConversationId] = useState<string | null>(() => readSession(convKey));
+  const [conversationBackend, setConversationBackend] = useState<ConcreteBackend | null>(() => readStoredBackend(mode));
   const [nsfw, setNsfw] = useState(() => readSession(NSFW_KEY) === "true");
   const [searchEnabled, setSearchEnabled] = useState(() => readSession(SEARCH_KEY) !== "false");
   // CLI-style prompt recall. `history` is newest-last and deliberately NOT
@@ -107,6 +138,10 @@ export function NutBotChat() {
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [messages, sending, backendState.kind]);
+
+  useEffect(() => {
+    messageStash[mode] = messages;
+  }, [mode, messages]);
 
   useEffect(() => {
     try {
@@ -132,14 +167,14 @@ export function NutBotChat() {
   useEffect(() => {
     try {
       if (conversationId) {
-        sessionStorage.setItem(CONV_KEY, conversationId);
-        if (conversationBackend) sessionStorage.setItem(CONV_BACKEND_KEY, conversationBackend);
+        sessionStorage.setItem(convKey, conversationId);
+        if (conversationBackend) sessionStorage.setItem(convBackendKey, conversationBackend);
       } else {
-        sessionStorage.removeItem(CONV_KEY);
-        sessionStorage.removeItem(CONV_BACKEND_KEY);
+        sessionStorage.removeItem(convKey);
+        sessionStorage.removeItem(convBackendKey);
       }
     } catch {}
-  }, [conversationId, conversationBackend]);
+  }, [conversationId, conversationBackend, convKey, convBackendKey]);
 
 
   useEffect(() => {
@@ -164,7 +199,7 @@ export function NutBotChat() {
 
     async function probeBonfire(hydrate: boolean) {
       const storedConv = readSession(CONV_KEY);
-      const storedBackend = readStoredBackend();
+      const storedBackend = readStoredBackend("chill");
       const canHydrate = Boolean(storedConv && (!storedBackend || storedBackend === "bonfire"));
       const url = hydrate && canHydrate && storedConv
         ? `/api/nutbot-chat?conversationId=${encodeURIComponent(storedConv)}`
@@ -191,6 +226,22 @@ export function NutBotChat() {
 
     async function resolveBackend() {
       try {
+        // work mode needs tools, so Bonfire is never a candidate: a pinned
+        // harness is used as-is, auto/bonfire walk the harness chain. The
+        // user picked work mode deliberately, so no auto-fallback confirm.
+        if (work && !isHarnessId(prefs.chatBackend)) {
+          setBackendState({ kind: "checking", label: "checking cli harnesses" });
+          const statuses = await loadHarnessStatuses();
+          if (cancelled) return;
+          const chosen = prefs.harnessChain.find((id) => availability(statuses, id));
+          setBackendState(
+            chosen
+              ? { kind: "ready", backend: chosen }
+              : { kind: "offline", message: "work mode needs a cli harness (claude/codex/opencode) and none was found" },
+          );
+          return;
+        }
+
         if (prefs.chatBackend === "bonfire") {
           setBackendState({ kind: "checking", label: "checking bonfire" });
           const ok = await probeBonfire(true);
@@ -248,7 +299,7 @@ export function NutBotChat() {
       cancelled = true;
       abort.abort();
     };
-  }, [prefs.chatBackend, prefs.harnessChain]);
+  }, [prefs.chatBackend, prefs.harnessChain, work]);
 
   const resolvedBackend = backendState.kind === "ready" ? backendState.backend : null;
   const bonfireActive = resolvedBackend === "bonfire";
@@ -304,6 +355,21 @@ export function NutBotChat() {
         updated[idx] = { ...msg, text: msg.text + text };
         return updated;
       });
+    } else if (frame.type === "tool") {
+      emitBrowsing();
+      const d = (frame.data ?? {}) as { name?: string; detail?: string };
+      // close the current prose bubble so text after the tool call starts a
+      // new one below it instead of growing the bubble above. Done inside the
+      // updater: the token updater assigns assistantIdxRef when it runs, so a
+      // reset outside would be undone by a still-queued token update
+      setMessages((prev) => {
+        const updated = [...prev];
+        const idx = assistantIdxRef.current;
+        const msg = updated[idx];
+        if (msg?.role === "assistant" && msg.streaming) updated[idx] = { ...msg, streaming: false };
+        assistantIdxRef.current = -1;
+        return [...updated, { role: "tool", name: String(d.name ?? "tool"), detail: String(d.detail ?? "") }];
+      });
     } else if (frame.type === "status") {
       emitBrowsing();
       setMessages((prev) => [...prev, { role: "status", text: `[info] ${String(frame.data ?? "")}` }]);
@@ -355,6 +421,7 @@ export function NutBotChat() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           backend,
+          mode,
           message: userText,
           conversationId: conversationForBackend(backend),
           nsfw: bonfireActive ? nsfw : false,
@@ -477,8 +544,10 @@ export function NutBotChat() {
       : backendState.kind === "offline"
         ? "NutBot's backend is offline..."
         : sending
-          ? "thinking..."
-          : "talk to NutBot... (shift+enter for newline)";
+          ? work ? "working..." : "thinking..."
+          : work
+            ? "what's broken, bro?"
+            : "talk to NutBot...";
 
   return (
     <div className="nb-chat">
@@ -492,9 +561,11 @@ export function NutBotChat() {
         <div className="nb-chat-body" ref={bodyRef}>
           {messages.length === 0 && backendState.kind === "ready" && (
             <div className="nb-chat-empty">
-              {backendState.autoFallback
-                ? `bonfire is offline; chatting through ${backendLabel(backendState.backend)}`
-                : "say something, bro"}
+              {work
+                ? `work mode: ${backendLabel(backendState.backend)} has a real shell on this box. it looks around freely and asks before changing anything.`
+                : backendState.autoFallback
+                  ? `bonfire is offline; chatting through ${backendLabel(backendState.backend)}`
+                  : "say something, bro"}
             </div>
           )}
           {messages.length === 0 && backendState.kind === "checking" && (
@@ -524,6 +595,14 @@ export function NutBotChat() {
                 </div>
               );
             }
+            if (msg.role === "tool") {
+              const shell = msg.name === "Bash" || msg.name === "bash";
+              return (
+                <div key={i} className="nb-msg nb-msg-tool" title={msg.detail || msg.name}>
+                  <span className="nb-tool-name">{shell ? "$" : msg.name}</span> {msg.detail}
+                </div>
+              );
+            }
             if (msg.role === "status") {
               return <div key={i} className="nb-msg nb-msg-status">{msg.text}</div>;
             }
@@ -545,7 +624,24 @@ export function NutBotChat() {
       </div>
 
       <div className="nb-chat-toolbar">
-        {bonfireActive && (
+        <div className="nb-mode-switch" role="group" aria-label="chat mode">
+          {(["chill", "work"] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`nb-toggle-btn${mode === m ? " active" : ""}`}
+              aria-pressed={mode === m}
+              // a mid-stream switch would unmount the pane with the request
+              // still writing into it
+              disabled={sending}
+              onClick={() => onModeChange(m)}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+
+        {!work && bonfireActive && (
           <>
             <button
               type="button"

@@ -1,21 +1,25 @@
 "use client";
 
-// One placed widget inside a SlotRegion. Derives the widget's S/M/L size +
-// h/v orientation from its cell's real pixel box (lib/grid/sizeClass.ts)
-// and renders it through the same WidgetShell Graph Layout uses — existing
-// widget content components need zero changes to work here. In edit mode, a
-// remove button returns the widget to the unplaced pool, a move handle
-// repositions it, and four edge handles let the user drag-resize the footprint
-// cell-by-cell.
+// One placed widget inside a SlotRegion. Picks the widget's size preset from
+// its footprint (lib/grid/presetFit.ts, docs/WIDGET_SIZE_PRESETS.md) and
+// renders it through the same WidgetShell Graph Layout uses; widgets that
+// still branch on S/M/L get the preset's legacy size, so existing content
+// components need no changes. In edit mode, a remove button returns the widget
+// to the unplaced pool, a move handle repositions it, and four edge handles
+// drag-resize the footprint, snapping to sizes one of its presets allows.
 
 import { useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Move, Settings2, X } from "lucide-react";
-import { getManifest, isWidgetSize } from "@/config/widgets";
-import { minFootprint } from "@/config/slotLayout";
+import { getManifest, isWidgetSize, resolvePresetConfig, type WidgetManifest, type WidgetSize } from "@/config/widgets";
+import { SIZE_PRESETS, type PresetId } from "@/config/sizePresets";
+import { minFootprint, type FrameRatios, type RegionDims } from "@/config/slotLayout";
 import { getSlotLayout, removeWidget, setWidgetRect, updateWidgetSettings, type SlotWidgetInstance } from "@/lib/slotLayout";
 import type { WidgetInstance } from "@/lib/layout";
-import { minPixelSize, sizeClassForFootprint } from "@/lib/grid/sizeClass";
+import { choosePreset, isFootprintAllowed, resizeBounds, spansForPx, type RegionPitch } from "@/lib/grid/presetFit";
+import { sizeClassForFootprint } from "@/lib/grid/sizeClass";
+import { useFrameGeometry } from "@/lib/grid/regionMetrics";
+import { referenceGeometry, type StandardCell } from "@/lib/grid/standardCell";
 import { buildOccupancy, canPlace, growRect, shrinkRect, maxGrowth, type Direction, type Rect } from "@/lib/grid/occupancy";
 import type { HoverExpandEffect } from "@/lib/grid/hoverExpand";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
@@ -72,7 +76,24 @@ type DragState = {
   occupancy: boolean[][];
   baseRect: Rect;
   min: { colSpan: number; rowSpan: number };
+  /** resize ceiling from the widget's presets, never below baseRect */
+  max: { colSpan: number; rowSpan: number };
+  /** preset geometry for snapping — see allowedFootprint */
+  presets: PresetId[];
+  pitch: RegionPitch;
+  sc: StandardCell;
 };
+
+/** the widget's own S/M/L nearest to `size` — a declared preset's legacy size
+    can be one a widget doesn't have if its presets and sizes disagree */
+function supportedSize(size: WidgetSize, manifest: WidgetManifest): WidgetSize {
+  if (manifest.sizes.includes(size)) return size;
+  const order: WidgetSize[] = ["S", "M", "L"];
+  const wanted = order.indexOf(size);
+  return [...manifest.sizes].sort(
+    (a, b) => Math.abs(order.indexOf(a) - wanted) - Math.abs(order.indexOf(b) - wanted),
+  )[0];
+}
 
 function rectsEqual(a: Rect, b: Rect) {
   return a.col === b.col && a.row === b.row && a.colSpan === b.colSpan && a.rowSpan === b.rowSpan;
@@ -114,6 +135,8 @@ function hoverBoxStyle(rect: Rect, metrics: HoverGridMetrics): CSSProperties {
 
 export function SlotWidgetCell({
   instance,
+  dims,
+  frameRatios,
   hoverEffect,
   hoverMetrics,
   trackMetrics,
@@ -122,6 +145,12 @@ export function SlotWidgetCell({
   entranceDelay,
 }: {
   instance: SlotWidgetInstance;
+  /** this region's dims — SSR-safe, passed down from SlotDashboard's
+      useSyncExternalStore snapshot via SlotRegion, so preset selection below
+      never diverges from the server-rendered HTML */
+  dims: RegionDims;
+  /** SSR-safe for the same reason as `dims` */
+  frameRatios: FrameRatios;
   hoverEffect?: HoverExpandEffect;
   hoverMetrics?: HoverGridMetrics;
   /** the region's measured track size — always present once measured, unlike
@@ -133,6 +162,7 @@ export function SlotWidgetCell({
   entranceDelay?: number;
 }) {
   const { editMode, activePopover, setActivePopover, focusWidgetId } = useLayout();
+  const frameGeometry = useFrameGeometry();
   const manifest = getManifest(instance.id);
   const cellRef = useRef<HTMLDivElement>(null);
   // the settings panel portals to document.body and positions itself against
@@ -140,6 +170,8 @@ export function SlotWidgetCell({
   const settingsBtnRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const [previewRect, setPreviewRect] = useState<Rect | null>(null);
+  /** true while an edge handle is being dragged — shows the preset tag */
+  const [resizing, setResizing] = useState(false);
   // shared so opening one widget's settings closes any other open popover
   const popoverKey = `settings:${instance.id}`;
   const settingsOpen = activePopover === popoverKey;
@@ -268,14 +300,14 @@ export function SlotWidgetCell({
   // Bail out for an unregistered id only AFTER every hook above has run —
   // an early return placed among them makes the hook order conditional
   // (react-hooks/rules-of-hooks). No hook here reads `manifest`, and the
-  // first use of it is sizeClassForFootprint below, so this is the earliest
+  // first use of it is resolvePresetConfig below, so this is the earliest
   // legal exit.
   if (!manifest) return null;
 
   const effectiveHoverEffect = activeHoverEffect ?? flip?.effect;
   const effectiveHoverMetrics = hoverMetrics ?? flip?.metrics;
 
-  const regionDims = getSlotLayout().regionDims[instance.region];
+  const regionDims = dims;
   // Footprint the widget's *content* is sized against — deliberately NOT the
   // hover-expand visual rect.
   //
@@ -298,18 +330,51 @@ export function SlotWidgetCell({
         height: contentRect.rowSpan * trackMetrics.trackHeight + Math.max(0, contentRect.rowSpan - 1) * trackMetrics.gap,
       }
     : null;
-  const auto = sizeClassForFootprint(
+  // Size preset for this footprint (docs/WIDGET_SIZE_PRESETS.md). Uses the
+  // live frame when it describes this cell; otherwise (stacked layout, or not
+  // measured yet) the reference desktop frame with this canvas's own dims and
+  // ratios, so a phone shows the preset the widget has on desktop.
+  const presetConfig = resolvePresetConfig(manifest);
+  const declaredMinPx = manifest.minPx;
+  const live = frameGeometry && !frameGeometry.stacked && trackMetrics ? frameGeometry : null;
+  const geometry = live
+    ? {
+        sc: live.cell,
+        pitch: { x: trackMetrics!.trackWidth + trackMetrics!.gap, y: trackMetrics!.trackHeight + trackMetrics!.gap, gap: trackMetrics!.gap },
+      }
+    : referenceGeometry(instance.region, regionDims, frameRatios);
+  const presetChoice = choosePreset(
+    presetConfig.presets,
     { colSpan: contentRect.colSpan, rowSpan: contentRect.rowSpan },
     regionDims,
-    manifest.sizes,
-    manifest.orientations,
-    contentPx,
+    geometry.pitch,
+    geometry.sc,
   );
-  // the user's "layout size" override beats the box-derived pick — including
-  // the fill-the-region "largest variant" rule, since it is an explicit
-  // choice. Only honoured for a size the widget declares; a stale value (the
-  // manifest dropped that size) quietly falls back to auto. Orientation is
-  // always derived from the box.
+  // Widgets still branch on S/M/L, so render the preset's legacy size and
+  // orientation (orientation only if the widget has it — an h-only widget in
+  // a column keeps h, as it did before presets).
+  //
+  // Exception, by the user's choice (2026-09-23): the stacked layout (<1024px)
+  // keeps the pre-preset rule — S/M/L from the cell's pixel box — because its
+  // full-width rows suit the wider layouts better than the desktop preset's.
+  // The preset above is still computed and exposed there; it just doesn't
+  // pick the layout.
+  //
+  // The user's "layout size" pin beats both, including hero; a pin for a size
+  // the widget no longer declares quietly falls back to auto.
+  const legacy = SIZE_PRESETS[presetChoice.preset].legacy;
+  const auto = frameGeometry?.stacked
+    ? sizeClassForFootprint(
+        { colSpan: contentRect.colSpan, rowSpan: contentRect.rowSpan },
+        regionDims,
+        manifest.sizes,
+        manifest.orientations,
+        contentPx,
+      )
+    : {
+        size: supportedSize(legacy.size, manifest),
+        orientation: manifest.orientations.includes(legacy.orientation) ? legacy.orientation : manifest.orientations[0],
+      };
   const override = instance.settings?.layoutSize;
   const size = isWidgetSize(override) && manifest.sizes.includes(override) ? override : auto.size;
   const orientation = auto.orientation;
@@ -335,16 +400,16 @@ export function SlotWidgetCell({
     const pitchX = (regionRect.width + gap) / dims.cols;
     const pitchY = (regionRect.height + gap) / dims.rows;
 
-    // convert the widget's minimum pixel box into a cell-span floor at the
-    // current pitch: n spans cover n * pitch - gap px, so n >= (px + gap) / pitch
+    // resize limits from the widget's presets at this region's real pitch,
+    // plus the legacy per-widget floors (MIN_FOOTPRINT, a declared minPx)
+    const pitch: RegionPitch = { x: pitchX, y: pitchY, gap };
+    const sc = frameGeometry && !frameGeometry.stacked ? frameGeometry.cell : geometry.sc;
+    const bounds = resizeBounds(presetConfig.presets, dims, pitch, sc);
     const spanMin = minFootprint(instance.id);
-    const pxMin = manifest ? minPixelSize(manifest.sizes, manifest.minPx) : null;
-    const min = pxMin
-      ? {
-          colSpan: Math.max(spanMin.colSpan, Math.ceil((pxMin.width + gap) / pitchX - 0.01)),
-          rowSpan: Math.max(spanMin.rowSpan, Math.ceil((pxMin.height + gap) / pitchY - 0.01)),
-        }
-      : { ...spanMin };
+    const min = {
+      colSpan: Math.max(spanMin.colSpan, bounds.min.colSpan, declaredMinPx ? spansForPx(declaredMinPx.width, pitchX, gap) : 1),
+      rowSpan: Math.max(spanMin.rowSpan, bounds.min.rowSpan, declaredMinPx ? spansForPx(declaredMinPx.height, pitchY, gap) : 1),
+    };
     // never above the current footprint: a widget already placed below its
     // floor (placed before the floor existed, or squeezed by a region/screen
     // change) must not "shrink" into a bigger rect that could overlap
@@ -368,8 +433,26 @@ export function SlotWidgetCell({
       occupancy: buildOccupancy(dims, siblings, persistedRect),
       baseRect: persistedRect,
       min,
+      // a widget already placed above its ceiling isn't forced smaller
+      max: {
+        colSpan: Math.max(bounds.max.colSpan, persistedRect.colSpan),
+        rowSpan: Math.max(bounds.max.rowSpan, persistedRect.rowSpan),
+      },
+      presets: presetConfig.presets,
+      pitch,
+      sc,
     };
+    setResizing(mode === "resize");
     e.currentTarget.setPointerCapture(e.pointerId);
+  }
+
+  /** a footprint some declared preset allows (or the one the widget started
+      the drag at, so it can always be dragged back) */
+  function allowedFootprint(drag: DragState, candidate: Rect) {
+    return (
+      (candidate.colSpan === drag.baseRect.colSpan && candidate.rowSpan === drag.baseRect.rowSpan) ||
+      isFootprintAllowed(drag.presets, candidate, drag.dims, drag.pitch, drag.sc)
+    );
   }
 
   function handlePointerMove(e: ReactPointerEvent<HTMLElement>) {
@@ -401,12 +484,31 @@ export function SlotWidgetCell({
     else if (drag.direction === "s") outward = deltaCellsY;
     else outward = -deltaCellsY;
 
+    // Snap: take the furthest step toward the pointer whose footprint a
+    // preset allows, so the handle skips sizes the widget has no layout for
+    // (e.g. badge 2x1 → card 2x2 never stops on a 1x2 it can't do).
     let next: Rect = drag.baseRect;
+    const horizontal = drag.direction === "e" || drag.direction === "w";
     if (outward > 0) {
-      const grow = Math.min(outward, maxGrowth(drag.baseRect, drag.direction, drag.dims, drag.occupancy));
-      next = growRect(drag.baseRect, drag.direction, grow);
+      const ceiling = horizontal
+        ? drag.max.colSpan - drag.baseRect.colSpan
+        : drag.max.rowSpan - drag.baseRect.rowSpan;
+      const limit = Math.min(outward, ceiling, maxGrowth(drag.baseRect, drag.direction, drag.dims, drag.occupancy));
+      for (let step = limit; step >= 1; step--) {
+        const candidate = growRect(drag.baseRect, drag.direction, step);
+        if (allowedFootprint(drag, candidate)) {
+          next = candidate;
+          break;
+        }
+      }
     } else if (outward < 0) {
-      next = shrinkRect(drag.baseRect, drag.direction, -outward, drag.min);
+      for (let step = -outward; step >= 1; step--) {
+        const candidate = shrinkRect(drag.baseRect, drag.direction, step, drag.min);
+        if (!rectsEqual(candidate, drag.baseRect) && allowedFootprint(drag, candidate)) {
+          next = candidate;
+          break;
+        }
+      }
     }
 
     const nextPreview = rectsEqual(next, drag.baseRect) ? null : next;
@@ -422,6 +524,7 @@ export function SlotWidgetCell({
     if (!drag) return;
     e.currentTarget.releasePointerCapture(drag.pointerId);
     dragRef.current = null;
+    setResizing(false);
 
     // commit before clearing the preview — setWidgetRect notifies
     // SlotDashboard's useSyncExternalStore listener, which must not happen
@@ -538,6 +641,11 @@ export function SlotWidgetCell({
           onPointerCancel={handlePointerUp}
         />
       ))}
+      {resizing && previewRect && (
+        <div className="slot-preset-tag" aria-live="polite">
+          {SIZE_PRESETS[presetChoice.preset].label} · {previewRect.colSpan}x{previewRect.rowSpan}
+        </div>
+      )}
       <WidgetShell
         manifest={manifest}
         config={{
@@ -546,6 +654,9 @@ export function SlotWidgetCell({
           settings: instance.settings,
           hoverExpanded: activeHoverEffect?.state === "expanded",
           slot: { region: instance.region, colSpan: rect.colSpan, rowSpan: rect.rowSpan },
+          preset: presetChoice.preset,
+          box: contentPx ?? undefined,
+          belowFloor: presetChoice.belowFloor,
         }}
         entranceDelay={entranceDelay}
       />

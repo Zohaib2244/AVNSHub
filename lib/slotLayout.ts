@@ -24,9 +24,11 @@ import {
   type RegionDims,
   type SlotRegionId,
 } from "@/config/slotLayout";
-import { WIDGETS, getManifest, resolveSettings, type SettingsValues } from "@/config/widgets";
+import { WIDGETS, getManifest, resolvePresetConfig, resolveSettings, type SettingsValues } from "@/config/widgets";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
+import { placementFootprints } from "@/lib/grid/presetFit";
+import { regionGeometry } from "@/lib/grid/regionMetrics";
 import { DEFAULT_CANVAS_ID, getActiveCanvasId, slotLayoutKey, subscribeCanvases } from "@/lib/canvases";
 import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
@@ -366,6 +368,33 @@ export function getUnplacedWidgets(): string[] {
   return [...builtIn, ...custom];
 }
 
+/** where `id` would land in `region`: the first of its placement footprints
+    (default size preset first, see placementFootprints) that fits, at
+    `preferredCell` if possible. null if the region has no room for any. */
+export function findPlacement(
+  id: string,
+  region: SlotRegionId,
+  layout: SlotLayoutState = getSlotLayout(),
+  preferredCell?: { col: number; row: number },
+): { col: number; row: number; colSpan: number; rowSpan: number } | null {
+  const manifest = getManifest(id);
+  if (!manifest) return null;
+  const dims = layout.regionDims[region];
+  const occupancy = buildOccupancy(dims, layout.widgets.filter((w) => w.region === region).map(rectOf));
+  const { presets, defaultPreset } = resolvePresetConfig(manifest);
+  const { sc, pitch } = regionGeometry(region, dims, layout.frameRatios);
+  const floor = minFootprint(id);
+  for (const candidate of placementFootprints(presets, defaultPreset, dims, pitch, sc)) {
+    const footprint = {
+      colSpan: Math.max(candidate.colSpan, floor.colSpan),
+      rowSpan: Math.max(candidate.rowSpan, floor.rowSpan),
+    };
+    const spot = findFit(dims, occupancy, footprint, preferredCell);
+    if (spot) return { ...spot, ...footprint };
+  }
+  return null;
+}
+
 /** place an unplaced widget at `preferredCell` if it fits, otherwise the
     first available cell in `region`; no-op if already placed or region is full */
 export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { col: number; row: number }): boolean {
@@ -375,17 +404,14 @@ export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { 
   const manifest = getManifest(id);
   if (!manifest) return false;
 
-  const dims = current.regionDims[region];
-  const occupancy = buildOccupancy(dims, current.widgets.filter((w) => w.region === region).map(rectOf));
-  const footprint = minFootprint(id);
-  const spot = findFit(dims, occupancy, footprint, preferredCell);
-  if (!spot) return false;
+  const placement = findPlacement(id, region, current, preferredCell);
+  if (!placement) return false;
 
   commit({
     ...current,
     widgets: [
       ...current.widgets,
-      { id, region, col: spot.col, row: spot.row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan, settings: resolveSettings(manifest) },
+      { id, region, ...placement, settings: resolveSettings(manifest) },
     ],
   });
   return true;
@@ -395,12 +421,7 @@ export function getRegionsThatFitWidget(id: string, layout: SlotLayoutState = ge
   if (layout.widgets.some((w) => w.id === id)) return [];
   if (!getManifest(id)) return [];
 
-  const footprint = minFootprint(id);
-  return REGION_IDS.filter((region) => {
-    const dims = layout.regionDims[region];
-    const occupancy = buildOccupancy(dims, layout.widgets.filter((w) => w.region === region).map(rectOf));
-    return findFit(dims, occupancy, footprint) !== null;
-  });
+  return REGION_IDS.filter((region) => findPlacement(id, region, layout) !== null);
 }
 
 /** try to place an unplaced widget in the first region that has room;

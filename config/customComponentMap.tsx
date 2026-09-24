@@ -18,6 +18,7 @@ const _world_clock = lazy(() => import("@/components/widgets/custom/world-clock/
 const _spotify_visualizer = lazy(() => import("@/components/widgets/custom/spotify-visualizer/SpotifyVisualizerWidget").then((m) => ({ default: m.SpotifyVisualizerWidget })));
 const _weather_updated = lazy(() => import("@/components/widgets/custom/weather-updated/WeatherUpdatedWidget").then((m) => ({ default: m.WeatherUpdatedWidget })));
 const _idea_inbox = lazy(() => import("@/components/widgets/custom/idea-inbox/IdeaInboxWidget").then((m) => ({ default: m.IdeaInboxWidget })));
+const _claude_usage = lazy(() => import("@/components/widgets/custom/claude-usage/ClaudeUsageWidget").then((m) => ({ default: m.ClaudeUsageWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -30,5 +31,6 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "spotify-visualizer": _spotify_visualizer,
   "weather-updated": _weather_updated,
   "idea-inbox": _idea_inbox,
+  "claude-usage": _claude_usage,
 // --- custom-map end ---
 };

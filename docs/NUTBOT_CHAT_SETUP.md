@@ -220,6 +220,19 @@ Harness chat runs in a restrained mode:
 
 NSFW and web-search toggles are hidden for harness backends because AVN Hub does not provide equivalent orchestration for hosted CLI assistants.
 
+## Work Mode
+
+The chat toolbar's **chill | work** switch picks what NutBot is for. Chill is everything above. Work is a server-maintenance agent: ask it to troubleshoot a stuck download, check a drive, read container logs, and it does the digging itself.
+
+- **CLI harness only.** Bonfire is skipped (a local model can't run tools). A pinned harness backend is used as-is; `auto`/`bonfire` walk `harnessChain` and take the first installed CLI, with no provider-confirm dialog.
+- **Full agent, host-wide.** `claude` runs with tools and `--permission-mode bypassPermissions`; `codex` with `--sandbox danger-full-access`; `opencode` with `--dir ~`. The working directory is the home directory of the user running AVN Hub, so claude loads that user's `~/.claude/CLAUDE.md` and memory, same as an ssh session.
+- **Approval is conversational.** `NUTBOT_WORK_PROMPT` in `lib/nutbot/persona.ts` (passed via `--append-system-prompt` on every turn) lets it read freely but makes it stop and describe any state change — restarts, `compose up/down`, edits, deletes, installs — and wait for your go-ahead in the next message. Nothing in the harness enforces this; it is a prompt rule.
+- **No sudo.** It runs as the AVN Hub user; anything needing root comes back as a command for you to run.
+- **Tool activity is visible.** Each command/file read streams as a `tool` NDJSON frame and renders as a compact `$ …` line.
+- Closing the tab mid-turn aborts the request, which kills the running agent.
+
+Security: `/api/nutbot-chat` has no authentication. Anyone who can load the hub can drive a Work-mode agent as the host user — the same exposure as the NutBot shell (`NUTBOT_SHELL_DISABLED` does not cover it). Put the hub behind a login proxy before exposing it beyond your own devices.
+
 ## Neither Configured
 
 If Bonfire is unreachable and no supported CLI is installed, the chat tab shows an offline message. This is expected and does not affect widgets, shell tabs, the Widget Creator, or the rest of AVN Hub.

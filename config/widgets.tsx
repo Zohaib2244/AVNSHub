@@ -27,6 +27,13 @@ import { NotesWidget } from "@/components/widgets/default/notes/NotesWidget";
 import { DotMatrixWidget } from "@/components/widgets/default/dot-matrix/DotMatrixWidget";
 import { DictionaryWidget } from "@/components/widgets/default/dictionary/DictionaryWidget";
 import { CUSTOM_WIDGETS, CUSTOM_DEFAULT_ORDER } from "./customWidgets";
+import {
+  normalizePresets,
+  presetFromLegacySize,
+  presetsFromLegacy,
+  type FillMode,
+  type PresetId,
+} from "./sizePresets";
 
 /* ─── widget framework contracts ─────────────────────────────────────
    A widget = a content component + a manifest entry here. The shell
@@ -173,6 +180,15 @@ export type WidgetManifest = {
       in lib/grid/sizeClass.ts), so it can't be squeezed into a box it has no
       layout for. */
   minPx?: { width: number; height: number };
+  /** Size presets this widget ships a layout for (config/sizePresets.ts,
+      docs/WIDGET_SIZE_PRESETS.md). Optional during the S/M/L → presets
+      migration: when omitted they're derived from `sizes`/`orientations`
+      (see resolvePresetConfig). Not yet used for layout selection. */
+  presets?: PresetId[];
+  /** preset used when first placed; must be one of `presets` */
+  defaultPreset?: PresetId;
+  /** how content fills extra space inside a preset's range; default "reflow" */
+  fill?: FillMode;
   /** widget-specific options — drives the auto-generated settings form */
   settings?: SettingsField[];
   flags?: {
@@ -201,6 +217,23 @@ function migrateLegacySettings(stored?: SettingsValues): SettingsValues | undefi
   // pinned — otherwise every pre-existing widget would ignore the new global.
   // false stays an explicit "ghost"; that was a deliberate opt-out.
   return { ...stored, headerStyle: stored.showHeader ? "auto" : "ghost" };
+}
+
+export type PresetConfig = { presets: PresetId[]; defaultPreset: PresetId; fill: FillMode };
+
+/** a manifest's presets, falling back to ones derived from its S/M/L sizes
+    for widgets that haven't declared presets yet */
+export function resolvePresetConfig(manifest: WidgetManifest): PresetConfig {
+  const declared = normalizePresets(manifest.presets ?? []);
+  const presets = declared.length ? declared : presetsFromLegacy(manifest.sizes);
+  const legacyDefault = presetFromLegacySize(manifest.defaults.size, manifest.defaults.orientation);
+  const defaultPreset =
+    manifest.defaultPreset && presets.includes(manifest.defaultPreset)
+      ? manifest.defaultPreset
+      : presets.includes(legacyDefault)
+        ? legacyDefault
+        : presets[0];
+  return { presets, defaultPreset, fill: manifest.fill ?? "reflow" };
 }
 
 /** manifest settings schema → default values, overlaid with stored values

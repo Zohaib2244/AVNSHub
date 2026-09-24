@@ -35,9 +35,15 @@ const TOOL_DETAIL_FIELD: Record<string, string> = {
   WebSearch: "query",
 };
 
+// every consumer parses "[tool: Name] detail" one line at a time, so a
+// multi-line shell command must not spill its tail into the prose stream
+function oneLine(detail: string): string {
+  return detail.trim().replace(/\s*\n\s*/g, "; ");
+}
+
 function formatToolUse(name: string, input: Record<string, unknown> | undefined): string {
   const field = TOOL_DETAIL_FIELD[name];
-  const detail = field && typeof input?.[field] === "string" ? ` ${input[field]}` : "";
+  const detail = field && typeof input?.[field] === "string" ? ` ${oneLine(input[field] as string)}` : "";
   return `[tool: ${name}]${detail}\n`;
 }
 
@@ -75,7 +81,7 @@ function parseCodexLine(raw: string): string | null {
       return item.text;
     }
     if (item.type === "command_execution" && frame.type === "item.started" && typeof item.command === "string") {
-      return `[tool: Bash] ${item.command}\n`;
+      return `[tool: Bash] ${oneLine(item.command)}\n`;
     }
     if (item.type === "file_change" && frame.type === "item.started" && Array.isArray(item.changes)) {
       const path = (item.changes[0] as Record<string, unknown> | undefined)?.path;
@@ -118,7 +124,7 @@ function parseOpencodeLine(raw: string): string | null {
       if (!state || (state.status !== "completed" && state.status !== "error")) return null;
       const input = state.input as Record<string, unknown> | undefined;
       const field = OPENCODE_TOOL_DETAIL_FIELD[part.tool];
-      const detail = field && typeof input?.[field] === "string" ? ` ${input[field]}` : "";
+      const detail = field && typeof input?.[field] === "string" ? ` ${oneLine(input[field] as string)}` : "";
       return `[tool: ${part.tool}]${detail}\n`;
     }
     return null;
