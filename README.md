@@ -1,15 +1,42 @@
 # AVN Hub
 
-> A blank canvas. Fill it with whatever you want.
+### Your space. Your widgets.
 
-AVN Hub is a self-hosted dashboard framework that starts empty. There are no fixed widgets and no preset layout. You fill it, and the AI widget creator is the fastest way: open NutBot's creator tab, describe a widget (a cube timer, a live price feed, a rope-physics toy, a chore board), and it generates a real, type-checked `.tsx` component that drops straight onto the canvas. Then resize it, drag it around, and keep it in whichever named canvas fits: one for work, one for the homelab, one for fun.
+A self-hosted dashboard for your tools, live data and little distractions. Describe a widget to NutBot, watch it become a working component, then make room for it on your canvas.
 
-The bundled widgets (Spotify, Steam, homelab status, system stats, GitHub activity, notes and others) are examples of what the framework holds, not the point of it.
+[Get started](#get-started) · [Explore the gallery](docs/GALLERY.md) · [Create a widget](docs/WIDGET_CREATOR.md) · [Setup guide](docs/SETUP.md)
 
-![AVN Hub, dark mode](docs/screenshots/hero-dark.png)
-![AVN Hub, light mode](docs/screenshots/hero-light.png)
+[![AVN Hub — the starter arrangement with a night-city wallpaper and a palette drawn from the image](docs/screenshots/gallery-night-city.png)](docs/GALLERY.md#night-city)
 
-## Quick start
+## At home in light or dark
+
+Start with the **avn-hub** arrangement: clock, weather, storage, system stats and an idea inbox beside NutBot; prayer times and visual toys on the right; GitHub activity below. Move, resize, replace — every widget is yours to change.
+
+| Ember dark | Ember light |
+| :---: | :---: |
+| [![The avn-hub starter canvas in dark mode](docs/screenshots/hero-dark.png)](docs/screenshots/hero-dark.png) | [![The same avn-hub starter canvas in light mode](docs/screenshots/hero-light.png)](docs/screenshots/hero-light.png) |
+
+## Make it yours
+
+One install, many moods. Each named canvas keeps its own layout, palette, wallpaper and backdrop style. Go from a quiet reading desk to a toy box, a music corner or a work console.
+
+| Rain · a quieter desk | Forest · room to play |
+| :---: | :---: |
+| [![Rain — clocks, weather, dictionary and notes over a rainy street](docs/screenshots/gallery-rain.png)](docs/GALLERY.md#rain) | [![Forest — ping-pong, dot matrix, glyph rings and a rope toy](docs/screenshots/gallery-forest.png)](docs/GALLERY.md#forest) |
+| **Red room · music and code** | **Work · a different rhythm** |
+| [![Red room — music visualizer and tools in the berry palette](docs/screenshots/gallery-red-room.png)](docs/GALLERY.md#red-room) | [![Work — game ops, shift tracking and notes over a pixel-art skyline](docs/screenshots/gallery-work.png)](docs/GALLERY.md#work) |
+
+[See all eight canvases →](docs/GALLERY.md)
+
+## Dream up the next widget
+
+A cube timer. A chore board. A live price feed. A tiny game. Open NutBot's **Creator** tab and describe it: plan the idea, explore visual variations, then build a real, type-checked widget. Drag it onto any canvas alongside the bundled starters.
+
+[![NutBot Widget Creator workspace](docs/screenshots/widget-creator.png)](docs/WIDGET_CREATOR.md)
+
+[Walk through your first widget →](docs/WIDGET_CREATOR.md)
+
+## Get started
 
 ```bash
 git clone https://github.com/Zohaib2244/AVNSHub.git
@@ -19,46 +46,12 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000. Node 20.9+ is required. On Windows, double-click `install.bat` once (it checks Node, installs packages, creates `.env.local` and sets up the database), then use `run.bat` to start the hub. The Widget Creator and NutBot chat additionally need one signed-in agent CLI (`claude`, `codex` or `opencode`); the rest of the dashboard works without it.
+Open **http://localhost:3000**. Requires Node 20.9+. On Windows, double-click **install.bat**, then **run.bat**. AI creation and chat need a signed-in Claude Code, Codex or OpenCode CLI.
 
-AVN Hub deliberately runs the Next.js dev server as its runtime, because the Widget Creator writes real source files while it runs. It has no login of its own, so keep it on localhost, a LAN or Tailscale. See [docs/SETUP.md](docs/SETUP.md).
+AVN Hub runs through the dev server so generated widgets appear live. Host it on localhost, your LAN or Tailscale; it has no built-in login. [Full setup guide →](docs/SETUP.md)
 
-## What you get
+## Go deeper
 
-- **Widget Creator** - plan, ideate and build widgets from a description. A failed draft never touches your running dashboard.
-- **Named canvases** - separate layouts, each with its own theme, palette, wallpaper and arrangement.
-- **Slot grid** - drag and resize widgets; each size shows its own layout.
-- **Hub Core** - edit mode, themes and palettes, wallpaper and backdrop modes, widget manager, layout import/export, command palette (`Ctrl+K`).
-- **NutBot** - log, chat (local LLM or CLI), real shell sessions and the creator in one terminal widget.
+[Setup & hosting](docs/SETUP.md) · [Widget Creator](docs/WIDGET_CREATOR.md) · [Write a widget](docs/WIDGETS.md) · [NutBot & chat](docs/NUTBOT.md) · [Wallpaper Engine](wallpaper/README.md) · [Changelog](CHANGELOG.md)
 
-![Edit mode with the control deck](docs/screenshots/edit-mode.png)
-![Settings and palettes](docs/screenshots/hub-core.png)
-![Widget manager](docs/screenshots/widget-manager.png)
-
-## Make it yours
-
-Every canvas has its own arrangement, palette, wallpaper and backdrop style (solid, blur, transparent or glass). A few examples, all from the same install:
-
-| | |
-| --- | --- |
-| ![Night city](docs/screenshots/gallery-night-city.png) | ![Rain](docs/screenshots/gallery-rain.png) |
-| ![Forest](docs/screenshots/gallery-forest.png) | ![Red room](docs/screenshots/gallery-red-room.png) |
-
-More in the [gallery](docs/GALLERY.md).
-
-## Docs
-
-| Doc | For |
-| --- | --- |
-| [docs/GALLERY.md](docs/GALLERY.md) | Example canvases: palettes, wallpapers, backdrop modes |
-| [docs/SETUP.md](docs/SETUP.md) | Install, configuration, Docker, systemd, Tailscale |
-| [docs/WIDGET_CREATOR.md](docs/WIDGET_CREATOR.md) | Using the in-app creator |
-| [docs/WIDGETS.md](docs/WIDGETS.md) | Writing a widget by hand |
-| [docs/NUTBOT.md](docs/NUTBOT.md) | Chat backends, local LLM, Work mode |
-| [wallpaper/README.md](wallpaper/README.md) | Static Wallpaper Engine build |
-| [docs/design/](docs/design/) | Design system and internal design notes |
-| [CHANGELOG.md](CHANGELOG.md) | Release notes |
-
-## Tech
-
-Next.js (App Router), React, TypeScript, Tailwind CSS with CSS variables, Framer Motion, dnd-kit, Prisma + SQLite, `systeminformation`.
+Built with Next.js, React, TypeScript and SQLite. Styled with AVN's warm surfaces, pixel labels and chunky sticker cards.

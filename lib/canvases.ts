@@ -30,7 +30,7 @@ let defaultState: CanvasesState | null = null;
    React's "should be cached to avoid an infinite loop" warning */
 function buildDefaultState(): CanvasesState {
   if (!defaultState) {
-    defaultState = { canvases: [{ id: DEFAULT_CANVAS_ID, name: "Home" }], activeId: DEFAULT_CANVAS_ID };
+    defaultState = { canvases: [{ id: DEFAULT_CANVAS_ID, name: "avn-hub", icon: "NutBotScreen" }], activeId: DEFAULT_CANVAS_ID };
   }
   return defaultState;
 }

@@ -9,9 +9,9 @@ Where the controls are:
 - **Backdrop:** settings > *canvas* sets the canvas frame and settings > *widget style* sets the widgets. Each is one of `solid`, `blur`, `transparent` or `glass`, chosen independently.
 - **Arrangement:** the deck's **edit** switch. Drag widgets to move them, pull their edges to resize, and add more from the **widgets** tab.
 
-## Home (the default)
+## AVN Hub (the default)
 
-Ember palette, dark mode, solid canvas and widgets, no wallpaper. This is what a fresh install opens to.
+The **avn-hub** starter arrangement: clock, storage, weather, system stats and idea inbox on the left; NutBot in the center; prayer times, Claude usage, rope and glyph toys on the right; GitHub activity and the dot matrix below. Ember palette, dark mode, solid canvas and widgets, no wallpaper. Fresh installs and **reset layout** on the default canvas use this arrangement. Existing saved layouts stay as they are; new named canvases start empty.
 
 ![Home canvas, ember dark](screenshots/hero-dark.png)
 

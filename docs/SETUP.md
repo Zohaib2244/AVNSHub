@@ -16,6 +16,8 @@ There is no database server to install. Hub state (canvases, layout, theme, wall
 
 ## Install and run
 
+Fresh installs open the **avn-hub** starter canvas shown in the [README](../README.md#at-home-in-light-or-dark), in ember dark. It includes the maintainer's widget arrangement; configure integrations in each widget's settings as needed. Existing saved layouts are preserved. **Reset layout** restores the starter on the default canvas; additional named canvases start empty.
+
 ```bash
 git clone https://github.com/Zohaib2244/AVNSHub.git
 cd AVNSHub
