@@ -1,0 +1,11 @@
+{
+  "title": "Shift Tracker",
+  "iconName": "Timer",
+  "sizes": ["S", "M"],
+  "orientations": ["h", "v"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "presets": ["badge", "column", "card"],
+  "defaultPreset": "card",
+  "fill": "reflow",
+  "settings": []
+}

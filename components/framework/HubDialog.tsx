@@ -30,6 +30,9 @@ export function HubDialog() {
         >
           <motion.div
             className="hub-dialog"
+            role="dialog"
+            aria-modal="true"
+            aria-label={config.title}
             initial={{ scale: 0.93, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 4 }}
@@ -38,7 +41,7 @@ export function HubDialog() {
             <div className="hub-dialog-title">{config.title}</div>
             <p className="hub-dialog-body">{config.body}</p>
             <div className="hub-dialog-actions">
-              <button type="button" className="hub-dialog-cancel" onClick={dismissHubDialog}>
+              <button type="button" className="hub-dialog-cancel" onClick={() => dismissHubDialog()}>
                 cancel
               </button>
               <button
@@ -46,7 +49,7 @@ export function HubDialog() {
                 className="hub-dialog-confirm"
                 onClick={() => {
                   const fn = config.onConfirm;
-                  dismissHubDialog();
+                  dismissHubDialog(true);
                   fn();
                 }}
               >

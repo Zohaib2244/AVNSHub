@@ -8,6 +8,7 @@
 // brace-counting — the fragile part of the old single-file approach.
 import { readFileSync, writeFileSync, existsSync, readdirSync, rmSync, statSync } from "fs";
 import { join } from "path";
+import { isFillMode, isPresetId, normalizePresets, type FillMode, type PresetId } from "@/config/sizePresets";
 
 const ROOT = process.cwd();
 export const REGISTRY_PATH = join(ROOT, "config/customRegistry.json");
@@ -20,6 +21,11 @@ export type RegistryEntry = {
   sizes: string[];
   orientations: string[];
   defaults: { size: string; orientation: string; hidden?: boolean };
+  minPx?: { width: number; height: number };
+  /** size presets (config/sizePresets.ts); derived from sizes when absent */
+  presets?: PresetId[];
+  defaultPreset?: PresetId;
+  fill?: FillMode;
   settings?: unknown[];
   flags?: Record<string, unknown>;
 };
@@ -65,11 +71,32 @@ export function upsertRegistryEntry(id: string, entry: RegistryEntry): void {
 }
 
 export function removeRegistryEntry(id: string): void {
+  removeRegistryEntries([id]);
+}
+
+/** set one flag on a registered widget, or clear it with undefined; no-op for
+    an unregistered id. Skips the write when nothing changes, since every
+    registry write hot-updates every open page. */
+export function setRegistryFlag(id: string, key: string, value: unknown): void {
+  const entry = readRegistry()[id];
+  if (!entry) return;
+  if (JSON.stringify(entry.flags?.[key]) === JSON.stringify(value)) return;
+  const flags = { ...entry.flags };
+  if (value === undefined) delete flags[key];
+  else flags[key] = value;
+  upsertRegistryEntry(id, { ...entry, flags });
+}
+
+/** Remove many entries in ONE read-modify-write, so a bulk delete is a single
+    JSON change (which connected pages hot-update in place). Returns the ids
+    that were actually present. */
+export function removeRegistryEntries(ids: string[]): string[] {
   const registry = readRegistry();
-  if (id in registry) {
-    delete registry[id];
-    writeRegistry(registry);
-  }
+  const removed = ids.filter((id) => id in registry);
+  if (removed.length === 0) return [];
+  for (const id of removed) delete registry[id];
+  writeRegistry(registry);
+  return removed;
 }
 
 export function removeCustomWidgetFiles(id: string): boolean {
@@ -132,6 +159,19 @@ export async function pruneOrphanCustomWidgetFiles(): Promise<string[]> {
   if (protectedProjectIds) {
     for (const id of protectedProjectIds) keepIds.add(id);
   }
+  // A deleted widget is parked: its lazy import stays in customComponentMap.tsx
+  // until the next boot (see purgeParkedWidgets), so its folder is still part
+  // of the module graph. Sweeping it now would leave that import pointing at a
+  // missing file and take the whole dashboard down.
+  for (const id of listComponentMapIds()) keepIds.add(id);
+  // a widget with a workbench is being edited/imported right now — its folder
+  // is not an orphan even before it has a registry entry
+  try {
+    const { listWorkbenchSlugs } = await import("@/lib/widget-creator/workbench");
+    for (const slug of listWorkbenchSlugs()) keepIds.add(slug);
+  } catch {
+    // no workbenches configured/readable — nothing extra to protect
+  }
   const removed: string[] = [];
 
   for (const name of readdirSync(CUSTOM_WIDGETS_DIR)) {
@@ -161,6 +201,10 @@ export type EntryInput = {
   icon?: string;
   sizes?: string[];
   orientations?: string[];
+  /** the Plan brief's size presets — applied over the widget's manifest.json */
+  presets?: unknown[];
+  defaultPreset?: unknown;
+  fill?: unknown;
 };
 
 /** build a registry entry from the structured creator settings, overlaying any
@@ -177,6 +221,10 @@ export function buildRegistryEntry(input: EntryInput, existing?: RegistryEntry):
     sizes: finalSizes,
     orientations: finalOris,
     defaults: { size: defaultSize, orientation: finalOris[0] },
+    minPx: existing?.minPx,
+    presets: existing?.presets,
+    defaultPreset: existing?.defaultPreset,
+    fill: existing?.fill,
     settings: existing?.settings ?? [],
     flags: existing?.flags,
   };
@@ -210,6 +258,22 @@ export function mergeWidgetManifest(base: RegistryEntry, raw: unknown): Registry
     if (!out.sizes.includes(out.defaults.size)) out.defaults.size = out.sizes.includes("M") ? "M" : out.sizes[0];
     if (!out.orientations.includes(out.defaults.orientation)) out.defaults.orientation = out.orientations[0];
   }
+  if (m.minPx && typeof m.minPx === "object") {
+    const px = m.minPx as Record<string, unknown>;
+    const valid = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 4000;
+    if (valid(px.width) && valid(px.height)) out.minPx = { width: Math.round(px.width), height: Math.round(px.height) };
+  }
+  if (Array.isArray(m.presets)) {
+    const presets = normalizePresets(m.presets);
+    if (presets.length) out.presets = presets;
+  }
+  if (isPresetId(m.defaultPreset) && (out.presets ?? []).includes(m.defaultPreset)) {
+    out.defaultPreset = m.defaultPreset;
+  } else if (out.defaultPreset && !(out.presets ?? []).includes(out.defaultPreset)) {
+    // keep the default consistent with possibly-narrowed presets
+    out.defaultPreset = undefined;
+  }
+  if (isFillMode(m.fill)) out.fill = m.fill;
   if (Array.isArray(m.settings)) out.settings = m.settings;
   if (m.flags && typeof m.flags === "object") out.flags = m.flags as Record<string, unknown>;
   return out;
@@ -224,8 +288,8 @@ export type ComponentModule = { file: string; exportName: string | null };
     of assuming the conventional `<Pascal>Widget.tsx` name. The generator nudges
     the LLM toward that name, but it doesn't always comply (and imported widgets
     may be named differently), so detect the real file + export. */
-export function findComponentModule(id: string): ComponentModule | null {
-  const dir = join(CUSTOM_WIDGETS_DIR, id);
+export function findComponentModule(id: string, customDir: string = CUSTOM_WIDGETS_DIR): ComponentModule | null {
+  const dir = join(customDir, id);
   if (!existsSync(dir)) return null;
   const tsxFiles = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
   if (tsxFiles.length === 0) return null;
@@ -266,7 +330,12 @@ function mapEntryLine(id: string): string {
     `mod` defaults to the detected module, falling back to the conventional name. */
 export function addToComponentMap(id: string, mod?: ComponentModule): { ok: boolean; error?: string } {
   let content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  if (content.includes(`const ${localVar(id)} =`)) return { ok: true }; // already registered
+  if (content.includes(`const ${localVar(id)} =`)) {
+    // already wired — a repeat edit, or a parked (deleted, not yet purged) id
+    // being re-created, whose line may still point at the old component file
+    syncComponentMapEntry(id);
+    return { ok: true };
+  }
   // Without both markers String.replace silently no-ops and the widget would
   // "register" without ever being wired in — fail loudly instead.
   if (!content.includes("// --- custom-components end ---") || !content.includes("// --- custom-map end ---")) {
@@ -275,7 +344,19 @@ export function addToComponentMap(id: string, mod?: ComponentModule): { ok: bool
       error: "config/customComponentMap.tsx is missing its marker comments — restore them or the widget cannot be wired in",
     };
   }
-  const resolved = mod ?? findComponentModule(id) ?? { file: componentName(id), exportName: componentName(id) };
+  // Never guess. A map entry is a *static* import in customComponentMap.tsx,
+  // so one pointing at a file that isn't there is not a broken widget — it is
+  // a module-resolution failure that fails the whole module graph up through
+  // app/page.tsx and takes the entire dashboard down with it, with no error
+  // boundary able to catch it. Refusing to write the line is always better
+  // than writing one built from a conventional-name guess.
+  const resolved = mod ?? findComponentModule(id);
+  if (!resolved) {
+    return {
+      ok: false,
+      error: `no component .tsx file found in components/widgets/custom/${id}/ — refusing to add a map entry that would not resolve`,
+    };
+  }
   content = content.replace("// --- custom-components end ---", lazyDeclLine(id, resolved) + "// --- custom-components end ---");
   content = content.replace("// --- custom-map end ---", mapEntryLine(id) + "// --- custom-map end ---");
   writeFileSync(COMPONENT_MAP_PATH, content, "utf-8");
@@ -298,21 +379,15 @@ export function addToComponentMap(id: string, mod?: ComponentModule): { ok: bool
         deferred until the user explicitly clicks "add to layout", instead of
         happening mid-generation where the reload would tear down the SSE
         stream before the "done" event ever reaches the client. */
-export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: string } {
-  if (!isValidCustomWidgetId(input.id)) return { ok: false, error: `invalid slug "${input.id}"` };
-
-  const dir = join(CUSTOM_WIDGETS_DIR, input.id);
-  const mod = findComponentModule(input.id);
-  if (!mod) {
-    return { ok: false, error: `no component .tsx file was created in components/widgets/custom/${input.id}/` };
-  }
-
-  const existing = readRegistry()[input.id];
+/** The registry entry a widget gets from its creator settings, its folder's
+    manifest.json, and the plan's presets — what registerCustomWidget writes,
+    without writing it (the verify step needs it before registration). */
+export function entryFromDisk(input: EntryInput, existing?: RegistryEntry): RegistryEntry {
   let entry = buildRegistryEntry(input, existing);
 
   // overlay the LLM-authored per-widget manifest.json when it parses cleanly;
   // a malformed manifest is ignored so it can never corrupt the registry
-  const manifestPath = join(dir, "manifest.json");
+  const manifestPath = join(CUSTOM_WIDGETS_DIR, input.id, "manifest.json");
   if (existsSync(manifestPath)) {
     try {
       entry = mergeWidgetManifest(entry, JSON.parse(readFileSync(manifestPath, "utf-8")));
@@ -320,6 +395,30 @@ export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: 
       /* keep the settings-derived entry */
     }
   }
+
+  // presets the user picked in the plan win over whatever the builder wrote
+  // into manifest.json (it's told to copy them, but can't be trusted to)
+  const planned = normalizePresets(Array.isArray(input.presets) ? input.presets : []);
+  if (planned.length) {
+    entry.presets = planned;
+    entry.defaultPreset = isPresetId(input.defaultPreset) && planned.includes(input.defaultPreset)
+      ? input.defaultPreset
+      : entry.defaultPreset && planned.includes(entry.defaultPreset) ? entry.defaultPreset : undefined;
+    if (isFillMode(input.fill)) entry.fill = input.fill;
+  }
+  return entry;
+}
+
+export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: string } {
+  if (!isValidCustomWidgetId(input.id)) return { ok: false, error: `invalid slug "${input.id}"` };
+
+  const mod = findComponentModule(input.id);
+  if (!mod) {
+    return { ok: false, error: `no component .tsx file was created in components/widgets/custom/${input.id}/` };
+  }
+
+  const existing = readRegistry()[input.id];
+  const entry = entryFromDisk(input, existing);
 
   // Record from DISK whether this widget shipped its own app/api/<id> route —
   // never from the LLM manifest, which could claim anything. The delete route
@@ -341,18 +440,75 @@ export function registerCustomWidget(input: EntryInput): { ok: boolean; error?: 
   return { ok: true };
 }
 
+/** Repoint an already-registered widget's lazy import at the component module
+    currently on disk. An edit that renames the component file would otherwise
+    leave the map importing a file about to be deleted — a whole-dashboard
+    compile failure. Rewrites only the one declaration line, and only when it
+    changed. No-op for unregistered ids or when no module can be found. */
+export function syncComponentMapEntry(id: string): void {
+  const mod = findComponentModule(id);
+  if (!mod) return;
+  const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
+  const declPrefix = `const ${localVar(id)} = `;
+  const lines = content.split("\n");
+  const idx = lines.findIndex((line) => line.startsWith(declPrefix));
+  if (idx === -1) return;
+  const wanted = lazyDeclLine(id, mod).replace(/\n$/, "");
+  if (lines[idx] === wanted) return;
+  lines[idx] = wanted;
+  writeFileSync(COMPONENT_MAP_PATH, lines.join("\n"), "utf-8");
+}
+
 /** remove this widget's declaration + map entry by id — line-based so it works
     regardless of which file/export the declaration happened to point at */
 export function removeFromComponentMap(id: string): void {
+  removeManyFromComponentMap([id]);
+}
+
+/** same, for many ids at once — one file write, so one recompile */
+export function removeManyFromComponentMap(ids: string[]): void {
+  if (ids.length === 0) return;
   const content = readFileSync(COMPONENT_MAP_PATH, "utf-8");
-  const v = localVar(id);
-  const declPrefix = `const ${v} = `;
+  const declPrefixes = ids.map((id) => `const ${localVar(id)} = `);
   // handle both quoted ("id": v) and bare (id: v) key formats
+  const mapLines = new Set(ids.flatMap((id) => [`  "${id}": ${localVar(id)},`, `  ${id}: ${localVar(id)},`]));
   const lines = content.split("\n");
-  const kept = lines
-    .filter((line) => !line.startsWith(declPrefix) && line !== `  "${id}": ${v},` && line !== `  ${id}: ${v},`);
+  const kept = lines.filter(
+    (line) => !declPrefixes.some((prefix) => line.startsWith(prefix)) && !mapLines.has(line),
+  );
   if (kept.length === lines.length) return;
   writeFileSync(COMPONENT_MAP_PATH, kept.join("\n"), "utf-8");
+}
+
+/** ids that have a lazy declaration in customComponentMap.tsx */
+export function listComponentMapIds(): string[] {
+  const ids: string[] = [];
+  for (const line of readFileSync(COMPONENT_MAP_PATH, "utf-8").split("\n")) {
+    const m = line.match(/^const \w+ = lazy\(\(\) => import\("@\/components\/widgets\/custom\/([^/]+)\//);
+    if (m) ids.push(m[1]);
+  }
+  return ids;
+}
+
+/** Deleted widgets whose map line and files are still in place: wired into
+    customComponentMap.tsx but no longer in the registry. See the delete route
+    for why deletion stops short of removing them. */
+export function listParkedWidgetIds(): string[] {
+  const registry = readRegistry();
+  return listComponentMapIds().filter((id) => !(id in registry));
+}
+
+/** Finish the deletes that were parked: drop their map lines, then their
+    files. Removing a lazy import from the map is the one change a connected
+    page can't hot-swap (it full-reloads), so this only runs at server boot,
+    when every page reconnects to a fresh server anyway. */
+export function purgeParkedWidgets(): string[] {
+  const parked = listParkedWidgetIds();
+  if (parked.length === 0) return [];
+  // map first, then files — the map never points at a missing module
+  removeManyFromComponentMap(parked);
+  for (const id of parked) removeCustomWidgetFiles(id);
+  return parked;
 }
 
 /** Scan customComponentMap.tsx for lazy imports pointing to files that no longer

@@ -1,9 +1,31 @@
-@import "tailwindcss";
+/* Plain CSS on purpose: no Tailwind at-rules (@import "tailwindcss", @theme,
+   @apply, ...) may live in this file — they belong in styles/tailwind.css.
+   A file containing any of them is compiled through @tailwindcss/postcss,
+   whose per-file compiler cache inside Turbopack's long-running dev worker
+   kept serving the old output after edits (every change here was invisible
+   until .next/dev was wiped). Plain files skip that plugin entirely. */
 
 /* ─── design tokens ────────────────────────────────────────────────
    "Chunky Blocks + Accent Border" — see DESIGN_VARIATIONS.md
    Dark is the default; [data-theme="light"] overrides below.
 ──────────────────────────────────────────────────────────────────── */
+
+/* ─── type scale ──────────────────────────────────────────────────
+   Five steps, each >=1.15x the last, floored at ~11px (the legibility
+   limit for DotGothic16, a bitmap-grid face that drops strokes below it).
+   Root is 17px, so the px values in the comments are the rendered sizes.
+   Every font-size in this codebase references one of these — do not
+   reintroduce ad-hoc rem values, the old scale had 18 sizes with 14 of
+   them inside a 4px band, which is why headers and body text read alike.
+   Size alone cannot carry hierarchy at these sizes: pair the step with
+   family (DotGothic = label, JetBrains = content) and colour. */
+:root {
+  --fs-micro: 0.65rem;   /* 11.1px — badges, pills, counts, uppercase micro-labels */
+  --fs-label: 0.75rem;   /* 12.8px — section/field labels, dense rows */
+  --fs-body: 0.875rem;   /* 14.9px — sentences, inputs, settings rows */
+  --fs-lead: 1.2rem;     /* 20.4px — widget titles and primary data values */
+  --fs-stat: 2.2rem;     /* 37.4px — headline stat numbers */
+}
 
 :root {
   --bg-page: #13100c;
@@ -12,13 +34,13 @@
   --border: #3d3220;
   --shadow: #070604;
   --text-primary: #e8dfc8;
-  --text-muted: #9f9887;
-  --text-muted-dim: #8b8475;
+  --text-muted: #b5b0a3;
+  --text-muted-dim: #8b8576;
   --accent-orange: #ff6b2b;
   --accent-cyan: #00b4c8;
   --accent-warm: #e8dfc8;
   --badge-text: #13100c;
-  --status-up: #1c6b30;
+  --status-up: #2e7741;
   --status-down: #c84a12;
 }
 
@@ -29,12 +51,12 @@
   --border: #7a6a52;
   --shadow: #a89878;
   --text-primary: #1c1810;
-  --text-muted: #9a8870;
-  --text-muted-dim: #b0a090;
+  --text-muted: #514739;
+  --text-muted-dim: #796856;
   --accent-orange: #e05a18;
   --accent-cyan: #00768a;
   --accent-warm: #1c1810;
-  --badge-text: #f5f0e6;
+  --badge-text: #1c1810;
   --status-up: #1a5e28;
   --status-down: #c84a12;
 }
@@ -52,13 +74,13 @@
   --border: #2c3440;
   --shadow: #04060a;
   --text-primary: #d8e2ec;
-  --text-muted: #929aa3;
+  --text-muted: #abb1b8;
   --text-muted-dim: #7f868f;
   --accent-orange: #4da3ff;
   --accent-cyan: #00c8a0;
   --accent-warm: #d8e2ec;
   --badge-text: #0e1116;
-  --status-up: #1c6b40;
+  --status-up: #2e774f;
   --status-down: #d04848;
 }
 
@@ -69,9 +91,9 @@
   --border: #5a6a7e;
   --shadow: #98a8bc;
   --text-primary: #141a22;
-  --text-muted: #76869a;
-  --text-muted-dim: #98a8b8;
-  --accent-orange: #1a73d8;
+  --text-muted: #404a56;
+  --text-muted-dim: #596e82;
+  --accent-orange: #186ccb;
   --accent-cyan: #00806a;
   --accent-warm: #141a22;
   --badge-text: #eef2f6;
@@ -86,8 +108,8 @@
   --border: #2c3a28;
   --shadow: #040704;
   --text-primary: #dce8d0;
-  --text-muted: #949f8c;
-  --text-muted-dim: #808a7a;
+  --text-muted: #aab2a3;
+  --text-muted-dim: #7d8877;
   --accent-orange: #8fc63c;
   --accent-cyan: #d89a28;
   --accent-warm: #dce8d0;
@@ -103,9 +125,9 @@
   --border: #66785a;
   --shadow: #9cae8c;
   --text-primary: #161c10;
-  --text-muted: #849474;
-  --text-muted-dim: #a4b494;
-  --accent-orange: #4e8a10;
+  --text-muted: #434c3b;
+  --text-muted-dim: #60714f;
+  --accent-orange: #457b0e;
   --accent-cyan: #a87010;
   --accent-warm: #161c10;
   --badge-text: #eef4e4;
@@ -120,13 +142,13 @@
   --border: #3a2c40;
   --shadow: #060408;
   --text-primary: #ecdce8;
-  --text-muted: #a1949f;
-  --text-muted-dim: #8c808b;
+  --text-muted: #b4aab3;
+  --text-muted-dim: #8b7f8a;
   --accent-orange: #e84a8a;
   --accent-cyan: #d8a830;
   --accent-warm: #ecdce8;
   --badge-text: #120c14;
-  --status-up: #1c6b40;
+  --status-up: #2a744b;
   --status-down: #d04830;
 }
 
@@ -137,8 +159,8 @@
   --border: #7a5e76;
   --shadow: #ab92a8;
   --text-primary: #1c1018;
-  --text-muted: #988096;
-  --text-muted-dim: #b8a0b4;
+  --text-muted: #524251;
+  --text-muted-dim: #80607a;
   --accent-orange: #c01868;
   --accent-cyan: #9a7208;
   --accent-warm: #1c1018;
@@ -154,13 +176,13 @@
   --border: #2a4a45;
   --shadow: #030706;
   --text-primary: #d5ece7;
-  --text-muted: #8fa9a4;
-  --text-muted-dim: #748e89;
+  --text-muted: #a5bab6;
+  --text-muted-dim: #758f8a;
   --accent-orange: #ff7a59;
   --accent-cyan: #5ad7b7;
   --accent-warm: #d5ece7;
   --badge-text: #081514;
-  --status-up: #2a7a4a;
+  --status-up: #2e7d4e;
   --status-down: #d85838;
 }
 
@@ -171,9 +193,9 @@
   --border: #5f837c;
   --shadow: #95b2aa;
   --text-primary: #10201e;
-  --text-muted: #6f8d88;
-  --text-muted-dim: #99b7b0;
-  --accent-orange: #cf4e32;
+  --text-muted: #3e4e4c;
+  --text-muted-dim: #52746c;
+  --accent-orange: #be482e;
   --accent-cyan: #00866d;
   --accent-warm: #10201e;
   --badge-text: #eef7f4;
@@ -188,8 +210,8 @@
   --border: #49313a;
   --shadow: #060304;
   --text-primary: #f0dde4;
-  --text-muted: #a88f99;
-  --text-muted-dim: #8f7882;
+  --text-muted: #bda9b1;
+  --text-muted-dim: #947e87;
   --accent-orange: #ff4d6d;
   --accent-cyan: #39c6d6;
   --accent-warm: #f0dde4;
@@ -205,8 +227,8 @@
   --border: #815d68;
   --shadow: #b6929c;
   --text-primary: #241117;
-  --text-muted: #9c7480;
-  --text-muted-dim: #b99aa4;
+  --text-muted: #5b4149;
+  --text-muted-dim: #895f6c;
   --accent-orange: #d41446;
   --accent-cyan: #008598;
   --accent-warm: #241117;
@@ -222,8 +244,8 @@
   --border: #2c3d37;
   --shadow: #030504;
   --text-primary: #dce8df;
-  --text-muted: #93a196;
-  --text-muted-dim: #7d897f;
+  --text-muted: #a7b2a9;
+  --text-muted-dim: #7b887d;
   --accent-orange: #f2c94c;
   --accent-cyan: #2dd4bf;
   --accent-warm: #dce8df;
@@ -239,12 +261,12 @@
   --border: #647365;
   --shadow: #9eae9c;
   --text-primary: #10180f;
-  --text-muted: #7b8b78;
-  --text-muted-dim: #9fb09b;
+  --text-muted: #444d42;
+  --text-muted-dim: #5f735a;
   --accent-orange: #b38300;
   --accent-cyan: #008f7a;
   --accent-warm: #10180f;
-  --badge-text: #f1f6ee;
+  --badge-text: #1c1810;
   --status-up: #2a6f34;
   --status-down: #bc4a18;
 }
@@ -256,8 +278,8 @@
   --border: #3d3833;
   --shadow: #030303;
   --text-primary: #e7e1d7;
-  --text-muted: #9d968b;
-  --text-muted-dim: #817b73;
+  --text-muted: #b6b0a8;
+  --text-muted-dim: #8b857c;
   --accent-orange: #f0623d;
   --accent-cyan: #b4d455;
   --accent-warm: #e7e1d7;
@@ -273,19 +295,14 @@
   --border: #6f726c;
   --shadow: #a4a096;
   --text-primary: #1c1b18;
-  --text-muted: #878075;
-  --text-muted-dim: #aaa298;
+  --text-muted: #4c4842;
+  --text-muted-dim: #736a5f;
   --accent-orange: #bf3f20;
   --accent-cyan: #6d8a12;
   --accent-warm: #1c1b18;
   --badge-text: #f0f2ed;
   --status-up: #3f712b;
   --status-down: #ad3a1e;
-}
-
-@theme inline {
-  --font-display: var(--font-dot-gothic);
-  --font-mono: var(--font-jetbrains-mono);
 }
 
 /* ─── base ───────────────────────────────────────────────────── */
@@ -391,6 +408,18 @@ html[data-backdrop="glass"] .frame {
   box-shadow: 4px 4px 0 var(--shadow), inset 0 1px 0 color-mix(in srgb, var(--text-primary) 22%, transparent);
 }
 
+/* canvas border toggle (Hub Core -> canvas) — independent of backdrop mode
+   above, so it composes with any of the four. Drops the sticker offset
+   shadow along with the border line: a shadow with no border to cast it
+   read as a stray rectangle floating over the wallpaper. Equal specificity
+   to the backdrop-mode rules above (one attribute selector + .frame each),
+   so this being later in the file is what makes it win, including glass's
+   own two-layer box-shadow. */
+html[data-canvas-border="hidden"] .frame {
+  border-color: transparent;
+  box-shadow: none;
+}
+
 @media (min-width: 1024px) {
   .frame {
     height: calc(100vh - 3rem);
@@ -491,12 +520,26 @@ html[data-backdrop="glass"] .frame {
    `inert` attribute is applied by SlotRegion.tsx; the opacity change gives
    visual feedback that matches the interaction state). The center region gets
    an orange accent border to signal it owns the frame. */
-.slot-frame[data-focus-mode="true"] .slot-region:not(.slot-region-center) {
-  opacity: 0.08;
+/* Focus mode: the focused widget lifts out of its cell and grows over the
+   canvas (SlotWidgetCell sets the fixed box; .slot-cell already transitions
+   left/top/width/height, which is what animates the pop-out and the return).
+   Everything else keeps its place and dims behind the backdrop. */
+.slot-focus-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--shadow) 62%, transparent);
+  cursor: zoom-out;
 }
 
-.slot-frame[data-focus-mode="true"] .slot-region-center .block,
-.slot-frame[data-focus-mode="true"] .slot-region-center .namecard {
+.slot-cell.focused {
+  /* above the backdrop; the transition comes from .slot-cell itself */
+  z-index: 60;
+}
+
+.slot-cell.focused .block,
+.slot-cell.focused .namecard {
   border-color: var(--accent-orange);
   box-shadow: 5px 5px 0 var(--shadow);
 }
@@ -522,20 +565,36 @@ html[data-backdrop="glass"] .frame {
     width 0.4s cubic-bezier(0.4, 0, 0.2, 1), height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.22s ease;
 }
 
-/* only hint the compositor while a hover-expand is actually in flight —
-   leaving will-change on every idle cell wastes memory for no benefit */
+/* No will-change here on purpose. It only promotes to a compositor layer for
+   transform/opacity/filter; on layout properties like left/top/width/height it
+   buys nothing and just holds layer memory. The transition above genuinely
+   relayouts each frame, so the win comes from *scoping* that work (see the
+   `contain` rules on .slot-cell .block below), not from a compositor hint. */
 .slot-region.hover-expanding .slot-cell {
   pointer-events: auto;
-  will-change: left, top, width, height;
 }
 
 .slot-cell.hover-expanded {
   z-index: 35;
 }
 
+/* No opacity dim here on purpose. It used to be opacity: 0.82, which - since
+   opacity composites the whole layer (background + border + backdrop-filter
+   result) as a unit, not just the background color - multiplied straight
+   through whatever alpha a backdrop mode already had: solid absorbed an
+   100%->82% cut without looking different, but glass (35%) and blur (55%)
+   read as the card visibly fading toward "transparent" mode rather than
+   just dimming. Boosting each mode's base alpha to cancel the multiply back
+   out (glass 43%, blur 67%) fixed the *math* - contracted and normal ended
+   up at the same final alpha - but the whole layer, backdrop-filter blur
+   included, was still being composited at 0.82, so it was still visibly
+   less crisp than the resting state. Dropping the opacity dim entirely
+   means a contracted widget keeps its exact normal appearance (whichever
+   backdrop mode is active) and is differentiated by size and the
+   border-color shift below only - actually "not changing style", not just
+   "changing it less". */
 .slot-cell.hover-contracted {
   z-index: 18;
-  opacity: 0.82;
 }
 
 .slot-cell.hover-expanded .block,
@@ -553,6 +612,82 @@ html[data-backdrop="glass"] .frame {
    footprint's edges/handles render over neighboring cells */
 .slot-cell.resizing {
   z-index: 30;
+}
+
+/* move drag: the card is lifted and follows the pointer via an inline
+   transform SlotWidgetCell writes once per frame. The layout transitions are
+   dropped so nothing lags behind the pointer, and the sticker shadow grows
+   (still hard-offset, zero blur) to read as "picked up". */
+.slot-cell.dragging {
+  z-index: 50;
+  transition: none;
+  cursor: grabbing;
+}
+
+.slot-cell.dragging .block,
+.slot-cell.dragging .namecard {
+  border-color: var(--accent-orange);
+  box-shadow: 8px 8px 0 var(--shadow);
+}
+
+/* in edit mode the card body itself is a (mouse) drag handle */
+@media (hover: hover) and (pointer: fine) {
+  .slot-cell.editing:not(.dragging) {
+    cursor: grab;
+  }
+}
+
+/* where a move drag will land — a grid item in the same region, so it snaps
+   to exactly the cells the drop will take. The cyan variant marks where a
+   swapped neighbour goes. */
+.slot-drop-ghost {
+  position: relative;
+  z-index: 28;
+  min-width: 0;
+  min-height: 0;
+  border: 1.5px dashed var(--accent-orange);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent-orange) 10%, transparent);
+  pointer-events: none;
+}
+
+.slot-drop-ghost.swap {
+  border-color: var(--accent-cyan);
+  background: color-mix(in srgb, var(--accent-cyan) 10%, transparent);
+}
+
+/* a resize asked for a size none of the widget's presets has a layout for:
+   the footprint that was asked for, hatched, naming the sizes that would
+   work. The widget itself keeps snapping to the nearest supported size. */
+.slot-drop-ghost.unsupported {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px;
+  overflow: hidden;
+  text-align: center;
+  border-color: var(--status-down);
+  background:
+    repeating-linear-gradient(135deg, color-mix(in srgb, var(--status-down) 16%, transparent) 0 6px, transparent 6px 12px),
+    color-mix(in srgb, var(--bg-card) 80%, transparent);
+}
+
+.slot-ghost-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-orange);
+}
+
+.slot-ghost-hint {
+  max-width: 100%;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  line-height: 1.35;
+  color: var(--text-muted);
 }
 
 /* dashed outline on every placed widget while editing — mirrors
@@ -592,7 +727,7 @@ html[data-backdrop="glass"] .frame {
   border-radius: 12px;
   color: var(--text-muted);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 1.25rem;
+  font-size: var(--fs-lead);
   cursor: pointer;
   transition: border-color 0.15s ease, color 0.15s ease;
 }
@@ -636,6 +771,31 @@ html[data-backdrop="glass"] .frame {
   cursor: grab;
 }
 
+/* live "card · 2x3" readout while an edge handle is dragged — which size
+   preset (docs/design/WIDGET_SIZE_PRESETS.md) the footprint lands in, so crossing
+   into another layout is visible. Centred on the bottom edge and drawn over
+   the resize handles (z-index 25): a corner placement still collided with the
+   centred s handle in narrow cells, and the handle being dragged doesn't need
+   to be seen. pointer-events: none so it never takes the pointer from it. */
+.slot-preset-tag {
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 26;
+  padding: 1px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--accent-cyan);
+  background: var(--bg-card);
+  color: var(--accent-cyan);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .slot-move-btn:active {
   cursor: grabbing;
 }
@@ -659,6 +819,64 @@ html[data-backdrop="glass"] .frame {
   background: var(--bg-card);
   color: var(--accent-cyan);
   cursor: pointer;
+}
+
+/* Slot Layout's widget name + icon (WidgetShell renders it instead of the
+   in-flow .block-label/.block-crest header when inside a slot cell). It sits
+   on the card's top-left border so it takes no height from the content, and
+   only appears on hover or in edit mode — at rest the whole card is content.
+   pointer-events: none so it never blocks a click on what's underneath. In
+   edit mode it shifts right to clear the move button. Positioned against
+   .slot-cell, whose box the capsule fills. */
+
+.block-hover-tag {
+  position: absolute;
+  top: -8px;
+  left: 10px;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: calc(100% - 20px);
+  height: 17px;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  box-shadow: 2px 2px 0 var(--shadow);
+  color: var(--text-muted-dim);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.18s ease, transform 0.18s ease, left 0.2s ease;
+}
+
+.block-hover-tag svg {
+  flex: none;
+  color: var(--accent-orange);
+}
+
+.block-hover-tag span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-cell:hover .block-hover-tag,
+.slot-cell.editing .block-hover-tag {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.slot-cell.editing .block-hover-tag {
+  left: 36px;
+  /* stop short of the top-centre resize handle */
+  max-width: calc(50% - 50px);
 }
 
 .slot-settings-btn:hover {
@@ -769,7 +987,7 @@ html[data-backdrop="glass"] .frame {
 .slot-popover-empty {
   padding: 10px 4px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
   text-align: center;
 }
@@ -812,7 +1030,7 @@ html[data-backdrop="glass"] .frame {
   background: transparent;
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   text-align: left;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
@@ -872,11 +1090,40 @@ html[data-backdrop="glass"] .frame {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: transparent transparent;
+  /* The cell animates left/top/width/height for 400ms on hover-expand, and
+     every frame of that is a real layout pass. `contain` walls that pass off
+     at the card boundary, so a widget's subtree can't push work back out into
+     the region/frame/page. `paint` is safe here because the card already
+     clips via overflow-y; `size` is deliberately NOT included, since these
+     cards must still take their height from the cell. */
+  contain: layout paint style;
 }
 
 .slot-cell .block:hover,
 .slot-cell .namecard:hover {
   scrollbar-color: var(--border) transparent;
+}
+
+/* Horizontal-crop guards. The card clips on the x axis, so anything wider
+   than the cell is simply lost past the right edge. Two common causes are
+   neutralised framework-wide instead of per widget:
+   - a widget root with an intrinsic width (a long unbroken line, a fixed
+     width) can't grow past the card;
+   - form controls have a browser-default intrinsic width (~150-200px for an
+     <input>) and flex items refuse to shrink below it (min-width: auto), which
+     is what pushes an "Add" button or the input's own right edge out of a
+     narrow cell. Letting them shrink keeps the whole row on screen.
+   Checkboxes/radios keep their fixed native size. */
+.slot-cell .block > *,
+.slot-cell .namecard > * {
+  max-width: 100%;
+}
+
+.slot-cell .block :is(input:not([type="checkbox"], [type="radio"]), textarea, select),
+.slot-cell .namecard :is(input:not([type="checkbox"], [type="radio"]), textarea, select) {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .slot-cell .block::-webkit-scrollbar,
@@ -898,7 +1145,6 @@ html[data-backdrop="glass"] .frame {
 @media (hover: none), (pointer: coarse), (prefers-reduced-motion: reduce) {
   .slot-cell {
     transition: none;
-    will-change: auto;
   }
 
   .size-l-more-hoe {
@@ -928,14 +1174,15 @@ html[data-backdrop="glass"] .frame {
    content), then Left, then Right — with each cell ignoring its rect and
    taking a full-width, content-height row. Desktop (≥1024px) is untouched. */
 @media (max-width: 1023px) {
-  /* the Hub Core edge dock sits translateX(100%) past the frame's right edge
-     (28px wide). Reserve a right gutter wide enough for it so it doesn't hang
-     off-screen and trigger horizontal scroll; trim the now-unneeded left
-     gutter to keep the frame roughly centred. */
+  /* the right gutter that used to be reserved here for the edge dock (which
+     hung translateX(100%) past the frame) is gone with the dock itself — Hub
+     Core is the bottom-centred control deck now and never leaves the frame's
+     box horizontally. */
   .slot-page {
     padding-left: 12px;
-    padding-right: 38px;
+    padding-right: 12px;
   }
+
 
   .slot-frame {
     display: flex;
@@ -1091,15 +1338,88 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   gap: 5px;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   margin-bottom: 8px;
 }
 
+/* "crest" header style — the namecard's boxed identity mark + large DotGothic
+   title, reused as a widget header (see WidgetShell's headerStyle). Deliberately
+   mirrors .namecard-mark / .namecard-logo in IdentityBlock.css, scaled down to
+   sit inside a normal widget card rather than the full-width namecard. */
+.block-crest {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  min-width: 0;
+}
+
+.block-crest-mark {
+  flex: none;
+  width: 36px;
+  min-height: 36px;
+  border: 1.5px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-nested);
+  box-shadow: 2px 2px 0 var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  color: var(--accent-orange);
+}
+
+.block-crest-mark span {
+  max-width: 100%;
+  padding: 0 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-cyan);
+}
+
+.block-crest-title {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-lead);
+  line-height: 1.15;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* narrow cards: drop the mark's initials and shrink the title so the crest
+   still fits a single S-size column instead of pushing content out */
+@container widget (max-width: 190px) {
+  .block-crest {
+    gap: 7px;
+    margin-bottom: 8px;
+  }
+
+  .block-crest-mark {
+    width: 28px;
+    min-height: 28px;
+    border-radius: 7px;
+  }
+
+  .block-crest-mark span {
+    display: none;
+  }
+
+  .block-crest-title {
+    font-size: var(--fs-body);
+  }
+}
+
 .block-value {
-  font-size: 1.25rem;
+  font-size: var(--fs-lead);
   font-weight: 500;
   line-height: 1.3;
   color: var(--text-primary);
@@ -1117,16 +1437,22 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .block-sub {
-  font-size: 0.75rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
 .block-stat {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 2.2rem;
+  font-size: var(--fs-stat);
   line-height: 1;
   color: var(--accent-cyan);
   margin-bottom: 4px;
+}
+
+/* headline stat that needs attention (e.g. homelab services down) — mirrors
+   .block-value.accent, which existed for the smaller value type only */
+.block-stat.accent {
+  color: var(--accent-orange);
 }
 /* ─── L-size detail ──────────────────────────────────────────────
    extra content rendered below the main content at L size — either the
@@ -1307,6 +1633,116 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   box-shadow: 5px 5px 0 var(--shadow);
 }
 
+/* Widget settings dialog (WidgetSettingsPopover): Android-widget style — a
+   centred panel over a dim that spotlights the card being configured.
+   Stacking, all fixed to the viewport: .wset-dim (visual only) < .wset-backdrop
+   (click-to-close catcher) < .wset-modal-wrap (the panel). All sit above
+   .hub-core (z-index 100) and below .hub-dialog-backdrop (9000) so a confirm
+   dialog still covers them. */
+.wset-dim {
+  position: fixed;
+  inset: 0;
+  z-index: 190;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--shadow) 84%, transparent);
+}
+
+/* spotlight variant: the element itself is the cut-out around the card, and
+   its enormous spread shadow is the dim; top/left/width/height come inline */
+.wset-dim.wset-dim-spot {
+  inset: auto;
+  background: transparent;
+  border-radius: 16px;
+  outline: 1.5px dashed var(--accent-cyan);
+  outline-offset: -1px;
+  box-shadow: 0 0 0 200vmax color-mix(in srgb, var(--shadow) 84%, transparent);
+}
+
+.wset-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 191;
+}
+
+.wset-modal-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  /* the wrap spans the viewport for centring only — clicks outside the panel
+     fall through to .wset-backdrop */
+  pointer-events: none;
+}
+
+.wset-panel.wset-modal {
+  position: relative;
+  top: auto;
+  right: auto;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, 100%);
+  max-height: calc(100dvh - 32px);
+  padding: 14px 16px 12px;
+  border-radius: 14px;
+}
+
+.wset-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0 -4px;
+  padding: 0 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.wset-modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.wset-modal-hint {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  color: var(--text-muted-dim);
+}
+
+.wset-save {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: 600;
+  padding: 5px 16px;
+  border-radius: 6px;
+  border: 1.5px solid var(--accent-orange);
+  background: var(--accent-orange);
+  color: var(--bg-card);
+  box-shadow: 2px 2px 0 var(--shadow);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.wset-save:hover:not(:disabled) {
+  opacity: 0.88;
+}
+
+.wset-save:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted-dim);
+  box-shadow: none;
+  cursor: default;
+}
+
 .wset-head {
   display: flex;
   align-items: center;
@@ -1317,7 +1753,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -1325,7 +1761,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-section {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted-dim);
@@ -1340,7 +1776,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   justify-content: space-between;
   gap: 10px;
   padding: 3px 0;
-  font-size: 0.68rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
@@ -1355,18 +1791,18 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .wset-select,
 .wset-input {
-  max-width: 130px;
+  max-width: 148px;
   padding: 3px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-nested);
   color: var(--text-primary);
   font-family: inherit;
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
 }
 
 .wset-input {
-  width: 64px;
+  width: 76px;
 }
 
 .seg-row {
@@ -1386,7 +1822,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1404,51 +1840,19 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   color: var(--badge-text);
 }
 
-@container widget (max-width: 190px) {
-  .wset-row {
-    flex-direction: column;
-    align-items: flex-start;
-    justify-content: flex-start;
-    gap: 5px;
-  }
-
-  .wset-row > span:first-child {
-    white-space: normal;
-  }
-
-  .wset-select,
-  .wset-input,
-  .wset-row .seg-row {
-    max-width: 100%;
-  }
-}
-
+/* Widget *content* only. The settings-panel rules that used to live here
+   (and in a 190px block above) collapsed .wset-row, stacked .seg-row and set
+   .seg-btn to `font-size: 0` — they scaled the settings UI to the widget
+   being configured, which is what made options illegible on small widgets.
+   The panel is portalled out of this container now; do not add wset/seg
+   rules back into a `@container widget` block. */
 @container widget (max-width: 140px) {
   .capsule[data-size="S"] > .block {
     padding: 10px 8px;
   }
 
-  .capsule[data-size="S"] .block-label {
-    display: none;
-  }
-
-  .seg-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .seg-btn {
-    gap: 0;
-    padding: 3px 6px;
-    font-size: 0;
-    letter-spacing: 0;
-  }
-
-  .seg-btn svg {
-    flex-shrink: 0;
-  }
-
-  .wset-row > span:first-child {
+  .capsule[data-size="S"] .block-label,
+  .capsule[data-size="S"] .block-crest {
     display: none;
   }
 }
@@ -1466,7 +1870,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: inherit;
-  font-size: 0.64rem;
+  font-size: var(--fs-label);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -1524,123 +1928,347 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   position: relative;
 }
 
-.hub-core.hub-core-slot {
+/* ─── Hub Core: the control deck ─────────────────────────────────────────
+   Slot Layout's Hub Core is one horizontal sticker bar centred on the bottom
+   of the CANVAS — not the window — replacing the old right-edge tab column
+   (which was icon-only tabs that grew taller on hover to reveal vertical
+   text; horizontal labels just fit, so that mechanic is gone).
+
+   It auto-hides. At rest it is .hub-core-stub — three dots straddling the
+   frame's bottom border — and expands into .hub-core-bar on approach, click
+   or focus. Never a squeezed in-between: you get a stub, or a whole deck.
+   Timings and pinning live in lib/useDeckAutoHide.ts; the interaction model
+   was prototyped in public/proto/control-deck.html.
+
+   .hub-core-deck itself paints nothing: it is a transparent anchor layer over
+   the frame's padding box, so the bar, the stub and the panel can each be
+   centred independently of one another. pointer-events: none on the layer
+   (and auto on each real control) keeps it from eating clicks meant for the
+   widgets underneath. */
+
+.hub-core.hub-core-deck {
   position: absolute;
-  top: 10px;
+  inset: 0;
+  z-index: 100;
+  display: block;
+  pointer-events: none;
+}
+
+/* centred with auto margins rather than left: 50% + translateX(-50%): for an
+   absolutely positioned box, `left: 50%` also halves the width available to
+   lay out in, so the bar started wrapping at half the room it actually had.
+   left/right: 0 gives it the whole frame to measure against, margin-inline
+   centres it, and the transform is then free for the collapse animation. */
+.hub-core-bar {
+  position: absolute;
+  left: 0;
   right: 0;
-  transform: translateX(100%);
-  flex-direction: column;
-  gap: 3px;
-  padding-left: 2px;
-}
-
-.hub-core.hub-core-slot .hub-core-btn {
-  width: 28px;
-  height: 32px;
-  border-radius: 0 6px 6px 0;
-  border-left: none;
+  bottom: 10px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  display: flex;
+  align-items: center;
+  /* wraps rather than overflowing the frame when there are many canvases or
+     the frame is narrow. Wrapping, not scrolling: overflow: auto here would
+     clip the canvas rename flyout, an absolutely positioned descendant — the
+     same trap noted on .canvas-pill-list. */
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  row-gap: 4px;
+  padding: 6px;
+  pointer-events: auto;
   background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 var(--shadow);
+  transition: opacity 0.18s ease, transform 0.24s cubic-bezier(0.33, 1, 0.68, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
-/* panel opens to the LEFT of the slot tabs */
-.hub-core.hub-core-slot .hub-core-panel {
-  top: 0;
-  right: calc(100% + 8px);
-  left: auto;
+/* collapsed — the bar hands over to the stub rather than shrinking into a
+   squashed lip of itself */
+.hub-core-deck:not(.deck-open) .hub-core-bar {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(6px) scale(0.9);
 }
 
-/* ─── edge-dock hover-expand (wrench/settings/widgets + AVN Hub Canvases) ───
-   every button in the right-edge column shares this: icon-only and 28×32 at
-   rest, grows taller on hover/focus to reveal a vertical text label without
-   widening the dock. Height is the only thing animated so the column's
-   width — and its translateX(100%) attachment to the frame edge — never
-   moves. */
-
-.hub-core.hub-core-slot .hub-core-btn.edge-btn {
-  flex-direction: column;
-  justify-content: flex-start;
-  padding-top: 7px;
-  gap: 3px;
-  overflow: hidden;
-  transition: height 0.22s cubic-bezier(0.34, 1.2, 0.64, 1), color 0.15s ease, border-color 0.15s ease,
-    background-color 0.15s ease;
+.hub-core-deck[data-edit="true"] .hub-core-bar {
+  border-color: var(--accent-orange);
 }
 
-/* the icon itself must never shrink/get squeezed by the label below it —
-   without this, the label's intrinsic vertical-text height (taller than the
-   collapsed 32px box) can pressure flex-shrink on BOTH children at once and
-   the icon ends up rendered at ~0px, which read as "icons aren't showing" */
-.hub-core.hub-core-slot .hub-core-btn.edge-btn > svg {
+/* deck buttons: the base .hub-core-btn is a 32×30 icon square — in the bar
+   they size to their label instead */
+.hub-core-bar .hub-core-btn {
+  width: auto;
+  height: 32px;
+  gap: 6px;
+  padding: 0 9px;
+  border-radius: 8px;
+  border-color: transparent;
+  background: transparent;
+}
+
+.hub-core-bar .hub-core-btn.icon-only {
+  width: 32px;
+  padding: 0;
+}
+
+.hub-core-bar .hub-core-btn > svg {
   flex-shrink: 0;
 }
 
-.hub-core.hub-core-slot .hub-core-btn.edge-btn:hover,
-.hub-core.hub-core-slot .hub-core-btn.edge-btn:focus-visible,
-.hub-core.hub-core-slot .hub-core-btn.edge-btn.active {
-  height: 76px;
+/* the transparent resting border above is as specific as the base
+   .hub-core-btn:hover / .active rules and comes later in the file, so the
+   accent border has to be restated here or it never shows */
+.hub-core-bar .hub-core-btn:hover,
+.hub-core-bar .hub-core-btn:focus-visible,
+.hub-core-bar .hub-core-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.hub-core-bar .hub-core-btn.active {
+  background: color-mix(in srgb, var(--accent-orange) 10%, transparent);
 }
 
 .edge-btn-label {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: lowercase;
   white-space: nowrap;
   color: inherit;
-  opacity: 0;
-  /* explicit clamp (not just opacity) so the label deterministically takes
-     ~0 space at rest regardless of its intrinsic vertical-text height —
-     see the flex-shrink note above */
-  max-height: 0;
+  /* a canvas can be named anything — one long name must not stretch the deck
+     past the frame */
+  max-width: 96px;
   overflow: hidden;
-  flex-shrink: 0;
-  transition: opacity 0.15s ease, max-height 0.22s ease;
-}
-
-.hub-core-btn.edge-btn:hover .edge-btn-label,
-.hub-core-btn.edge-btn:focus-visible .edge-btn-label,
-.hub-core-btn.edge-btn.active .edge-btn-label {
-  opacity: 1;
-  max-height: 44px;
+  text-overflow: ellipsis;
 }
 
 .hub-core-divider {
-  width: 28px;
-  margin: 2px 0;
-  border-top: 1px solid var(--border);
+  width: 0;
+  height: 20px;
+  margin: 0 3px;
+  border-left: 1px solid var(--border);
   flex-shrink: 0;
+}
+
+/* ─── view | edit: one control, two legible states ───────────────────────
+   The old wrench-then-padlock tab showed the state you were NOT in, which
+   read as "is this locked or is that button the lock?". Both states are
+   spelled out here and the knob says which one you are in. */
+
+.deck-switch {
+  /* one knob-width, used by both halves and by the knob's travel — they must
+     never disagree or the knob stops short of the label it is under */
+  --switch-half: 58px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-nested);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.deck-switch-state {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: var(--switch-half);
+  height: 100%;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--text-muted-dim);
+  transition: color 0.2s ease;
+}
+
+.deck-switch-knob {
+  position: absolute;
+  z-index: 1;
+  top: 3px;
+  left: 3px;
+  width: var(--switch-half);
+  height: calc(100% - 6px);
+  border-radius: 6px;
+  background: var(--accent-cyan);
+  transition: transform 0.24s cubic-bezier(0.34, 1.3, 0.64, 1), background-color 0.2s ease;
+}
+
+/* whichever half the knob is under takes the knob's contrast colour */
+.deck-switch-state[data-state="view"] {
+  color: var(--badge-text);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-knob {
+  transform: translateX(var(--switch-half));
+  background: var(--accent-orange);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-state[data-state="view"] {
+  color: var(--text-muted-dim);
+}
+
+.hub-core-deck[data-edit="true"] .deck-switch-state[data-state="edit"] {
+  color: var(--badge-text);
+}
+
+/* Known trade below 1023px, where Slot Layout collapses to a tall stacked
+   scroll: the deck stays anchored to the canvas, so it sits at the end of
+   that scroll rather than floating at the bottom of the window. It is NOT
+   fixable with `position: fixed` here — the canvas's blur/glass backdrop
+   modes put a `backdrop-filter` on .frame, which makes .frame the containing
+   block for fixed descendants, so the deck would escape the frame on `solid`
+   and not on `blur`. Moving it out of .frame instead would drop it out of the
+   `inert` the widget-install lock puts on .frame (see .installing-overlay),
+   which is the one thing that really locks these controls. Reaching it needs
+   a portal plus its own inert handling; worth doing only if the phone layout
+   becomes something people drive rather than read. */
+
+/* phones: the frame is narrower than the deck's labelled width, so the deck
+   drops to icons (the one exception is the view|edit switch, where the words
+   are the whole point of it) and is allowed to wrap onto a second row rather
+   than overflow the frame and give the page a horizontal scrollbar. Wrapping
+   rather than scrolling on purpose: .hub-core-bar can't take overflow: auto
+   without clipping the canvas rename flyout, which is an absolutely
+   positioned descendant — the same trap noted on .canvas-pill-list. */
+@media (max-width: 640px) {
+  .hub-core-bar .hub-core-btn {
+    width: 32px;
+    padding: 0;
+  }
+
+  .hub-core-bar .edge-btn-label {
+    display: none;
+  }
+
+  .deck-switch {
+    --switch-half: 46px;
+  }
+}
+
+/* ─── the stub — Hub Core at rest ────────────────────────────────────────
+   Centred on the frame's bottom BORDER rather than sitting inside the
+   canvas, so at rest Hub Core covers no widget at all. An absolutely
+   positioned child resolves against its containing block's PADDING box,
+   which already includes .frame's 16px padding — the border's midline is
+   only 0.75px below `bottom: 0`, so the offset is half the stub's height
+   plus that, not half the height plus the padding.
+
+   It is a real button, not a hover trap — click it or tab to it. Hover is
+   the accelerator, not the only way in. */
+
+.hub-core-stub {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -13px;
+  width: fit-content;
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 11px;
+  pointer-events: auto;
+  cursor: pointer;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  transition: opacity 0.16s ease, transform 0.22s cubic-bezier(0.33, 1, 0.68, 1), border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hub-core-deck.deck-open .hub-core-stub {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-12px) scale(0.72);
+}
+
+/* the dots are not decoration: one per canvas, the active one lit, so a
+   put-away deck still reports which canvas you are on */
+.hub-core-stub-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text-muted-dim);
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.hub-core-stub-dot.active {
+  background: var(--accent-cyan);
+}
+
+.hub-core-stub:hover,
+.hub-core-stub:focus-visible {
+  border-color: var(--accent-orange);
+}
+
+.hub-core-stub:hover .hub-core-stub-dot {
+  transform: translateY(-1px);
+}
+
+.hub-core-stub:hover .hub-core-stub-dot:nth-child(2) {
+  transform: translateY(-2px);
+}
+
+/* edit mode stays visible with the deck put away */
+.hub-core-deck[data-edit="true"] .hub-core-stub {
+  border-color: var(--accent-orange);
+}
+
+.hub-core-deck[data-edit="true"] .hub-core-stub-dot:not(.active) {
+  background: color-mix(in srgb, var(--accent-orange) 70%, transparent);
 }
 
 /* ─── AVN Hub Canvases (canvas switcher) ────────────────────────── */
 
-.canvas-edge-group {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
 .canvas-pill-list {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 4px;
   /* deliberately no `overflow: hidden` here (even axis-split clip/auto
      combinations still clip absolutely-positioned descendants) — the
      rename/delete flyout (.canvas-manage-panel) is an absolutely-positioned
-     descendant that escapes to the left and must not be clipped. The
-     height: 0 -> auto collapse transition just shows pills a little early
-     instead of cleanly clipping them; an acceptable trade for a working
-     flyout. */
+     descendant that escapes upward out of the deck and must not be clipped */
 }
 
 .canvas-pill-wrap {
   position: relative;
 }
 
+/* Each pill's hover highlight uses THAT canvas's own accent (--pill-accent,
+   set inline per-pill from lib/canvasAccent.ts — see CanvasSwitcher.tsx),
+   not --accent-orange, which only ever reflects the currently active canvas.
+   Extra specificity (.canvas-pill on top of .hub-core-btn) beats the generic
+   .hub-core-bar .hub-core-btn:hover rule above without needing !important.
+   The active pill is untouched: its resting colour already IS
+   --accent-orange, because it's the canvas currently on screen. */
+.hub-core-bar .hub-core-btn.canvas-pill:hover,
+.hub-core-bar .hub-core-btn.canvas-pill:focus-visible {
+  color: var(--pill-accent, var(--accent-orange));
+  border-color: var(--pill-accent, var(--accent-orange));
+}
+
 .canvas-pill-glyph {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-label);
   font-weight: 700;
   line-height: 1;
   color: var(--text-primary);
@@ -1654,10 +2282,13 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   color: inherit;
 }
 
+/* opens upward out of its pill, like every other Hub Core surface now does,
+   and is left-aligned to the pill so a rename on the leftmost canvas can't
+   escape past the frame */
 .canvas-manage-panel {
   position: absolute;
-  top: 0;
-  right: calc(100% + 8px);
+  bottom: calc(100% + 8px);
+  left: 0;
   z-index: 5;
   width: 196px;
   display: flex;
@@ -1678,7 +2309,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   outline: none;
 }
 
@@ -1714,7 +2345,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-muted);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -1774,7 +2405,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .hub-canvas-glyph-btn .canvas-pill-glyph {
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
 }
 
 .hub-canvas-name-input {
@@ -1789,17 +2420,26 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--accent-orange);
   color: var(--badge-text);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
+/* opens UPWARD out of the deck (`bottom`, not `top`) and centred on it, so
+   the canvas you are changing stays visible instead of being covered by a
+   panel over its right third. Centred with auto margins so framer is free to
+   own the transform (it writes the whole thing — a CSS translateX(-50%) here
+   would be clobbered by the enter animation). */
 .hub-core-panel {
   position: absolute;
-  top: calc(100% + 8px);
+  left: 0;
   right: 0;
+  bottom: 56px;
+  margin-inline: auto;
+  transform-origin: 50% 100%;
+  pointer-events: auto;
   width: 250px;
-  max-height: calc(100vh - 60px);
+  max-height: min(58vh, 430px);
   overflow-y: auto;
   padding: 12px 14px;
   background: var(--bg-card);
@@ -1814,6 +2454,25 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   width: 280px;
   overflow: hidden;
 }
+
+/* wide enough for the rail plus a body that doesn't wrap its controls.
+   The height cap and the scrolling move INSIDE, onto .hub-settings-scroll:
+   the panel's height is tweened by AutoHeight to the scroller's rendered
+   size, so the panel itself must neither cap nor scroll a second time. */
+.hub-core-panel-settings {
+  width: 400px;
+  max-height: none;
+  overflow: hidden;
+}
+
+.hub-settings-scroll {
+  /* the panel's own cap, less its 12px top + bottom padding */
+  max-height: calc(min(58vh, 430px) - 24px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
 
 .hub-core-tab-content {
   display: flex;
@@ -1835,7 +2494,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-core-tab-meta {
   color: var(--text-muted-dim);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1859,35 +2518,90 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 999px;
 }
 
-.hub-core-section + .hub-core-section {
-  border-top: 1px solid var(--border);
-  margin-top: 8px;
-  padding-top: 8px;
-}
+/* ─── settings: rail + one section ───────────────────────────────────────
+   Replaces the accordion column, where four section headers and whichever
+   body was open all stacked into one 250px-wide scroll. The rail names the
+   six groups down the left, the body shows exactly one of them, and the
+   panel is wide enough that the controls inside don't have to wrap. */
 
-.hub-core-section-head {
+.hub-settings-split {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  padding: 0;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+}
+
+.hub-settings-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: none;
+  width: 104px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border);
+}
+
+.hub-settings-rail-btn {
+  text-align: left;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 7px;
   background: transparent;
-  border: none;
-  color: var(--text-primary);
-  cursor: pointer;
-}
-
-.hub-core-chevron {
   color: var(--text-muted);
-  transition: transform 0.2s ease;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-label);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.hub-core-chevron.open {
-  transform: rotate(180deg);
+.hub-settings-rail-btn:hover {
+  color: var(--accent-orange);
 }
 
-.hub-core-section-body {
-  margin-top: 8px;
+.hub-settings-rail-btn.active {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 9%, transparent);
+}
+
+.hub-settings-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* the height-tweening wrapper around the settings split (AutoHeight in
+   HubCorePanel) — clips while it is shorter than its content mid-animation */
+.hub-autoheight {
+  overflow: hidden;
+}
+
+/* at phone width the rail would leave the body too narrow to use — it
+   becomes a wrapping row of chips above the section instead. Kept directly
+   after the rail's own rules: these overrides are no more specific than the
+   base rules, so they only win on source order. */
+@media (max-width: 640px) {
+  .hub-core-panel-settings {
+    width: calc(100vw - 32px);
+    max-width: 400px;
+  }
+
+  .hub-settings-split {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .hub-settings-rail {
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: auto;
+    padding-right: 0;
+    padding-bottom: 8px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
 }
 
 .hub-appearance-panel {
@@ -1903,9 +2617,9 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 }
 
 .hub-setting-label {
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1938,7 +2652,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
   text-transform: uppercase;
   cursor: pointer;
@@ -1980,6 +2694,38 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   white-space: nowrap;
 }
 
+/* "auto" (palette from wallpaper) — spans the grid row above the packs and
+   says why it's unavailable instead of silently doing nothing */
+.palette-btn-auto {
+  grid-column: 1 / -1;
+}
+
+.palette-btn-auto .palette-swatch {
+  color: var(--accent-cyan);
+}
+
+.palette-hint {
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.palette-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.palette-btn:disabled:hover {
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+
 /* ─── wallpaper picker (Hub Core → appearance) ───────────────────── */
 
 .wallpaper-picker {
@@ -1997,7 +2743,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 8px;
   background: var(--bg-nested);
   color: var(--text-muted);
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -2015,6 +2761,38 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-radius: 8px;
   overflow: hidden;
   border: 1.5px solid var(--border);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.wallpaper-preview:hover,
+.wallpaper-preview.dragging {
+  border-color: var(--accent-orange);
+}
+
+.wallpaper-change {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  pointer-events: none;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.wallpaper-preview:hover .wallpaper-change,
+.wallpaper-preview.dragging .wallpaper-change {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
 }
 
 .wallpaper-thumb {
@@ -2060,10 +2838,10 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-region-head {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-muted-dim);
   margin-bottom: 6px;
 }
 
@@ -2072,13 +2850,13 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   justify-content: space-between;
   padding: 2px 0;
-  font-size: 0.68rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
 .hub-region-label {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.58rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
@@ -2114,7 +2892,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   min-width: 24px;
   text-align: center;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--text-primary);
   border-left: 1px solid var(--border);
@@ -2126,12 +2904,12 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-core-fixed-note {
   color: var(--text-muted-dim);
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
 }
 
 .hub-core-placeholder {
   color: var(--text-muted-dim);
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
   line-height: 1.5;
 }
 
@@ -2153,7 +2931,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2167,14 +2945,14 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-core-io-error {
   margin-top: 4px;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   color: var(--status-down);
   font-family: var(--font-jetbrains-mono), monospace;
 }
 
 .hub-core-io-ok {
   margin-top: 4px;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   color: var(--accent-cyan);
   font-family: var(--font-jetbrains-mono), monospace;
 }
@@ -2210,7 +2988,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-primary);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.66rem;
+  font-size: var(--fs-body);
 }
 
 .hub-widget-search input::placeholder {
@@ -2239,7 +3017,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: transparent;
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.56rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2249,7 +3027,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-filter-tab span {
   color: var(--text-muted-dim);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0;
 }
 
@@ -2297,6 +3075,124 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-nested);
 }
 
+.hub-widget-item.selectable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.hub-widget-item.selectable:hover {
+  border-color: var(--text-muted);
+}
+
+.hub-widget-item.selected {
+  border-color: var(--accent-orange);
+  background: var(--bg-card);
+}
+
+.hub-widget-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--badge-text);
+}
+
+.hub-widget-check.on {
+  border-color: var(--accent-orange);
+  background: var(--accent-orange);
+}
+
+/* bulk selection bar — deleting widgets one at a time rewrites the component
+   map per widget, and every rewrite is a full recompile + reload, so the whole
+   selection is sent as one request */
+.hub-widget-bulk-toggle,
+.hub-widget-bulk-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.hub-widget-bulk-toggle:hover,
+.hub-widget-bulk-btn:hover:not(:disabled) {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.hub-widget-bulk-btn.danger:hover:not(:disabled),
+.hub-widget-bulk-btn.danger.confirm {
+  color: var(--status-down);
+  border-color: var(--status-down);
+}
+
+.hub-widget-bulk-btn:disabled {
+  cursor: default;
+  color: var(--text-muted-dim);
+  opacity: 0.55;
+}
+
+.hub-widget-bulkbar {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-nested);
+}
+
+.hub-widget-bulk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.hub-widget-bulk-count {
+  flex: 1;
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  text-align: center;
+}
+
+.hub-widget-bulk-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-micro);
+  cursor: pointer;
+}
+
+.hub-widget-bulk-link:hover {
+  color: var(--accent-orange);
+}
+
+.hub-widget-bulk-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.hub-widget-bulk-note {
+  color: var(--text-muted-dim);
+  font-size: var(--fs-micro);
+}
+
 .hub-widget-icon {
   flex-shrink: 0;
   color: var(--text-muted);
@@ -2311,7 +3207,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-widget-title {
   color: var(--text-primary);
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2320,7 +3216,18 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 .hub-widget-meta {
   color: var(--text-muted-dim);
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
+}
+
+/* the Widget Creator's size check still found a preset box it doesn't fit */
+.hub-widget-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--accent-orange);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  cursor: help;
 }
 
 .hub-widget-actions {
@@ -2381,7 +3288,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   background: var(--bg-card);
   color: var(--text-muted);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.52rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
@@ -2393,13 +3300,217 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   border-color: var(--accent-cyan);
 }
 
+/* ── command palette (Ctrl/Cmd+K) ────────────────────────────────────────────
+   components/dashboard/CommandPalette.tsx. Fixed to the viewport and outside
+   .frame (mounted by LayoutProvider), so the canvas's backdrop-filter can't
+   become its containing block. z-index 500: above the deck (100) and its
+   panels (200), below the install cover (8000) and HubDialog (9000) — both
+   modal, and the palette refuses to open over either anyway. Sticker chrome
+   like everything else: hard offset shadow, no blur on the card itself. */
+
+.cmdk-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: min(18vh, 160px) 16px 16px;
+  background: color-mix(in srgb, var(--bg-page) 72%, transparent);
+}
+
+.cmdk {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: min(70vh, 520px);
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 5px 5px 0 var(--shadow);
+  overflow: hidden;
+}
+
+.cmdk-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted-dim);
+}
+
+.cmdk-input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+}
+
+.cmdk-input::placeholder {
+  color: var(--text-muted-dim);
+}
+
+.cmdk-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.cmdk-group {
+  padding: 10px 10px 4px;
+  color: var(--text-muted-dim);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: var(--fs-micro);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.cmdk-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+  cursor: pointer;
+}
+
+.cmdk-item.selected {
+  color: var(--text-primary);
+  border-color: var(--accent-orange);
+  background: color-mix(in srgb, var(--accent-orange) 10%, transparent);
+}
+
+.cmdk-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex: none;
+  color: var(--text-muted-dim);
+}
+
+.cmdk-item.selected .cmdk-item-icon {
+  color: var(--accent-orange);
+}
+
+.cmdk-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* the current state ("on", "current") reads as state, not as a second label */
+.cmdk-item-hint {
+  flex: none;
+  color: var(--accent-cyan);
+  font-size: var(--fs-micro);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cmdk-item-enter {
+  flex: none;
+  color: var(--accent-orange);
+}
+
+.cmdk-empty {
+  padding: 18px 10px;
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-body);
+  text-align: center;
+}
+
+.cmdk-foot {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+}
+
+.cmdk-foot span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cmdk-kbd,
+.deck-kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg-nested);
+  color: var(--text-muted-dim);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: var(--fs-micro);
+  line-height: 1.5;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+/* on the deck the key cap IS the button, so it takes the button's hover */
+.hub-core-bar .deck-kbd-btn {
+  padding: 0 6px;
+}
+
+.hub-core-bar .deck-kbd-btn:hover .deck-kbd,
+.hub-core-bar .deck-kbd-btn.active .deck-kbd {
+  color: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+/* phones: no keyboard, so neither the chord nor the footer's key hints mean
+   anything — and every deck action is already one tap away on the bar. The
+   key-cap button and the footer go; the palette itself still works if a
+   hardware keyboard is attached. */
+@media (max-width: 640px) {
+  .cmdk-foot,
+  .hub-core-bar .deck-kbd-btn,
+  .hub-core-bar .deck-kbd-divider {
+    display: none;
+  }
+}
+
 /* ── Widget-install lock overlay ─────────────────────────────────────────────
-   Covers the entire .slot-page (including the HubCore edge panel) while a new
-   widget is being compiled and registered. Blocks all pointer + keyboard
-   interaction via pointer-events:all on the overlay (top z-index) and
-   pointer-events:none on the canvas content via the data-installing selector.
-   The page reloads once registration completes, so this state is always
-   transient. */
+   Covers the whole viewport while a new widget is compiled and registered.
+
+   `fixed`, not `absolute`: the absolute box resolved against .slot-page, so
+   anything painted outside that box stayed uncovered and clickable — most
+   visibly the HubCore edge dock, which is `right: 0` + `translateX(100%)`
+   against .frame-with-tabs and therefore hangs past .frame's right edge, out
+   through .slot-page's padding and beyond it. Those protruding edge controls
+   were the one part of the page the "lock" never actually locked. Fixed also
+   makes the cover independent of .slot-page's max-width (1800px — a wider
+   monitor left the gutters exposed), its padding, and the scroll position.
+
+   Interaction is blocked by `inert` on .frame (set in SlotDashboard), not by
+   the overlay: unlike pointer-events, inert also stops tab-navigation into
+   the controls underneath and takes them out of the accessibility tree, which
+   is what makes this a real lock rather than a pane you can reach around.
+   The dim below is now visual only (plus a fallback where inert is missing).
+
+   The page reloads once registration completes, so this state is transient. */
 
 .slot-frame[data-installing="true"] .slot-region {
   opacity: 0.2;
@@ -2407,10 +3518,18 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   transition: opacity 0.3s ease;
 }
 
+/* nothing behind a modal cover should scroll away from it */
+html:has(.installing-overlay) {
+  overflow: hidden;
+}
+
 .installing-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 600;
+  /* above every page surface, including .hub-core-panel (200) and the widget
+     settings popover (200); still below .hub-dialog-backdrop (9000) so a
+     confirm dialog can cover this, matching the pre-existing ordering */
+  z-index: 8000;
   background: color-mix(in srgb, var(--bg-page) 72%, transparent);
   backdrop-filter: blur(3px);
   -webkit-backdrop-filter: blur(3px);
@@ -2418,7 +3537,6 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   align-items: center;
   justify-content: center;
   pointer-events: all;
-  border-radius: inherit;
 }
 
 .installing-badge {
@@ -2432,7 +3550,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
   box-shadow: 4px 4px 0 var(--shadow);
   color: var(--text-primary);
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   user-select: none;
@@ -2444,7 +3562,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .installing-badge-sub {
   color: var(--text-muted);
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.06em;
 }
 
@@ -2497,7 +3615,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-title {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.13em;
   text-transform: uppercase;
   color: var(--text-primary);
@@ -2506,7 +3624,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-body {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
   line-height: 1.55;
   color: var(--text-muted);
   margin: 0 0 18px;
@@ -2520,7 +3638,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-cancel {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 5px 14px;
@@ -2539,7 +3657,7 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-confirm {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.54rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.1em;
   text-transform: uppercase;
   padding: 5px 14px;
@@ -2554,4 +3672,54 @@ html[data-widget-backdrop="glass"] .block:not([data-backdrop]) {
 
 .hub-dialog-confirm:hover {
   opacity: 0.88;
+}
+
+/* ─── platform hygiene (design audit 2026-10-19) ─────────────────── */
+
+/* native scrollbars, selects and form controls follow the theme */
+:root { color-scheme: dark; }
+[data-theme="light"] { color-scheme: light; }
+
+/* no double-tap-zoom delay on controls; :where() keeps specificity at zero
+   so the drag handles' own `touch-action: none` still wins */
+:where(button, a, input, select, textarea, summary, [role="button"]) {
+  touch-action: manipulation;
+}
+
+/* global reduced-motion floor: anything not covered by a component's own
+   rule stops animating (0.01ms, not 0, so animationend/transitionend still fire) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* touch: grow the hit area of the small chrome buttons to >=44px without
+   changing their painted size or the layout (invisible ::after) */
+@media (pointer: coarse) {
+  .theme-toggle {
+    position: relative;
+  }
+  .theme-toggle::after,
+  .slot-move-btn::after,
+  .slot-remove-btn::after,
+  .slot-settings-btn::after {
+    content: "";
+    position: absolute;
+    inset: -14px;
+  }
+}
+
+/* borderless inputs that had outline:none and no other focus cue */
+.cmdk-input-row:focus-within {
+  border-bottom-color: var(--accent-orange);
+}
+
+.term-input:focus-visible {
+  box-shadow: 0 2px 0 var(--accent-orange);
 }

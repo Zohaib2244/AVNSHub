@@ -104,7 +104,8 @@ export function WidgetPicker({
               ref={inputRef}
               type="text"
               className="drawer-search"
-              placeholder="search widgets..."
+              aria-label="search widgets"
+              placeholder="search widgets…"
               value={query}
               onChange={(e) => {
                 setQuery(e.target.value);

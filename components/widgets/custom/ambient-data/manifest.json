@@ -1,8 +1,0 @@
-{
-  "title": "ambient data",
-  "iconName": "Server",
-  "sizes": ["M", "L", "S"],
-  "orientations": ["h"],
-  "defaults": { "size": "M", "orientation": "h" },
-  "settings": []
-}

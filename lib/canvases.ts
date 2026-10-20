@@ -203,6 +203,8 @@ export function deleteCanvas(id: string) {
     localStorage.removeItem(slotLayoutKey(id));
     localStorage.removeItem(canvasScopedKey("nutmag-theme", id));
     localStorage.removeItem(canvasScopedKey("nutmag-palette", id));
+    // lib/wallpaperPalette.ts's derived "auto" tokens — local-only, never synced
+    localStorage.removeItem(canvasScopedKey("nutmag-wallpaper-palette", id));
   } catch {
     // ignore
   }

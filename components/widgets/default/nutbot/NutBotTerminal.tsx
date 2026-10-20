@@ -7,15 +7,17 @@ import "./chat/NutBotChat.css";
 // Visited tabs stay mounted (display:none when inactive) so ptys and streams survive tab switches.
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Maximize2, Minimize2 } from "lucide-react";
 import { NutBotFaceV2 } from "@/components/widgets/default/nutbot/NutBotFaceV2";
-import { NutBotModelPicker } from "@/components/widgets/default/nutbot/NutBotModelPicker";
+import { ModelSettings } from "@/components/widgets/default/nutbot/ModelSettings";
 import { ShellsScreen } from "@/components/widgets/default/nutbot/ShellsScreen";
 import { WidgetCreatorPanel } from "@/components/widgets/default/nutbot/creator/WidgetCreatorPanel";
 import { NutBotChat } from "@/components/widgets/default/nutbot/chat/NutBotChat";
 import { getPrefs, getServerPrefs, setPrefs, subscribePrefs } from "@/lib/prefs";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
+import { useWidget } from "@/components/framework/WidgetContext";
+import { useServiceLog, type ServiceLogLine } from "@/lib/nutbot/useServiceLog";
 
 export const LOG_MESSAGES = [
   "[ok] homelab uplink ... stable",
@@ -25,7 +27,7 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.3 ready",
+  "[info] nutbot v2.6 ready",
 ];
 
 type MainTab = "log" | "chat" | "shells" | "creator";
@@ -39,6 +41,42 @@ function renderLogLine(text: string) {
     <>
       <span className={`term-tag term-tag-${m[1]}`}>[{m[1]}]</span> {m[2]}
     </>
+  );
+}
+
+/** short relative age — a live feed can sit untouched for hours, so a line with
+    no age reads as "just now" and makes a quiet feed look stuck */
+function ago(at: number): string {
+  const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
+  if (seconds < 45) return "now";
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  return hours < 24 ? `${hours}h` : `${Math.round(hours / 24)}d`;
+}
+
+function ServiceLogRow({ line, tick }: { line: ServiceLogLine; tick: number }) {
+  void tick; // re-render hook so relative ages stay honest without their own timer
+  const body = (
+    <>
+      <span className={`term-tag term-tag-${line.level}`}>[{line.level}]</span>{" "}
+      <span className="term-svc">{line.service}</span> {line.text}
+      {line.repeat > 1 && <span className="term-repeat">×{line.repeat}</span>}
+      <span className="term-age">{ago(line.at)}</span>
+    </>
+  );
+  // Replayed backlog renders instantly: animating 200 rows in at once on
+  // connect is both ugly and a needless layout storm.
+  if (!line.live) return <div className="term-line">{body}</div>;
+  return (
+    <motion.div
+      className="term-line"
+      initial={{ opacity: 0, x: -6 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.2 }}
+    >
+      {body}
+    </motion.div>
   );
 }
 
@@ -59,29 +97,62 @@ export function NutBotTerminal() {
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && isFocusMode) exitFocusMode();
+      if (e.key === "Escape" && isFocusMode && !document.querySelector("dialog[open]")) exitFocusMode();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isFocusMode, exitFocusMode]);
 
+  const { settings } = useWidget();
+  const realtime = settings.realtimeLog === true;
+  const maxLines = Math.max(5, Math.min(200, Number(settings.logMaxLines) || 40));
+  const feed = useServiceLog({
+    enabled: realtime,
+    lifecycle: settings.logLifecycle !== false,
+    stdout: settings.logStdout === true,
+    mute: typeof settings.logMute === "string" ? settings.logMute : "",
+    maxLines,
+  });
+
+  // Relative ages must age even when no new line arrives — without this a feed
+  // that goes quiet freezes every timestamp at whatever it said on arrival.
+  const [ageTick, setAgeTick] = useState(0);
+  useEffect(() => {
+    if (!realtime) return;
+    const id = setInterval(() => setAgeTick((n) => n + 1), 30_000);
+    return () => clearInterval(id);
+  }, [realtime]);
+
   const [logLines, setLogLines] = useState<LogLine[]>([]);
   const logIndex = useRef(0);
   const logId = useRef(0);
 
+  // The canned ticker is the `realtime: false` presentation — decorative, and
+  // deliberately still running so the widget reads as alive on a fresh install
+  // where nobody has opted into the real feed yet.
   useEffect(() => {
+    if (realtime) return;
     const id = setInterval(() => {
       setLogLines((prev) => {
         const entry = { id: logId.current++, text: LOG_MESSAGES[logIndex.current % LOG_MESSAGES.length] };
         logIndex.current += 1;
         const next = [...prev, entry];
-        return next.length > 7 ? next.slice(next.length - 7) : next;
+        return next.length > maxLines ? next.slice(next.length - maxLines) : next;
       });
     }, 1800);
     return () => clearInterval(id);
-  }, []);
+  }, [realtime, maxLines]);
 
   const [activeTab, setActiveTab] = useState<MainTab>("log");
+  // geometry of the sliding tab highlight, measured from the active button
+  const tabsRef = useRef<HTMLElement | null>(null);
+  const [indicator, setIndicator] = useState<{ left: number; width: number } | null>(null);
+  // `activeTab` is what the user clicked (drives the tab bar's highlight, so it
+  // reacts instantly); `displayedTab` is what the body is actually showing.
+  // They diverge only for the ~110ms fade-out below.
+  const [displayedTab, setDisplayedTab] = useState<MainTab>("log");
+  const [tabPhase, setTabPhase] = useState<"idle" | "out">("idle");
+  const reduceMotion = useReducedMotion();
   const [mountedTabs, setMountedTabs] = useState<Set<MainTab>>(() => new Set(["log"]));
   const skipTabWrite = useRef(true);
   const bodyRef = useRef<HTMLDivElement>(null);
@@ -93,7 +164,9 @@ export function NutBotTerminal() {
       const tab = sanitizeTab(stored);
       t = window.setTimeout(() => {
         skipTabWrite.current = false;
+        // restore straight to the stored tab — no fade from "log" on load
         setActiveTab(tab);
+        setDisplayedTab(tab);
       }, 0);
     } catch {
       skipTabWrite.current = false;
@@ -106,14 +179,71 @@ export function NutBotTerminal() {
     try { sessionStorage.setItem(NUTBOT_TAB_KEY, activeTab); } catch {}
   }, [activeTab]);
 
+  // Measure the active tab so the highlight can slide to it. Re-measured when
+  // the tab bar resizes (widget resize, focus mode's --nb-scale bump, or the
+  // icons dropping out under 280px).
   useEffect(() => {
-    if (bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
-  }, [logLines, activeTab]);
+    const nav = tabsRef.current;
+    if (!nav) return;
+    const measure = () => {
+      const button = nav.querySelector<HTMLElement>(`.term-tab[data-tab="${activeTab}"]`);
+      if (button) setIndicator({ left: button.offsetLeft, width: button.offsetWidth });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [activeTab]);
 
-  const isShells   = activeTab === "shells";
-  const isCreator  = activeTab === "creator";
-  const isChat     = activeTab === "chat";
-  const activeTabIndex = TAB_ORDER.indexOf(activeTab);
+  // Tab switches run fade-out -> swap -> fade-in, NOT a crossfade. The body
+  // restyles per tab (block vs flex, 7px/8px/0 padding, overflow auto vs
+  // hidden), so any moment with two panels visible re-lays-out the outgoing
+  // one under the incoming tab's container rules — that snap was the jank.
+  // Swapping while everything is at opacity 0 hides the restyle completely,
+  // and means exactly one panel is ever in flow.
+  function selectTab(tab: MainTab) {
+    if (tab === activeTab) return;
+    setActiveTab(tab);
+    // clicking back to the panel that's still on screen mid-fade cancels the
+    // fade-out instead of completing it and blinking the same tab back in
+    setTabPhase(tab === displayedTab ? "idle" : "out");
+  }
+
+  // Failsafe: onAnimationComplete is the normal way out of the "out" phase,
+  // but it never fires if the element is hidden mid-flight (widget resized to
+  // S, canvas switched). Without this the body would stay blank.
+  useEffect(() => {
+    if (tabPhase !== "out") return;
+    const t = window.setTimeout(() => {
+      setDisplayedTab(activeTab);
+      setTabPhase("idle");
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [tabPhase, activeTab]);
+
+  // Only the log tab is a scrolling feed that should pin to the bottom. Firing
+  // this for every tab yanked chat/creator/shells to the bottom on each switch.
+  //
+  // Pin only when the reader is already at the bottom. The demo ticker capped
+  // itself at 7 lines so there was never scrollback to lose; the real feed
+  // keeps 200, and force-scrolling would drag someone out of history every
+  // time a container so much as reports a health check.
+  useEffect(() => {
+    if (displayedTab !== "log") return;
+    const el = bodyRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (distanceFromBottom < 48) el.scrollTop = el.scrollHeight;
+  }, [logLines, feed.lines, displayedTab]);
+
+  // deliberately keyed to displayedTab, not activeTab — see the fade-out effect
+  const isShells   = displayedTab === "shells";
+  const isCreator  = displayedTab === "creator";
+  const isChat     = displayedTab === "chat";
+  // which way the new tab lies relative to the old one, so the fade carries a
+  // small directional nudge instead of blinking in place
+  const switchDir =
+    Math.sign(TAB_ORDER.indexOf(activeTab) - TAB_ORDER.indexOf(displayedTab)) || 1;
 
   if (!mountedTabs.has(activeTab)) {
     const next = new Set(mountedTabs);
@@ -121,67 +251,49 @@ export function NutBotTerminal() {
     setMountedTabs(next);
   }
 
-  function panelAnimate(tab: MainTab) {
-    if (tab === activeTab) return { opacity: 1, x: 0, display: "flex" };
-    return {
-      opacity: 0,
-      x: 10 * Math.sign(TAB_ORDER.indexOf(tab) - activeTabIndex),
-      transitionEnd: { display: "none" },
-    };
-  }
-
   return (
     <div className="nutbot-terminal">
-      {/* ── single combined row: title + tabs + controls ── */}
-      <div className="term-row">
-        <span className="term-title">NUTBOT V2.3</span>
-
-        <div className="term-tabs">
-          {(["log", "chat", "shells", "creator"] as MainTab[]).map((tab) => (
-            <button
-              key={tab}
-              type="button"
-              className={`term-tab${activeTab === tab ? " active" : ""}`}
-              onClick={() => setActiveTab(tab)}
-            >
-              {/* sliding background pill — layoutId makes Framer animate it between tabs */}
-              {activeTab === tab && (
-                <motion.div
-                  layoutId="term-tab-bg"
-                  className="term-tab-bg"
-                  transition={{ type: "spring", stiffness: 500, damping: 32, mass: 0.6 }}
-                />
-              )}
-              <span className="term-tab-content">
-                {tab === "log"     && <span className="term-tab-icon">◈</span>}
-                {tab === "chat"    && <span className="term-tab-icon">◎</span>}
-                {tab === "shells"  && <span className="term-tab-icon">⌨</span>}
-                {tab === "creator" && <span className="term-tab-icon">✦</span>}
-                {tab}
-              </span>
+      <header className="term-header">
+        <div className="term-toolbar">
+          <div className="term-identity">
+            <div className="term-mascot-slot" aria-hidden="true">
+              {!isChat && <div className="nutbot-v2-scale nutbot-v2-scale-nano"><NutBotFaceV2 compact /></div>}
+            </div>
+            <span className="term-title">NUTBOT <span className="term-version">v2.6</span></span>
+          </div>
+          <div className="term-actions">
+            <ModelSettings />
+            <button type="button" className={`term-focus-btn${isFocusMode ? " active" : ""}`}
+              onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
+              aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
+              title={isFocusMode ? "exit focus mode (Esc)" : "expand NutBot"}>
+              {isFocusMode ? <Minimize2 size={14} strokeWidth={2} /> : <Maximize2 size={14} strokeWidth={2} />}
             </button>
-          ))}
-        </div>
-
-        <div className="term-row-right">
-          <NutBotModelPicker />
-          <button
-            type="button"
-            className={`term-focus-btn${isFocusMode ? " active" : ""}`}
-            onClick={() => (isFocusMode ? exitFocusMode() : enterFocusMode("nutbot"))}
-            aria-label={isFocusMode ? "exit focus mode" : "focus mode"}
-            title={isFocusMode ? "exit focus mode (Esc)" : "focus mode"}
-          >
-            {isFocusMode ? <Minimize2 size={11} strokeWidth={2} /> : <Maximize2 size={11} strokeWidth={2} />}
-          </button>
-          <div className="nutbot-v2-scale nutbot-v2-scale-nano">
-            <NutBotFaceV2 compact />
           </div>
         </div>
-      </div>
+        <nav className="term-tabs" aria-label="NutBot views" ref={tabsRef}>
+          {/* one pill that slides between tabs — each tab used to fade in its
+              own, so the highlight jumped rather than travelled */}
+          <span
+            aria-hidden="true"
+            className={`term-tab-indicator${indicator ? " ready" : ""}`}
+            style={indicator ? { transform: `translateX(${indicator.left}px)`, width: indicator.width } : undefined}
+          />
+          {TAB_ORDER.map((tab) => <button key={tab} type="button"
+            data-tab={tab}
+            className={`term-tab${activeTab === tab ? " active" : ""}`}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onClick={() => selectTab(tab)}>
+            <span className="term-tab-content">
+              <span className="term-tab-icon" aria-hidden="true">{{ log: "◈", chat: "◎", shells: "⌨", creator: "✦" }[tab]}</span>
+              {tab}
+            </span>
+          </button>)}
+        </nav>
+      </header>
 
       {/* ── body ── */}
-      <div
+      <motion.div
         className={[
           "term-body",
           isShells  ? "term-body-shells"  : "",
@@ -189,16 +301,48 @@ export function NutBotTerminal() {
           isChat    ? "term-body-chat"    : "",
         ].filter(Boolean).join(" ")}
         ref={bodyRef}
+        initial={false}
+        animate={tabPhase === "idle" ? { opacity: 1, x: 0 } : { opacity: 0, x: -6 * switchDir }}
+        transition={{
+          duration: reduceMotion ? 0 : tabPhase === "out" ? 0.11 : 0.17,
+          ease: tabPhase === "out" ? [0.4, 0, 1, 1] : [0, 0, 0.2, 1],
+        }}
+        onAnimationComplete={() => {
+          if (tabPhase !== "out") return;
+          setDisplayedTab(activeTab);
+          setTabPhase("idle");
+        }}
       >
         {TAB_ORDER.map((tab) => mountedTabs.has(tab) && (
-          <motion.div
+          <div
             key={tab}
             className="term-tab-panel"
-            initial={false}
-            animate={panelAnimate(tab)}
-            transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
+            /* `display` is plain style, never animated. The old code drove it
+               through framer's transitionEnd, which raced on fast switching and
+               left panels stacked in normal flow. */
+            style={tab === displayedTab ? undefined : { display: "none" }}
+            aria-hidden={tab === displayedTab ? undefined : true}
           >
-            {tab === "log" && (
+            {tab === "log" && (realtime ? (
+              <>
+                <div className={`term-feed-status${feed.status.connected ? " live" : ""}`}>
+                  <span className="term-feed-dot" aria-hidden="true" />
+                  <span>{feed.status.connected ? "live · docker" : feed.status.detail}</span>
+                </div>
+                {feed.lines.length === 0 ? (
+                  <div className="term-line term-feed-empty">
+                    {feed.status.connected
+                      ? "no service activity yet — the feed is idle, not stuck"
+                      : "waiting for the docker event stream…"}
+                  </div>
+                ) : (
+                  feed.lines.map((line) => (
+                    <ServiceLogRow key={line.id} line={line} tick={ageTick} />
+                  ))
+                )}
+                <span className="term-caret" aria-hidden="true" />
+              </>
+            ) : (
               <>
                 <AnimatePresence initial={false}>
                   {logLines.map((line) => (
@@ -215,9 +359,9 @@ export function NutBotTerminal() {
                 </AnimatePresence>
                 <span className="term-caret" aria-hidden="true" />
               </>
-            )}
+            ))}
 
-            {tab === "chat" && <NutBotChat />}
+            {tab === "chat" && <NutBotChat active={isChat} />}
 
             {tab === "shells" && <ShellsScreen />}
 
@@ -233,9 +377,9 @@ export function NutBotTerminal() {
                 </div>
               )
             )}
-          </motion.div>
+          </div>
         ))}
-      </div>
+      </motion.div>
     </div>
   );
 }

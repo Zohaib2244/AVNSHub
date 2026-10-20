@@ -10,6 +10,9 @@ import customRegistryRaw from "@/config/customRegistry.json";
 import { slugify, isValidSlug } from "@/lib/widget-creator/slug";
 import { renameWidgetPlacement } from "@/lib/slotLayout";
 import { LUCIDE_SUGGESTIONS } from "@/lib/widget-creator/lucideSuggestions";
+import { PRESET_ORDER, SIZE_PRESETS, normalizePresets, presetsFromLegacy, type PresetId } from "@/config/sizePresets";
+import type { WidgetSize } from "@/config/widgets";
+import { PRESET_EXAMPLES, presetCells, presetRange, presetSettingsPatch } from "@/lib/widget-creator/briefPresets";
 
 // kept in sync with PanelMode in WidgetCreatorPanel but defined locally to
 // avoid a circular import when SettingsPane is used from CreatorWorkspace
@@ -53,6 +56,9 @@ type RawRegistryEntry = {
   sizes: string[];
   orientations: string[];
   defaults: { size: string; orientation: string };
+  /** absent on widgets built before presets; derived from `sizes` then */
+  presets?: string[];
+  defaultPreset?: string;
   settings?: { key: string; label: string; type: string }[];
 };
 
@@ -138,9 +144,24 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
   }
 
   const settingsSchema = entry?.settings ?? [];
+  // the shapes the widget actually has a layout for, which is what resizing
+  // snaps to — the S/M/L toggles below only matter to widgets without presets
+  const declaredPresets = normalizePresets(entry?.presets ?? []);
+  const layouts = declaredPresets.length ? declaredPresets : presetsFromLegacy((entry?.sizes ?? ["M"]) as WidgetSize[]);
 
   return (
     <Section title="current configuration">
+      <div className="wc-meta-readonly">
+        <span className="wc-field-label">layouts (read-only — the shapes this widget can be resized to)</span>
+        <div className="wc-meta-schema-list">
+          {layouts.map((id) => (
+            <span key={id} className="wc-meta-schema-chip" title={PRESET_EXAMPLES[id]}>
+              {id}{id === entry?.defaultPreset ? " · default" : ""} · {presetCells(id) ?? "whole region"}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {settingsSchema.length > 0 && (
         <div className="wc-meta-readonly">
           <span className="wc-field-label">widget settings schema (read-only — re-describe the widget to change)</span>
@@ -238,7 +259,7 @@ function EditMetaForm({ id, onIdChange }: { id: string; onIdChange: (newId: stri
 }
 
 export function SettingsPane({ settings, onChange, mode, onModeChange, showModeToggle = true, disabled = false }: Props) {
-  const [perSizeTab, setPerSizeTab] = useState<"S" | "M" | "L">("S");
+  const [perSizeTab, setPerSizeTab] = useState<string>("S");
   const [slugTouched, setSlugTouched] = useState(() => Boolean(settings.slug) && settings.slug !== slugify(settings.name ?? ""));
   const [prevIdentity, setPrevIdentity] = useState({ name: settings.name, slug: settings.slug });
   if (settings.name !== prevIdentity.name || settings.slug !== prevIdentity.slug) {
@@ -251,22 +272,34 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
   const isPlanMode = mode === "plan";
   const customIds = Object.keys(CUSTOM_WIDGETS);
 
-  function toggleSize(s: string) {
-    const current = settings.sizes ?? ["S", "M", "L"];
-    const next = current.includes(s) ? current.filter((x) => x !== s) : [...current, s];
-    onChange({ sizes: next.length > 0 ? next : current });
+  // Size presets are the widget's real sizing (config/sizePresets.ts). Picking
+  // them here is the Build-mode twin of the Plan brief's preset editor — without
+  // it, a widget that skipped Plan could only get the fixed S/M/L set (badge,
+  // column, card, panel, hero) with no say in which shapes it supports.
+  const presets: PresetId[] = settings.presets ?? [];
+  const hasPresets = presets.length > 0;
+
+  function togglePreset(id: PresetId) {
+    const on = presets.includes(id);
+    const next = PRESET_ORDER.filter((p) => (p === id ? !on : presets.includes(p)));
+    onChange(presetSettingsPatch(next, settings.defaultPreset, settings.fill));
   }
 
-  function toggleOri(o: string) {
-    const current = settings.orientations ?? ["h"];
-    const next = current.includes(o) ? current.filter((x) => x !== o) : [...current, o];
-    onChange({ orientations: next.length > 0 ? next : current });
-  }
-
-  const descKey = perSizeTab === "S" ? "sDescription" : perSizeTab === "M" ? "mDescription" : "lDescription";
-  const descValue = (settings[descKey as keyof GenerateSettings] as string) ?? "";
-  const imageKey = IMAGE_KEY_MAP[perSizeTab];
+  // content is written per preset once presets are picked, per S/M/L before
+  const contentTabs: string[] = hasPresets ? presets : ["S", "M", "L"];
+  const activeTab = contentTabs.includes(perSizeTab) ? perSizeTab : contentTabs[0];
+  const activePreset = hasPresets ? (activeTab as PresetId) : null;
+  const legacyOfTab = activePreset ? SIZE_PRESETS[activePreset].legacy.size : (activeTab as "S" | "M" | "L");
+  const descKey = legacyOfTab === "S" ? "sDescription" : legacyOfTab === "M" ? "mDescription" : "lDescription";
+  const descValue = activePreset
+    ? settings.presetContent?.[activePreset] ?? ""
+    : (settings[descKey as keyof GenerateSettings] as string) ?? "";
+  const imageKey = IMAGE_KEY_MAP[legacyOfTab];
   const imageValue = (settings[imageKey as keyof GenerateSettings] as string | null) ?? null;
+  // presets that share a legacy size share its single reference image
+  const imageLabel = activePreset
+    ? presets.filter((id) => SIZE_PRESETS[id].legacy.size === legacyOfTab).join("/")
+    : activeTab;
 
   return (
     <div
@@ -395,30 +428,69 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
 
       {isCreateMode && (
         <Section title="sizes & layout">
-          <div className="wc-row wc-row-spread">
-            <div className="wc-inline-label">sizes</div>
-            <div className="wc-toggle-group">
-              {SIZE_OPTIONS.map((s) => (
+          <div className="wc-field">
+            <span className="wc-field-label">size presets</span>
+            <div className="wc-toggle-group wc-brief-size-toggle" role="group" aria-label="size presets">
+              {PRESET_ORDER.map((id) => (
                 <button
-                  key={s}
+                  key={id}
                   type="button"
-                  className={`wc-toggle-btn${(settings.sizes ?? ["S","M","L"]).includes(s) ? " active" : ""}`}
-                  onClick={() => toggleSize(s)}
-                >{s}</button>
-              ))}
-            </div>
-            <div className="wc-inline-label">ori</div>
-            <div className="wc-toggle-group">
-              {ORI_OPTIONS.map((o) => (
-                <button
-                  key={o}
-                  type="button"
-                  className={`wc-toggle-btn${(settings.orientations ?? ["h"]).includes(o) ? " active" : ""}`}
-                  onClick={() => toggleOri(o)}
-                >{o}</button>
+                  className={`wc-toggle-btn${presets.includes(id) ? " active" : ""}`}
+                  aria-pressed={presets.includes(id)}
+                  title={`${presetRange(id)} — ${PRESET_EXAMPLES[id]}`}
+                  onClick={() => togglePreset(id)}
+                >{id}</button>
               ))}
             </div>
           </div>
+          {hasPresets ? (
+            <>
+              <div className="wc-brief-presets">
+                {presets.map((id) => (
+                  <div key={id} className="wc-brief-preset-row">
+                    <span className="wc-brief-preset-name">{id}{id === settings.defaultPreset ? " ·default" : ""}</span>
+                    <span className="wc-brief-preset-range">{presetCells(id) ? `${presetCells(id)} cells` : "the whole region"}</span>
+                  </div>
+                ))}
+              </div>
+              {!presets.includes("column") && !presets.includes("hero") && (
+                <p className="wc-ideate-help">
+                  Resizing snaps to these ranges only, so it can&apos;t be made one cell wide and two or more tall. Add column for that shape.
+                </p>
+              )}
+              <div className="wc-brief-preset-opts">
+                <label className="wc-brief-preset-opt">
+                  <span className="wc-field-label">default</span>
+                  <select
+                    className="wc-input"
+                    value={settings.defaultPreset ?? presets[0]}
+                    onChange={(e) => onChange({ defaultPreset: e.target.value as PresetId })}
+                  >
+                    {presets.map((id) => <option key={id} value={id}>{id}</option>)}
+                  </select>
+                </label>
+                <div className="wc-brief-preset-opt">
+                  <span className="wc-field-label">fill</span>
+                  <div className="wc-toggle-group" role="group" aria-label="fill mode">
+                    {(["reflow", "scale"] as const).map((f) => (
+                      <button
+                        key={f}
+                        type="button"
+                        className={`wc-toggle-btn${(settings.fill ?? "reflow") === f ? " active" : ""}`}
+                        aria-pressed={(settings.fill ?? "reflow") === f}
+                        title={f === "reflow" ? "extra space shows more content" : "drawn at the preset's min size, then scaled to fit — for fixed artwork"}
+                        onClick={() => onChange({ fill: f })}
+                      >{f}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <p className="wc-ideate-help">
+              Optional. Pick the shapes this widget ships in; the builder designs one layout per preset and resizing snaps to their ranges. With none picked it builds the default set: badge, column, card, panel and hero.
+            </p>
+          )}
           <div className="wc-row wc-row-spread">
             <div className="wc-inline-label">hover expand</div>
             <button
@@ -455,26 +527,32 @@ export function SettingsPane({ settings, onChange, mode, onModeChange, showModeT
       )}
 
       {isCreateMode && (
-        <Section title="per-size content">
+        <Section title={hasPresets ? "per-preset content" : "per-size content"}>
           <div className="wc-size-tabs">
-            {(["S", "M", "L"] as const).map((s) => (
+            {contentTabs.map((tab) => (
               <button
-                key={s}
+                key={tab}
                 type="button"
-                className={`wc-size-tab${perSizeTab === s ? " active" : ""}`}
-                onClick={() => setPerSizeTab(s)}
-              >{s}</button>
+                className={`wc-size-tab${activeTab === tab ? " active" : ""}`}
+                onClick={() => setPerSizeTab(tab)}
+              >{tab}</button>
             ))}
           </div>
           <textarea
             className="wc-textarea"
-            placeholder={`What should the ${perSizeTab} size show?`}
+            placeholder={`What should the ${activeTab} ${hasPresets ? "layout" : "size"} show?`}
             value={descValue}
-            onChange={(e) => onChange({ [descKey]: e.target.value } as Partial<GenerateSettings>)}
+            onChange={(e) =>
+              onChange(
+                activePreset
+                  ? { presetContent: { ...settings.presetContent, [activePreset]: e.target.value } }
+                  : ({ [descKey]: e.target.value } as Partial<GenerateSettings>),
+              )
+            }
             rows={3}
           />
           <ImageUploadSlot
-            label={perSizeTab}
+            label={imageLabel}
             value={imageValue}
             onChange={(v) => onChange({ [imageKey]: v } as Partial<GenerateSettings>)}
           />

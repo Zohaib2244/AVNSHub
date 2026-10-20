@@ -1,6 +1,4 @@
-/* ── NutBot chat tab — face left, conversation right, input full-width ── */
-
-.nutbot-v2-scale-chat { zoom: 0.5; }
+/* Chat is NutBot's monitor: a single face behind the conversation. */
 
 .nb-chat {
   display: flex;
@@ -14,15 +12,6 @@
   min-height: 0;
   display: flex;
   gap: 8px;
-}
-
-.nb-chat-face {
-  flex-shrink: 0;
-  width: calc(108px * var(--nb-scale, 1));
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
 }
 
 .nb-chat-body {
@@ -67,7 +56,7 @@
   padding: 2px 6px;
   border-radius: 4px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
 }
@@ -122,6 +111,26 @@
   font-style: italic;
 }
 
+/* work mode: one compact line per command/tool the agent runs */
+.nb-msg-tool {
+  font-size: calc(0.66rem * var(--nb-scale, 1));
+  color: var(--nb-muted, var(--text-muted));
+  border-left: 2px solid var(--accent-cyan);
+  border-radius: 0 4px 4px 0;
+  background: var(--bg-nested);
+  padding: 2px 7px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  animation-duration: 0.14s;
+}
+
+.nb-tool-name {
+  color: var(--accent-cyan);
+  font-weight: 600;
+}
+
 .nb-msg-error {
   border: 1px solid var(--status-down, #c0392b);
   border-left-width: 2px;
@@ -164,14 +173,64 @@
   padding-top: 6px;
 }
 
-.nb-backend-picker .hp-popover {
-  left: 0;
+/* portaled to <body> (escapes the chat panel's clipping scroller) and
+   positioned inline via style={{ left, top | bottom }}. .hp-popover's base
+   rule sets top/right for its original absolute-inside-a-relative-parent
+   use — reset all four insets to auto here so only the inline ones (which
+   win per-property regardless) take effect; leaving top: calc(100% + 5px)
+   live would over-constrain the box against the inline bottom anchor and
+   collapse its height to ~0. */
+.ap-popover {
+  top: auto;
   right: auto;
+  bottom: auto;
+  left: auto;
+  width: 230px;
   min-width: 170px;
+  max-width: calc(100vw - 24px);
 }
 
-.nb-backend-picker .hp-item.unavailable {
-  cursor: pointer;
+/* ── Agents menu (model + strength section inside the hp-popover) ────── */
+
+.ap-section-head {
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+  padding-top: 7px;
+}
+
+.ap-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 10px;
+}
+
+.ap-label {
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(0.6rem * var(--nb-scale, 1));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--nb-muted, var(--text-muted));
+  flex-shrink: 0;
+}
+
+.ap-field select,
+.ap-field input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  padding: 3px 5px;
+  background: var(--bg-nested);
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(0.66rem * var(--nb-scale, 1));
+}
+
+.ap-field select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .nb-toggle-btn {
@@ -193,6 +252,32 @@
   border-color: var(--accent-orange);
 }
 
+.nb-toggle-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* chill | work — two joined toggles */
+.nb-mode-switch {
+  display: flex;
+  margin-right: 4px;
+}
+
+.nb-mode-switch .nb-toggle-btn:first-child {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.nb-mode-switch .nb-toggle-btn:last-child {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  margin-left: -1px;
+}
+
+.nb-mode-switch .nb-toggle-btn.active {
+  position: relative;
+}
+
 .nb-new-btn {
   margin-left: auto;
   display: flex;
@@ -205,7 +290,7 @@
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
@@ -266,7 +351,7 @@
   justify-content: center;
   border-radius: 5px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
   transition: background 0.15s, opacity 0.15s;
@@ -300,3 +385,388 @@
   flex-direction: column;
   padding: 8px;
 }
+
+.term-body.term-body-chat { padding: 0; border: 0; background: transparent; overflow: visible; }
+.nb-chat, .ap-popover {
+  --monitor-shell-high: #eae4da;
+  --monitor-shell: #cdc7bb;
+  --monitor-shell-low: #bcb6aa;
+  --monitor-edge: #9c907e;
+  --monitor-trim: #504840;
+  --monitor-screen: #040302;
+  --monitor-ink: #e8dfc8;
+  --monitor-muted: #b5b0a3;
+}
+.nb-chat {
+  /* The same physical bezel and dark glass used by NutBotFaceV2. */
+  position: relative;
+  padding: 10px 10px 7px;
+  border: 3px solid var(--monitor-edge);
+  border-radius: 22px 22px 14px 14px;
+  background: linear-gradient(145deg, var(--monitor-shell-high), var(--monitor-shell) 55%, var(--monitor-shell-low));
+  min-width: 0;
+}
+.nb-chat-screen {
+  position: relative;
+  isolation: isolate;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 10px;
+  border: 2.5px solid var(--monitor-trim);
+  border-radius: 11px;
+  background: var(--monitor-screen);
+  /* Glass stays dark in light themes, including its controls and transcript. */
+  --text-primary: var(--monitor-ink);
+  --text-muted: var(--monitor-muted);
+  --nb-muted: var(--monitor-muted);
+  --bg-nested: color-mix(in srgb, var(--monitor-screen) 92%, var(--monitor-ink));
+  --border: color-mix(in srgb, var(--monitor-ink) 28%, var(--monitor-screen));
+  --nb-btn-bg: color-mix(in srgb, var(--monitor-screen) 84%, var(--monitor-ink));
+  color: var(--monitor-ink);
+  box-shadow: inset 0 0 30px color-mix(in srgb, var(--accent-cyan) 9%, transparent);
+}
+.nb-chat-screen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, transparent 0 3px, color-mix(in srgb, var(--monitor-ink) 5%, transparent) 3px 4px);
+  animation: nb-crt-rise 1.2s linear infinite;
+}
+.nb-chat-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 24px color-mix(in srgb, var(--monitor-screen) 40%, transparent);
+}
+.nb-screen-eyes {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 148px;
+  height: 62px;
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  justify-content: space-between;
+  padding: 0 22px;
+  transform: translate(calc(-50% + var(--gaze-x, 0px)), calc(-50% + var(--gaze-y, 0px)));
+  transition: transform .32s ease;
+}
+.nb-screen-eyes i {
+  width: 24px;
+  height: 48px;
+  border-radius: 7px;
+  background: var(--accent-cyan);
+  opacity: .65;
+  box-shadow: 0 0 7px color-mix(in srgb, var(--accent-cyan) 70%, transparent);
+  transform-origin: center 75%;
+  animation: nb-eye-blink 5.7s infinite;
+  transition: height .25s, width .25s, border-radius .25s, background .25s, opacity .25s;
+}
+/* Wake-up (tab opened): CRT power-on line -> eyes open from a slit, look around,
+   blink -> transcript fades in -> greeting types itself. ~1.5s total, matching
+   WAKE_MS in NutBotChat.tsx. Sits before the typing/expression rules on purpose,
+   so a reply that starts mid-wake still wins. No blur anywhere: flat fills only. */
+.nb-chat-screen[data-wake="on"] .nb-screen-eyes i {
+  animation: nb-eye-wake 1.2s cubic-bezier(.3, .7, .3, 1) .3s backwards, nb-eye-look 1.2s ease-in-out .3s backwards;
+}
+.nb-chat-screen[data-wake="on"] .nb-chat-top,
+.nb-chat-screen[data-wake="on"] .nb-chat-footer { animation: nb-wake-content .4s ease .5s backwards; }
+.nb-wake-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: var(--monitor-ink);
+  transform-origin: center;
+  animation: nb-wake-flash .5s ease-out forwards;
+}
+.nb-chat:has(.nb-chat-screen[data-wake="on"]) .nb-monitor-led { animation: nb-led-boot 1.5s steps(1, end); }
+.nb-typed { clip-path: inset(0 100% 0 0); animation: nb-type calc(var(--n, 12) * 34ms) steps(var(--n, 12), end) .8s forwards; }
+@keyframes nb-wake-flash {
+  0%   { transform: scale(0, .008); opacity: .9; }
+  38%  { transform: scale(1, .008); opacity: .9; }
+  70%  { transform: scale(1, 1); opacity: .28; }
+  100% { transform: scale(1, 1); opacity: 0; }
+}
+@keyframes nb-wake-content { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@keyframes nb-eye-wake {
+  0%   { transform: scaleY(.05); opacity: .15; }
+  38%  { transform: scaleY(.05); opacity: .3; }
+  56%  { transform: scaleY(1.14); opacity: .8; }
+  66%  { transform: scaleY(1); opacity: .65; }
+  76%  { transform: scaleY(.08); }
+  84%  { transform: scaleY(1); }
+  100% { transform: scaleY(1); }
+}
+@keyframes nb-eye-look {
+  0%, 52% { translate: 0 0; }
+  64%     { translate: -11px 0; }
+  80%     { translate: 11px 0; }
+  94%, 100% { translate: 0 0; }
+}
+@keyframes nb-led-boot { 0%, 24% { opacity: .1; } 25%, 49% { opacity: 1; background: var(--accent-orange); } 50%, 100% { opacity: 1; background: var(--accent-cyan); } }
+@keyframes nb-type { to { clip-path: inset(0 0 0 0); } }
+.nb-chat-screen[data-attention="typing"] .nb-screen-eyes i { height: 33px; opacity: .9; }
+.nb-chat-screen[data-attention="typing"] .nb-screen-eyes i:first-child { border-radius: 7px 7px 10px 10px; }
+.nb-chat-screen[data-expression="thinking"] .nb-screen-eyes i {
+  background: var(--accent-orange);
+  animation: nb-eye-blink 6.7s infinite;
+}
+.nb-chat-screen[data-expression="thinking"] .nb-screen-eyes i:last-child { height: 29px; margin-top: 10px; }
+.nb-chat-screen[data-expression="replying"] .nb-screen-eyes i {
+  height: 35px;
+  width: 29px;
+  border-radius: 16px 16px 6px 6px;
+  opacity: .95;
+  animation: nb-eye-blink 5.7s infinite;
+}
+.nb-chat-screen[data-expression="working"] .nb-screen-eyes i { height: 18px; animation: nb-eye-scan 1.8s ease-in-out infinite; }
+.nb-chat-screen[data-expression="sleeping"] .nb-screen-eyes i { height: 5px; opacity: .35; margin-top: 24px; animation: nb-eye-doze 4s ease-in-out infinite; }
+.nb-chat-screen[data-expression="error"] .nb-screen-eyes i { height: 27px; background: var(--accent-orange); animation: none; transform: rotate(12deg); }
+.nb-chat-screen[data-expression="error"] .nb-screen-eyes i:last-child { transform: rotate(-12deg); }
+/* A Kuma outage is an interrupt, not a permanent face. The eyes flash an
+   alert for a few seconds, then return to the conversation expression while
+   the investigation chip remains available. */
+.nb-chat-screen[data-outage-alert="on"] .nb-screen-eyes i {
+  height: 43px;
+  background: var(--status-down, var(--accent-orange));
+  opacity: .95;
+  animation: nb-eye-alert .45s ease-out;
+}
+@keyframes nb-eye-alert {
+  0%, 100% { transform: translateY(0); }
+  45% { transform: translateY(-3px); }
+}
+@keyframes nb-eye-scan { 0%,100% { transform: translateX(-9px); } 50% { transform: translateX(9px); } }
+@keyframes nb-eye-doze { 0%,100% { transform: translateY(0); } 50% { transform: translateY(4px); } }
+.nb-chat-top, .nb-chat-toolbar, .nb-chat-footer { position: relative; z-index: 1; }
+.nb-msg { flex-shrink: 0; }
+.nb-msg-assistant { background: color-mix(in srgb, var(--monitor-screen) 92%, transparent); }
+.nb-chat-empty { background: color-mix(in srgb, var(--monitor-screen) 85%, transparent); width: fit-content; }
+.nb-chat-footer:focus-within .nb-chat-input { border-color: var(--accent-orange); }
+.nb-monitor-foot { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; padding: 7px 4px 0; color: var(--monitor-trim); font-size: calc(.55rem * var(--nb-scale, 1)); letter-spacing: .12em; }
+.nb-monitor-vents { width: 42px; height: 5px; border-radius: 2px; background: repeating-linear-gradient(90deg, var(--monitor-trim) 0 5px, transparent 5px 9px); }
+.nb-monitor-led { width: 5px; height: 5px; border-radius: 50%; background: var(--accent-cyan); }
+/* Tactile controls mounted on the warm plastic below the glass. */
+.nb-chat > .nb-chat-toolbar { padding: 14px 4px 6px; gap: 12px 16px; align-items: center; }
+.nb-chat > .nb-chat-toolbar .nb-mode-switch {
+  gap: 8px;
+  margin-right: 0;
+  padding: 4px;
+  border-radius: 9px;
+  border: 1px solid var(--monitor-edge);
+  background: color-mix(in srgb, var(--monitor-shell-low) 80%, var(--monitor-trim));
+}
+.nb-chat > .nb-chat-toolbar .nb-mode-switch .nb-toggle-btn {
+  margin: 0;
+  border-radius: 5px;
+  min-width: 57px;
+  padding-inline: 12px;
+}
+.nb-chat > .nb-chat-toolbar .nb-toggle-btn,
+.nb-chat > .nb-chat-toolbar .nb-new-btn,
+.nb-chat > .nb-chat-toolbar .hp-pill {
+  min-height: 32px;
+  padding: 5px 11px;
+  background: linear-gradient(var(--monitor-shell-high), var(--monitor-shell));
+  border: 1px solid var(--monitor-edge);
+  color: var(--monitor-trim);
+  box-shadow: 0 2px 0 var(--monitor-trim), inset 0 1px 0 var(--monitor-shell-high);
+  border-radius: 5px;
+  transition: background .15s, box-shadow .15s, transform .15s;
+}
+.nb-chat > .nb-chat-toolbar .nb-toggle-btn.active,
+.nb-chat > .nb-chat-toolbar .hp-pill.open {
+  background: var(--monitor-trim);
+  color: var(--monitor-ink);
+  box-shadow: inset 0 2px 2px var(--monitor-screen);
+}
+.nb-chat > .nb-chat-toolbar button:hover:not(:disabled) { filter: brightness(1.08); }
+.nb-chat > .nb-chat-toolbar button:active:not(:disabled) { transform: translateY(2px); box-shadow: none; }
+.nb-chat > .nb-chat-toolbar button:focus-visible { outline: 2px solid var(--monitor-trim); outline-offset: 3px; }
+.nb-chat > .nb-chat-toolbar .nb-backend-picker { min-width: 0; max-width: 100%; }
+.nb-chat > .nb-chat-toolbar .hp-pill { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.ap-popover {
+  /* The portal lives under body, so explicitly share the monitor palette. */
+  --bg-card: var(--monitor-shell);
+  --bg-nested: var(--monitor-shell-high);
+  --text-primary: var(--monitor-trim);
+  --text-muted: var(--monitor-trim);
+  --text-muted-dim: var(--monitor-trim);
+  --nb-muted: var(--monitor-trim);
+  --border: var(--monitor-edge);
+  --accent-orange: var(--monitor-trim);
+  color-scheme: light;
+  color: var(--monitor-trim);
+  width: 280px;
+  padding: 7px;
+  background: linear-gradient(145deg, var(--monitor-shell-high), var(--monitor-shell));
+  border: 2px solid var(--monitor-edge);
+  border-radius: 11px;
+  box-shadow: 3px 4px 0 var(--monitor-trim), inset 0 1px 0 var(--monitor-shell-high);
+}
+.ap-popover .hp-item { width: 100%; min-height: 32px; border-radius: 5px; margin-bottom: 3px; }
+.ap-popover .hp-item:hover { background: var(--monitor-shell-low); }
+.ap-popover .hp-item.active { background: var(--monitor-trim); color: var(--monitor-ink); }
+.ap-popover .hp-badge.active { color: var(--monitor-ink); border-color: var(--monitor-shell-low); }
+.ap-popover .ap-field { padding: 5px 8px; }
+.ap-popover .ap-field select, .ap-popover .ap-field input { min-height: 31px; }
+.ap-popover button:focus-visible, .ap-popover select:focus-visible, .ap-popover input:focus-visible { outline: 2px solid var(--monitor-trim); outline-offset: 2px; }
+@keyframes nb-crt-rise { to { background-position: 0 -4px; } }
+/* Stay fully open between short blinks, without a breathing/resize cycle. */
+@keyframes nb-eye-blink { 0%,70%,73%,100% { transform: scaleY(1); } 71.5% { transform: scaleY(.08); } }
+.nb-chat-screen[data-motion="paused"]::before,
+.nb-chat-screen[data-motion="paused"] .nb-screen-eyes i { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .nb-chat-screen::before, .nb-chat-screen .nb-screen-eyes i { animation: none !important; }
+  .nb-wake-flash, .nb-typed, .nb-chip, .nb-jump, .nb-outage-chip, .nb-outage-dot { animation: none !important; }
+  .nb-typed { clip-path: none; }
+  .nb-screen-eyes, .nb-screen-eyes i { transition: none; }
+}
+
+/* ── empty state: greeting up top, starter chips at the bottom, eyes between ── */
+.nb-chat-note { font-family: var(--font-jetbrains-mono), monospace; font-size: calc(.62rem * var(--nb-scale, 1)); line-height: 1.45; color: var(--nb-muted, var(--text-muted)); padding: 0 4px; max-width: 34ch; }
+.nb-chat-note:empty { display: none; }
+.nb-chips { margin-top: auto; display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 2px 2px; }
+.nb-chip {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(.64rem * var(--nb-scale, 1));
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--monitor-screen) 85%, transparent);
+  color: var(--nb-muted, var(--text-muted));
+  cursor: pointer;
+  transition: color .15s, border-color .15s, transform .15s;
+}
+.nb-chip:hover { color: var(--accent-orange); border-color: var(--accent-orange); transform: translateY(-1px); }
+.nb-chip:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; }
+.nb-chat-screen[data-wake="on"] .nb-chip { animation: nb-msg-in .3s ease backwards; }
+.nb-chat-screen[data-wake="on"] .nb-chip:nth-child(1) { animation-delay: 1.0s; }
+.nb-chat-screen[data-wake="on"] .nb-chip:nth-child(2) { animation-delay: 1.08s; }
+.nb-chat-screen[data-wake="on"] .nb-chip:nth-child(3) { animation-delay: 1.16s; }
+.nb-chat-screen[data-wake="on"] .nb-chip:nth-child(4) { animation-delay: 1.24s; }
+
+/* A real monitor problem earns a single prominent chip. It floats just above
+   the input so it is reachable even deep in a transcript, and its parent
+   reserves enough reader space that it never hides the final reply line. */
+.nb-chat-top.has-outage .nb-chat-body { padding-bottom: 40px; }
+.nb-outage-chip {
+  position: absolute;
+  z-index: 3;
+  left: 7px;
+  right: 7px;
+  bottom: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--status-down, var(--accent-orange));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--monitor-screen) 86%, var(--status-down, var(--accent-orange)));
+  color: var(--monitor-ink);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: calc(.63rem * var(--nb-scale, 1));
+  line-height: 1.2;
+  animation: nb-msg-in .24s ease backwards;
+}
+.nb-outage-chip button {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+.nb-outage-investigate { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.nb-outage-chip .nb-outage-ignore { flex-shrink: 0; border-left: 1px solid var(--border); padding-inline: 10px; color: var(--monitor-muted); }
+.nb-outage-chip button:hover { color: var(--accent-orange); }
+.nb-outage-chip button:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 2px; border-radius: 4px; }
+.nb-outage-dot { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--status-down, var(--accent-orange)); animation: nb-outage-dot 1s steps(1, end) infinite; }
+@keyframes nb-outage-dot { 50% { opacity: .3; } }
+
+/* while there is a transcript the face is ambient: keep it behind the text */
+.nb-chat-screen:not([data-empty]) .nb-screen-eyes i { opacity: .5; }
+
+/* ── replies: copy, inline code, code blocks ── */
+.nb-msg-assistant { position: relative; }
+.nb-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--nb-btn-bg, var(--bg-nested));
+  color: var(--nb-muted, var(--text-muted));
+  cursor: pointer;
+  transition: color .15s, border-color .15s, opacity .15s;
+}
+.nb-copy-btn:hover { color: var(--accent-orange); border-color: var(--accent-orange); }
+.nb-copy-btn:focus-visible { outline: 2px solid var(--accent-cyan); outline-offset: 1px; }
+.nb-msg-copy { position: absolute; top: 3px; right: 3px; opacity: 0; }
+.nb-msg-assistant:hover .nb-msg-copy, .nb-msg-copy:focus-visible { opacity: 1; }
+@media (hover: none) { .nb-msg-copy { opacity: .7; } }
+.nb-code-inline {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: .95em;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+  background: var(--bg-nested);
+  color: var(--accent-cyan);
+}
+.nb-code { margin: 4px 0; border: 1px solid var(--border); border-left: 2px solid var(--accent-cyan); border-radius: 4px; background: var(--bg-nested); white-space: normal; }
+.nb-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 2px 8px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(.58rem * var(--nb-scale, 1));
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--nb-muted, var(--text-muted));
+}
+.nb-code pre { margin: 0; padding: 6px 8px; overflow-x: auto; white-space: pre; font-family: var(--font-jetbrains-mono), monospace; font-size: calc(.68rem * var(--nb-scale, 1)); line-height: 1.5; color: var(--text-primary); }
+
+/* ── scroll-lock escape hatch ── */
+.nb-chat-top { position: relative; }
+.nb-jump {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: calc(.62rem * var(--nb-scale, 1));
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-orange);
+  background: var(--monitor-screen);
+  color: var(--accent-orange);
+  cursor: pointer;
+  animation: nb-msg-in .18s ease backwards;
+}
+.nb-jump:hover { background: var(--accent-orange); color: var(--monitor-screen); }
+
+/* ── input grows with its content ── */
+.nb-chat-footer { align-items: flex-end; }
+.nb-chat-input { min-height: calc(.74rem * var(--nb-scale, 1) * 1.35 + 12px); max-height: calc(.74rem * var(--nb-scale, 1) * 1.35 * 5 + 14px); overflow-y: auto; }

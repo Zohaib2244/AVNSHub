@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- NutBot's CRT head, drawn to survive a 16px tab.
+       Colours lifted from NutBotFaceV2.css / globals.css:
+       shell #eae4da→#bcb6aa, trim #9c907e, screen #040302/#504840,
+       eyes accent-cyan #00b4c8, LED accent-orange #ff6b2b. -->
+  <defs>
+    <linearGradient id="shell" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eae4da"/>
+      <stop offset=".55" stop-color="#cdc7bb"/>
+      <stop offset="1" stop-color="#bcb6aa"/>
+    </linearGradient>
+    <linearGradient id="ear" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#b8b2a6"/>
+      <stop offset="1" stop-color="#ccc6ba"/>
+    </linearGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- side ears -->
+  <rect x="1.5" y="24" width="6" height="16" rx="2" fill="url(#ear)" stroke="#9c907e" stroke-width="2"/>
+  <rect x="56.5" y="24" width="6" height="16" rx="2" fill="url(#ear)" stroke="#9c907e" stroke-width="2"/>
+
+  <!-- monitor shell -->
+  <rect x="6" y="6" width="52" height="52" rx="10" ry="10" fill="url(#shell)" stroke="#9c907e" stroke-width="3"/>
+
+  <!-- screen -->
+  <rect x="11.5" y="11.5" width="41" height="31" rx="6" fill="#040302" stroke="#504840" stroke-width="2"/>
+
+  <!-- eye bars -->
+  <g fill="#00b4c8" filter="url(#glow)">
+    <rect x="21" y="20.5" width="7" height="13" rx="3.5"/>
+    <rect x="36" y="20.5" width="7" height="13" rx="3.5"/>
+  </g>
+
+  <!-- vents + power LED on the chin -->
+  <g fill="#9c907e" opacity=".85">
+    <rect x="14" y="48" width="4" height="4" rx="1.4"/>
+    <rect x="20" y="48" width="4" height="4" rx="1.4"/>
+    <rect x="26" y="48" width="4" height="4" rx="1.4"/>
+    <rect x="32" y="48" width="4" height="4" rx="1.4"/>
+  </g>
+  <circle cx="47" cy="50" r="3" fill="#ff6b2b"/>
+</svg>

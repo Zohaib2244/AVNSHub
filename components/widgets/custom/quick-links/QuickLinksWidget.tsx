@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  createElement,
   type ChangeEvent,
   type CSSProperties,
   type FormEvent,
@@ -63,6 +64,7 @@ import {
   X,
 } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
+import { useCanvasSyncedState } from "@/lib/canvasStore";
 
 type Accent = "orange" | "cyan" | "none";
 type Density = "compact" | "comfy";
@@ -301,31 +303,19 @@ function normalizeStoredLink(raw: unknown): LinkItem | null {
   };
 }
 
-function loadStore(): QuickLinksStore {
-  if (typeof window === "undefined") return buildDefaultStore();
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return buildDefaultStore();
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-    const groups = Array.isArray(parsed.groups) ? parsed.groups.filter(isValidGroup) : [];
-    const linksRaw = Array.isArray(parsed.links) ? parsed.links : [];
-    const links = linksRaw.map(normalizeStoredLink).filter((l): l is LinkItem => l !== null);
-    const recents = Array.isArray(parsed.recents) ? parsed.recents.filter((r): r is string => typeof r === "string") : [];
-    if (groups.length === 0 && links.length === 0) return buildDefaultStore();
-    const finalGroups = groups.length > 0 ? groups : buildDefaultStore().groups;
-    return { version: 1, groups: finalGroups, links, recents };
-  } catch {
-    return buildDefaultStore();
-  }
-}
-
-function saveStore(store: QuickLinksStore) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-  } catch {
-    // storage unavailable or full -- nothing to do
-  }
+// canvas-scoped + DB-synced (app/api/hub-data) — see lib/canvasStore.ts.
+// Canvas A's links are invisible on canvas B, and every write mirrors to the
+// shared-hub DB so the same links show up from any browser/device.
+function sanitizeStore(raw: unknown): QuickLinksStore | null {
+  if (!raw || typeof raw !== "object") return null;
+  const parsed = raw as Record<string, unknown>;
+  const groups = Array.isArray(parsed.groups) ? parsed.groups.filter(isValidGroup) : [];
+  const linksRaw = Array.isArray(parsed.links) ? parsed.links : [];
+  const links = linksRaw.map(normalizeStoredLink).filter((l): l is LinkItem => l !== null);
+  const recents = Array.isArray(parsed.recents) ? parsed.recents.filter((r): r is string => typeof r === "string") : [];
+  if (groups.length === 0 && links.length === 0) return null;
+  const finalGroups = groups.length > 0 ? groups : buildDefaultStore().groups;
+  return { version: 1, groups: finalGroups, links, recents };
 }
 
 function fallbackCopy(text: string, done: () => void) {
@@ -392,14 +382,14 @@ function LinkRow({
   onEdit,
   onDelete,
 }: LinkRowProps) {
-  const Icon = getIcon(link.iconName);
+  const icon = createElement(getIcon(link.iconName), { size: 14, strokeWidth: 1.75 });
   const accentVar = resolveAccentVar(link.accent, accentMode);
   return (
     <div className="ql-row">
       <button type="button" className="ql-row-main" onClick={() => onOpen(link)} title={link.url}>
         {showIcons && (
           <span className="ql-icon" style={{ color: accentVar }}>
-            <Icon size={14} strokeWidth={1.75} />
+            {icon}
           </span>
         )}
         <span className="ql-row-text">
@@ -533,7 +523,7 @@ function LinkForm({ editingId, initialDraft, groups, onCancel, onSave, onCreateG
     }
   }
 
-  const PreviewIcon = getIcon(iconName);
+  const previewIcon = createElement(getIcon(iconName), { size: 14, strokeWidth: 1.75 });
 
   return (
     <form className="ql-form" onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
@@ -594,7 +584,7 @@ function LinkForm({ editingId, initialDraft, groups, onCancel, onSave, onCreateG
           </label>
           <div className="ql-icon-pick">
             <span className="ql-icon-preview">
-              <PreviewIcon size={14} strokeWidth={1.75} />
+              {previewIcon}
             </span>
             <select id="ql-f-icon" className="ql-input" value={iconName} onChange={(e) => setIconName(e.target.value)}>
               {ICON_NAMES.map((name) => (
@@ -700,8 +690,7 @@ export function QuickLinksWidget() {
   const accentMode: AccentMode = settings.accentMode === "orange" || settings.accentMode === "cyan" ? settings.accentMode : "mixed";
   const maxVisible = typeof settings.maxVisible === "number" && settings.maxVisible > 0 ? settings.maxVisible : 6;
 
-  const [store, setStore] = useState<QuickLinksStore>(() => buildDefaultStore());
-  const [hydrated, setHydrated] = useState(false);
+  const [store, setStore] = useCanvasSyncedState<QuickLinksStore>(STORAGE_KEY, buildDefaultStore, sanitizeStore);
   const [query, setQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [formMode, setFormMode] = useState<"new" | { editId: string } | null>(null);
@@ -714,28 +703,22 @@ export function QuickLinksWidget() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    setStore(loadStore());
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    saveStore(store);
-  }, [store, hydrated]);
-
-  useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
     };
   }, []);
 
-  useEffect(() => {
+  // entering zen mode closes any open editors — adjusted during render when
+  // zenMode flips on, rather than in an effect that renders twice
+  const [prevZenMode, setPrevZenMode] = useState(zenMode);
+  if (zenMode !== prevZenMode) {
+    setPrevZenMode(zenMode);
     if (zenMode) {
       setFormMode(null);
       setEditingGroupId(null);
       setGroupsExpanded(false);
     }
-  }, [zenMode]);
+  }
 
   const allowManage = !zenMode && size === "L";
   const groupNameById = useMemo(() => new Map(store.groups.map((g) => [g.id, g.name])), [store.groups]);

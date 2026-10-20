@@ -47,7 +47,7 @@
 
 .spotify-s-title {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.72rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   line-height: 1.15;
   color: var(--media-text);
@@ -61,7 +61,7 @@
   align-items: center;
   gap: 5px;
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.62rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   line-height: 1.2;
   text-transform: uppercase;
@@ -107,7 +107,7 @@
 
 .spotify-title {
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.94rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   line-height: 1.25;
   color: var(--media-text);
@@ -118,7 +118,7 @@
 
 .spotify-artist {
   margin-top: 3px;
-  font-size: 0.68rem;
+  font-size: var(--fs-label);
   line-height: 1.25;
   color: var(--media-subtle);
   white-space: nowrap;
@@ -196,7 +196,7 @@
 }
 
 .control-error {
-  font-size: 0.62rem;
+  font-size: var(--fs-micro);
   color: var(--status-down);
   margin-top: 5px;
 }

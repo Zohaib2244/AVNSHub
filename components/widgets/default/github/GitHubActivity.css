@@ -30,7 +30,7 @@
 }
 
 .github-username {
-  font-size: 0.8rem;
+  font-size: var(--fs-body);
   font-weight: 500;
   color: var(--text-primary);
   white-space: nowrap;
@@ -67,7 +67,7 @@
 
 .github-tab {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   padding: 4px 10px;
@@ -97,7 +97,7 @@
   justify-content: space-between;
   gap: 8px;
   padding: 4px 0;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-primary);
   border-bottom: 1px solid var(--bg-nested);
 }

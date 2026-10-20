@@ -12,7 +12,9 @@ export function NutBotMascot() {
   return (
     <div className="nutbot-mini">
       <div className="nutbot-v2-scale nutbot-v2-scale-m">
-        <NutBotFaceV2 compact />
+        {/* telemetry off: the wallpaper build is static, there is no
+            /api/system-stats behind it to poll */}
+        <NutBotFaceV2 compact telemetry={false} />
       </div>
     </div>
   );

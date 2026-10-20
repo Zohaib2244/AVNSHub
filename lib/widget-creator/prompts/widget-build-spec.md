@@ -35,6 +35,9 @@ exported as a **named export** matching the file basename:
 - Data fetching: `usePolling<T>(url, intervalMs)` from `@/lib/usePolling` —
   never a bare `setInterval`. Formatters: `timeAgo`, `formatDuration`,
   `formatMins` from `@/lib/format`.
+- Persisting the widget's own data (notes, a todo list, saved items, anything
+  the user builds up — not just a settings toggle): **never `localStorage`
+  directly.** Use `@/lib/canvasStore` — see "Persisting your own data" below.
 - Class vocabulary (inherits the theme automatically): `block-value`
   (`.accent`/`.teal`), `block-sub`, `block-stat`, `more-head`,
   `more-row`/`more-meta`.
@@ -68,33 +71,139 @@ return <RichView />;                         // L: more rows, detail, controls
 A widget with L-only content must include `"L"` in its manifest `sizes`, or
 the user can never reach that layout.
 
+## Size presets (when the build prompt lists them)
+
+If the prompt has a "Size presets" section, the user picked the widget's
+sizing as **presets**: shapes with a size range. Build one layout per listed
+preset and branch on `useWidget().preset`. It is `undefined` outside Slot
+Layout (Graph Layout, the wallpaper build), so fall back to `size` there,
+mapped onto the presets you actually have:
+
+```tsx
+const { preset, size } = useWidget();
+// e.g. presets badge + card: S → badge, M/L → card
+const view = preset ?? (size === "S" ? "badge" : "card");
+if (view === "badge") return <BadgeView />;
+return <CardView />;
+```
+
+- Shapes: **badge** is small (1-2 cells wide, 1 tall), **strip** is wide and
+  short (never tall), **column** is tall and narrow (never wide), **card** is
+  the standard card, **panel** is a detailed view, **hero** fills a whole
+  region of any shape. The prompt gives each range in px.
+- Design each preset at its range's **smallest** box; extra space shows more
+  content. No fixed heights. `useWidget().box` is the cell's measured px size
+  if a layout needs to adapt within its range.
+- Copy `presets`, `defaultPreset` and `fill` into manifest.json exactly as the
+  prompt gives them.
+- After the build is applied, it is rendered at every preset's smallest box,
+  largest box and small-screen floor. Text or controls that end up cut off or
+  outside the card come back to you once, with screenshots.
+
 ## Space discipline (widgets live in a hard size budget)
 
-A widget renders inside a dashboard grid cell, NOT a page. Rough footprints
-(width x height, varies with screen, rows are 128px-based):
+(In Slot Layout the S/M/L below now comes from the widget's size preset; the
+pixel bands still apply in the stacked phone layout. Everything about flexing
+to the space applies either way.)
 
-- S: ~220 x 140
-- M: ~440 x 140 horizontal / ~440 x 300 vertical
-- L: ~680 x 300 horizontal / ~440 x 460 vertical
+A widget renders inside a dashboard grid cell, NOT a page. The user resizes
+widgets freely, and `size` is picked from the cell's **real pixel box**
+(outer size, before the card's ~14px/16px padding and header):
 
-Rules that follow from this:
+- **S**: narrower than 300px OR shorter than 150px. This covers tiny
+  squares (~236x96) but also tall-narrow (~236x204) and wide-short strips
+  (~485x96, ~727x120). Design S for BOTH shapes: never assume S is wide
+  or tall.
+- **M**: everything between S and L, typically ~485x204 up to ~485x312.
+- **L**: at least 600x250 OR 400x400.
+- `orientation` is `"v"` when the box is taller than wide, else `"h"`.
+
+The user can also pin a widget to any size it declares ("layout size" in its
+settings), which overrides the box. So any layout may occasionally render in a
+box smaller than its range above: it must clip cleanly, never break or spill.
+
+Within one size the box still varies a lot, so layouts must **flex to the
+space**, never assume exact pixels. Rules that follow from this:
 
 - The root element must fill its container (`height: 100%`) and NEVER
-  overflow it. No fixed pixel heights taller than the footprint, no
-  `min-width` that exceeds it, no page-level scrolling.
+  overflow it. No fixed pixel widths/heights, no `min-width` larger than
+  ~200px, no page-level scrolling.
 - If content can outgrow the space (lists, logs, history), give THAT inner
-  area `overflow-y: auto` and `min-height: 0` on its flex parents - the
-  block itself never scrolls.
+  area `overflow-y: auto` and `min-height: 0` on its flex parents — never
+  `overflow: hidden` on an area holding controls or text the user needs.
+- **Every horizontal row must be able to shrink.** Put `minWidth: 0` on
+  flex children that hold text or inputs, and `flex: "0 0 auto"` on buttons
+  and icons so they stay visible while the text/input gives way. A row
+  whose total intrinsic width is wider than ~200px will be cut off at S.
+- **Text entry: use an auto-growing `<textarea rows={1}>`, not
+  `<input type="text">`**, for anything a user may type more than a few
+  words into. Set `resize: "none"`, `width: "100%"`, `minWidth: 0`,
+  `boxSizing: "border-box"`, `overflowWrap: "anywhere"`, and on every
+  change set `height = "auto"` then `height = min(scrollHeight, cap)` with
+  `overflowY: "auto"` past the cap (pick a cap that fits the size: ~48px S,
+  ~64px M, ~96px L). Enter submits, Shift+Enter inserts a newline.
+- User-authored text in lists wraps (`overflowWrap: "anywhere"`,
+  `whiteSpace: "pre-wrap"`) inside a scrolling list; clamp it with
+  `WebkitLineClamp` only in S where there's no room to scroll.
+- **One primary action per control.** Never render a second button that
+  duplicates another (e.g. a header "Add" plus the form's own "Add").
 - Density over decoration: paddings 8-12px, gaps 4-8px, inputs ~24-28px
   tall, font sizes on the small end of the token scale. Every element must
   earn its pixels.
-- A smaller size shows FEWER things, not everything smaller. If the widget
-  has many fields/sections, S/M show the essential subset; the full set is
-  an L-only layout (and `"L"` goes in manifest `sizes`).
-- Prefer one focused view with a compact switcher (tabs, dropdown, chips)
-  over side-by-side panels - side-by-side rarely fits, especially at M.
-- Long text truncates (`text-overflow: ellipsis` + `min-width: 0` on flex
-  children) instead of wrapping into multiple lines that blow the height.
+- A smaller size shows FEWER things, not everything smaller. S shows the
+  single most useful thing plus at most one control; secondary sections
+  (history, "done" lists, stats) are L-only or hidden behind a tab.
+- Prefer one focused view with a compact switcher (tabs, chips) over
+  stacked or side-by-side sections — a collapsible section below a list
+  steals height and gets cropped; a tab that swaps the list does not.
+- Don't repeat the widget's own title inside the component — the shell's
+  header already shows it (or the user has hidden it on purpose).
+- Short labels/values truncate (`textOverflow: "ellipsis"`,
+  `whiteSpace: "nowrap"`, `overflow: "hidden"`, `minWidth: 0`).
+- If the widget is unusable below some size, declare `minPx` in the
+  manifest (below) instead of cramming — resizes then stop there.
+
+## Persisting your own data
+
+Settings-schema fields (toggles, a chosen unit, a threshold) are already
+persisted for free as part of the layout — don't build separate storage for
+those. But if the widget owns real data (notes, a todo list, saved links, a
+tracked list, anything the user builds up over time), it **must not** call
+`localStorage.setItem`/`getItem` directly. AVN Hub is multi-canvas (named
+layouts a user switches between) and server-backed (a small DB on the host,
+synced across every browser/device that opens the hub) — a bare `localStorage`
+key is global across every canvas and trapped in one browser, which breaks
+both. Use `@/lib/canvasStore` instead:
+
+```tsx
+import { useCanvasSyncedState } from "@/lib/canvasStore";
+
+type Item = { id: string; label: string };
+
+function buildDefault(): Item[] {
+  return [];
+}
+
+function sanitize(raw: unknown): Item[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.filter((v): v is Item => typeof v === "object" && v !== null && typeof (v as Item).id === "string");
+}
+
+export function MyWidget() {
+  const [items, setItems] = useCanvasSyncedState("my-widget-items", buildDefault, sanitize);
+  // setItems(next) or setItems(prev => ...) - same shape as useState's setter
+}
+```
+
+Pick one unscoped `baseKey` string per piece of data (e.g. `"my-widget-items"`
+- unique to this widget, not reused from another). Everything else (per-canvas
+namespacing, localStorage caching, DB sync) is handled internally - never
+construct the storage key by hand and never touch `localStorage` yourself.
+`sanitize()` returning `null` for anything malformed is what keeps a corrupt
+value from crashing the widget - validate shape, don't just cast. If the data
+needs to live outside React or be shared across multiple mounts, use
+`createCanvasStore` (same file) instead - see
+`components/widgets/default/notes/NotesWidget.tsx` for a worked example.
 
 ## manifest.json shape
 
@@ -111,6 +220,10 @@ Rules that follow from this:
 }
 ```
 
+- `minPx` (optional) — `{ "width": number, "height": number }`, the
+  smallest outer cell box in px the widget still works in; drag-resize
+  won't go below it. Omit it unless the widget truly breaks when small. A
+  widget whose `sizes` lack `"S"` already gets a 300x150 floor.
 - `iconName` — a `lucide-react` icon name as a **string**, PascalCase (no
   import in this file).
 - `settings` — each field is one of: `{type:"toggle",default:boolean}`,
@@ -310,6 +423,9 @@ and `->`/`=>` instead of arrow glyphs.
 
 - Reuse an existing `id`/slug, or rename one casually.
 - Fetch with a bare `setInterval` — use `usePolling`.
+- Call `localStorage.setItem`/`getItem` directly for the widget's own data —
+  use `@/lib/canvasStore` (see "Persisting your own data" above) so it's
+  scoped to the active canvas and synced to the shared-hub DB.
 - Hard-code colors or fonts — use the CSS variable tokens.
 - Attach `framer-motion layout` or dnd-kit `animateLayoutChanges` to grid
   items — dense grid reflow + per-item re-measure loops into "Maximum
@@ -323,3 +439,11 @@ and `->`/`=>` instead of arrow glyphs.
   platform writes/updates it automatically after every successful turn from
   the creator's settings. If one is included above under "Project spec", it
   is already the authoritative context; don't second-guess it by exploring.
+- **Delete, move, or rename the component `.tsx` when editing it — always
+  rewrite it in place.** The hub runs against a live dev server that
+  recompiles on every file event, and `config/customComponentMap.tsx` holds a
+  static import of this exact path. If the file is absent for even the moment
+  between a delete and the write that follows, that import fails to resolve
+  and the *entire dashboard* 500s — not just this widget — until the file is
+  back. Removing it first to "start clean" is never worth that. Same reason:
+  don't rename the file to change a component's name.

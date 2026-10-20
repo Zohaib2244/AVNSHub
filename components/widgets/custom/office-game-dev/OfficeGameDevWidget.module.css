@@ -1,0 +1,861 @@
+.root {
+  color: var(--text-primary);
+  font-family: var(--font-jetbrains-mono), monospace;
+  min-height: 0;
+  width: 100%;
+}
+
+.root :is(button, input, select, textarea) {
+  transition:
+    border-color 140ms ease,
+    background-color 140ms ease,
+    color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.root :is(input, select, textarea) {
+  font-size: 0.68rem !important;
+}
+
+.root :is(input, select, textarea):focus-visible,
+.root button:focus-visible {
+  border-color: var(--accent-cyan) !important;
+  outline: 1.5px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.root button:not(:disabled):active {
+  transform: translate(1px, 1px);
+}
+
+.summary {
+  text-align: center;
+}
+
+.needsAttention {
+  color: var(--accent-orange) !important;
+}
+
+.listView,
+.detail,
+.workspace,
+.gameList,
+.tabPanel {
+  min-height: 0;
+}
+
+.workspace {
+  overflow: hidden;
+}
+
+.sidebar {
+  min-width: 0;
+}
+
+.gameRow {
+  border: 1px solid transparent;
+  gap: 5px !important;
+  min-height: 38px;
+  padding: 3px 4px 3px 7px !important;
+}
+
+.gameRow:hover {
+  background: color-mix(in srgb, var(--bg-card) 75%, var(--accent-cyan) 4%) !important;
+  border-color: color-mix(in srgb, var(--border) 80%, var(--accent-cyan));
+}
+
+.gameSelect {
+  border-radius: 5px;
+}
+
+.gameName {
+  font-size: 0.72rem !important;
+  font-weight: 650;
+}
+
+.gameMeta {
+  font-size: 0.59rem !important;
+  margin-top: 2px;
+}
+
+.countChip {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.59rem !important;
+  height: 20px;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0 5px !important;
+}
+
+.addRow,
+.addLinkRow {
+  align-items: stretch;
+}
+
+.searchRow input {
+  min-height: 28px;
+}
+
+.iconButton {
+  min-height: 28px !important;
+  min-width: 28px;
+}
+
+.iconButton:hover {
+  background: color-mix(in srgb, var(--bg-card) 86%, var(--accent-cyan) 14%) !important;
+  border-color: var(--accent-cyan) !important;
+  color: var(--accent-cyan) !important;
+}
+
+.confirmDelete {
+  align-items: center;
+  color: var(--accent-orange) !important;
+  display: inline-flex;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.53rem;
+  gap: 3px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.backButton {
+  border-radius: 7px !important;
+  min-height: 28px;
+}
+
+.backButton:hover {
+  background: var(--bg-nested) !important;
+  color: var(--text-primary) !important;
+}
+
+.detail {
+  overflow: hidden;
+}
+
+.detailHeader {
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  gap: 10px;
+  min-height: 36px;
+  padding-bottom: 7px;
+}
+
+.detailIdentity {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.detailIdentity > :first-child {
+  font-size: 0.86rem !important;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailIdentity > :last-child {
+  color: var(--text-muted);
+  font-size: 0.58rem;
+  margin-top: 2px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailActions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+}
+
+.identityPanel {
+  flex-shrink: 0;
+}
+
+.tabList {
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-shrink: 0;
+  gap: 2px !important;
+  padding: 3px;
+}
+
+.tab {
+  border-color: transparent !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  font-size: 0.58rem !important;
+  min-height: 28px !important;
+}
+
+.tab:hover {
+  background: var(--bg-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.tabActive {
+  background: var(--bg-card) !important;
+  border-color: var(--border) !important;
+  box-shadow: 1px 1px 0 var(--shadow) !important;
+  color: var(--accent-cyan) !important;
+}
+
+.tabPanel {
+  animation: panelIn 240ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  height: 100%;
+}
+
+.linksSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  padding: 1px;
+}
+
+.linkGrid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+}
+
+.linkGroupHeader {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+}
+
+.addLinkButton {
+  align-items: center;
+  background: transparent;
+  border: 1.5px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.58rem;
+  gap: 4px;
+  letter-spacing: 0.08em;
+  min-height: 26px;
+  padding: 3px 10px;
+  text-transform: uppercase;
+}
+
+.addLinkButton:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* portrait tile: icon box on top, name + host centred, two buttons bottom-right */
+.linkTile,
+.linkEmpty {
+  background: var(--bg-nested);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.linkTile:hover,
+.linkTile:focus-within {
+  border-color: var(--accent-cyan);
+}
+
+.linkEmpty {
+  align-items: stretch;
+  background: transparent;
+  border-style: dashed;
+  box-shadow: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  /* the buttons row a filled tile has, so both kinds line up in the grid */
+  padding-bottom: 38px;
+  text-align: center;
+  width: 100%;
+}
+
+.linkEmpty:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.linkMain {
+  align-items: stretch;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.linkIcon {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  color: var(--accent-orange);
+  display: flex;
+  height: 64px;
+  justify-content: center;
+  width: 100%;
+}
+
+.linkEmpty .linkIcon {
+  color: var(--text-muted);
+}
+
+.linkLabel {
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.2;
+  overflow: hidden;
+  padding: 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkHost {
+  color: var(--text-muted);
+  font-size: 0.6rem;
+  overflow: hidden;
+  padding: 0 2px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkActions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.linkActions .iconButton {
+  height: 26px;
+  justify-content: center;
+  width: 26px;
+}
+
+.linkEditor {
+  background: var(--bg-nested);
+  border: 1.5px solid var(--accent-cyan);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  grid-column: 1 / -1;
+  padding: 8px;
+}
+
+.linkEditorTitle {
+  color: var(--text-muted);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.linkEditorButtons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+/* the wrapper animates height (grid 1fr -> 0fr) so neighbours slide up/down
+   instead of jumping; the row inside stays at its natural size */
+.todoWrap {
+  display: grid;
+  grid-template-rows: 1fr;
+}
+
+.todoWrap > .todoRow {
+  min-height: 0;
+}
+
+.todoEnter {
+  animation: todoIn 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.todoLeave {
+  animation: todoOut 240ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.todoEnter > .todoRow,
+.todoLeave > .todoRow {
+  overflow: hidden;
+}
+
+@keyframes todoIn {
+  from {
+    grid-template-rows: 0fr;
+    margin-bottom: -6px;
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    grid-template-rows: 1fr;
+    margin-bottom: 0;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes todoOut {
+  from {
+    grid-template-rows: 1fr;
+    margin-bottom: 0;
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    grid-template-rows: 0fr;
+    margin-bottom: -6px;
+    opacity: 0;
+    transform: translateX(18px);
+  }
+}
+
+.todoRow {
+  transition: border-color 160ms ease, background-color 160ms ease, opacity 200ms ease;
+  align-items: flex-start;
+  background: var(--bg-nested);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 2px 2px 0 var(--shadow);
+  display: flex;
+  gap: 8px;
+  padding: 6px 6px 6px 8px;
+}
+
+.todoCheck {
+  align-items: center;
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  color: var(--bg-card);
+  cursor: pointer;
+  display: inline-flex;
+  flex-shrink: 0;
+  height: 20px;
+  justify-content: center;
+  margin-top: 1px;
+  padding: 0;
+  width: 20px;
+}
+
+.todoCheck {
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+}
+
+.todoCheck:hover {
+  border-color: var(--accent-cyan);
+  transform: scale(1.08);
+}
+
+.todoCheck:active {
+  transform: scale(0.88);
+}
+
+/* a check icon pops in when it mounts: todo ticked, link copied */
+.popIn {
+  animation: tickPop 260ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes tickPop {
+  from {
+    opacity: 0;
+    transform: scale(0.3) rotate(-25deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.todoRow[data-done="true"] .todoCheck {
+  background: var(--accent-orange);
+  border-color: var(--accent-orange);
+}
+
+.todoText {
+  color: var(--text-primary);
+  flex: 1 1 auto;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding-top: 2px;
+  white-space: pre-wrap;
+}
+
+.todoText {
+  transition: color 200ms ease;
+}
+
+.todoRow[data-done="true"] {
+  opacity: 0.72;
+}
+
+.todoRow[data-done="true"] .todoText {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+/* buttons: lift on hover, press on click (the root rule already nudges :active) */
+.iconButton:hover {
+  transform: translateY(-1px);
+}
+
+.todoActions {
+  align-items: center;
+  display: flex;
+  flex-shrink: 0;
+  gap: 3px;
+}
+
+.publishForm {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.formGroup {
+  background: var(--bg-nested);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+}
+
+.formGroup:last-of-type {
+  grid-column: 1 / -1;
+}
+
+.formGroupTitle {
+  color: var(--accent-cyan);
+  font-family: var(--font-dot-gothic), monospace;
+  font-size: 0.54rem;
+  letter-spacing: 0.09em;
+  margin-bottom: 1px;
+  text-transform: uppercase;
+}
+
+.primaryButton {
+  grid-column: 1 / -1;
+  min-height: 32px !important;
+}
+
+.emptyWorkspace {
+  align-items: center;
+  align-self: center;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-self: center;
+  text-align: center;
+}
+
+.emptyWorkspace svg {
+  color: var(--accent-cyan);
+}
+
+.emptyWorkspace strong {
+  color: var(--text-primary);
+  font-size: 0.72rem;
+}
+
+.emptyWorkspace span {
+  font-size: 0.59rem;
+}
+
+@container widget (max-width: 620px) {
+  .publishForm {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .formGroup:last-of-type,
+  .primaryButton {
+    grid-column: auto;
+  }
+
+  .tab {
+    font-size: 0.53rem !important;
+  }
+}
+
+@container widget (max-width: 390px) {
+  .root :is(input, select, textarea) {
+    font-size: 0.62rem !important;
+  }
+
+  .tabList {
+    overflow-x: auto;
+  }
+
+  .tab {
+    flex: 0 0 auto !important;
+    padding-inline: 8px !important;
+  }
+
+  .linkGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (pointer: coarse) {
+  .iconButton,
+  .tab {
+    min-height: 36px !important;
+  }
+
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- motion ---------------------------------------------------------------
+   Everything below runs once on mount (or on a state swap that remounts), so
+   it never fights the grid: no layout animation on grid items, no state set
+   from a measurement. The reduced-motion rule at the bottom flattens it. */
+
+@keyframes panelIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* list <-> detail on M, and a new game selected on L */
+.listView {
+  animation: viewInLeft 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.detail {
+  animation: viewInRight 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+@keyframes viewInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes viewInRight {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* identity editor opening under the header */
+.slideDown {
+  animation: slideDown 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transform-origin: top;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scaleY(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* game rows stagger in; a deleted one slides out and closes up */
+.gameRow {
+  animation: rowIn 240ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.gameRow:nth-child(2) { animation-delay: 30ms; }
+.gameRow:nth-child(3) { animation-delay: 60ms; }
+.gameRow:nth-child(4) { animation-delay: 90ms; }
+.gameRow:nth-child(n + 5) { animation-delay: 120ms; }
+
+@keyframes rowIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.gameLeave {
+  animation: rowOut 240ms cubic-bezier(0.4, 0, 1, 1) forwards !important;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+@keyframes rowOut {
+  from {
+    margin-bottom: 0;
+    max-height: 64px;
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    margin-bottom: -4px;
+    max-height: 0;
+    min-height: 0;
+    opacity: 0;
+    padding-block: 0;
+    transform: translateX(16px);
+  }
+}
+
+/* link tiles pop in staggered, lift on hover (the shadow grows with them),
+   and an opening editor expands */
+.linkTile,
+.linkEmpty {
+  animation: tileIn 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.linkGrid > :nth-child(2) { animation-delay: 40ms; }
+.linkGrid > :nth-child(3) { animation-delay: 80ms; }
+.linkGrid > :nth-child(4) { animation-delay: 120ms; }
+.linkGrid > :nth-child(n + 5) { animation-delay: 160ms; }
+
+@keyframes tileIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.linkTile:hover {
+  box-shadow: 5px 5px 0 var(--shadow);
+  transform: translateY(-2px);
+}
+
+.linkEmpty:hover {
+  transform: translateY(-2px);
+}
+
+.linkIcon {
+  transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1), border-color 160ms ease;
+}
+
+.linkMain:hover .linkIcon,
+.linkEmpty:hover .linkIcon {
+  border-color: var(--accent-cyan);
+  transform: scale(1.04);
+}
+
+.linkEditor {
+  animation: slideDown 220ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+  transform-origin: top;
+}
+
+.addLinkButton {
+  transition: border-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+
+.addLinkButton:hover {
+  transform: translateY(-1px);
+}
+
+/* publish form: its three groups cascade in */
+.formGroup {
+  animation: panelIn 260ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.formGroup:nth-of-type(2) { animation-delay: 50ms; }
+.formGroup:nth-of-type(3) { animation-delay: 100ms; }
+
+.primaryButton {
+  animation: panelIn 260ms 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+/* S summary: the count settles in */
+.summary > :global(.block-stat) {
+  animation: popStat 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+@keyframes popStat {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root *,
+  .root *::before,
+  .root *::after {
+    animation-delay: 0s !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* remaining-todos count on the Todo tab; re-keyed text means it pops on change */
+.tabCount {
+  animation: popStat 260ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  background: var(--accent-orange);
+  border-radius: 99px;
+  color: var(--bg-card);
+  display: inline-block;
+  font-size: 0.54rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1;
+  margin-left: 6px;
+  min-width: 14px;
+  padding: 2px 5px;
+  text-align: center;
+}

@@ -1,14 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createElement, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle, ArrowUp, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain,
   CloudSnow, CloudSun, Droplets, Eye, Gauge, MapPin, RefreshCw, Settings, Sun,
-  Thermometer, Wind, X,
+  Thermometer, X,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { usePolling } from "@/lib/usePolling";
+import { useCanvasSyncedState } from "@/lib/canvasStore";
 
 /* ─── types ─── */
 
@@ -180,14 +182,16 @@ function degreesToDir(deg: number | null): string {
   return DIR_NAMES[Math.round(deg / 45) % 8];
 }
 
-function loadSettings(): WeatherSettings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const stored = localStorage.getItem(SETTINGS_KEY);
-    return stored ? { ...DEFAULT_SETTINGS, ...JSON.parse(stored) } : DEFAULT_SETTINGS;
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
+// canvas-scoped + DB-synced (app/api/hub-data) — see lib/canvasStore.ts.
+// Canvas A's saved location is invisible on canvas B, and every write mirrors
+// to the shared-hub DB so the same settings show up from any browser/device.
+function sanitizeSettings(raw: unknown): WeatherSettings | null {
+  if (!raw || typeof raw !== "object") return null;
+  return { ...DEFAULT_SETTINGS, ...(raw as Partial<WeatherSettings>) };
+}
+
+function buildDefaultSettings(): WeatherSettings {
+  return DEFAULT_SETTINGS;
 }
 
 /* ─── font/style tokens ─── */
@@ -201,14 +205,14 @@ const border: CSSProperties = { border: "1.5px solid var(--border)" };
 
 export function WeatherUpdatedWidget() {
   const { size } = useWidget();
-  const [settings, setSettings] = useState<WeatherSettings>(loadSettings);
+  const [settings, setSettings] = useCanvasSyncedState<WeatherSettings>(SETTINGS_KEY, buildDefaultSettings, sanitizeSettings);
   const [showSettings, setShowSettings] = useState(false);
   const [draft, setDraft] = useState<WeatherSettings>(settings);
   const [mTab, setMTab] = useState<"hourly" | "details">("hourly");
   const [lTab, setLTab] = useState<"hourly" | "daily">("hourly");
   const [spin, setSpin] = useState(false);
-  const [, tick] = useState(0);
-  const lastFetchRef = useRef(Date.now());
+  // null until the first poll lands; the stale check starts counting from then
+  const lastFetchRef = useRef<number | null>(null);
 
   const isEmpty = settings.lat === 0 && settings.lon === 0;
 
@@ -229,22 +233,24 @@ export function WeatherUpdatedWidget() {
   );
 
   /* track last successful fetch time */
+  const dataRef = useRef(data);
   useEffect(() => {
+    dataRef.current = data;
     if (data && !("error" in data)) {
       lastFetchRef.current = Date.now();
     }
   }, [data]);
 
-  /* force re-render every 60s for stale indicator */
-  useEffect(() => {
-    const t = setInterval(() => tick((n) => n + 1), 60_000);
-    return () => clearInterval(t);
-  }, []);
-
-  /* auto-refresh when data is stale */
+  /* every 60s: if the data is older than two poll intervals, mark exactly this
+     payload as stale and ask for a refresh. Tying "stale" to the payload's
+     identity means a fresh response clears it without any extra state reset,
+     and nothing reads the clock during render. */
+  const [stalePayload, setStalePayload] = useState<unknown>(undefined);
   useEffect(() => {
     const t = setInterval(() => {
-      if (Date.now() - lastFetchRef.current > settings.pollingInterval * 60_000 * 2) {
+      const last = lastFetchRef.current;
+      if (last !== null && Date.now() - last > settings.pollingInterval * 60_000 * 2) {
+        setStalePayload(dataRef.current);
         refresh();
       }
     }, 60_000);
@@ -252,7 +258,7 @@ export function WeatherUpdatedWidget() {
   }, [settings.pollingInterval, refresh]);
 
   const isStale = !isEmpty && !!data && !("error" in data) && settings.pollingInterval > 0 &&
-    Date.now() - lastFetchRef.current > settings.pollingInterval * 60_000 * 2;
+    stalePayload === data;
 
   const isLoading = !isEmpty && data === null;
   const isError = !!(data && "error" in data);
@@ -271,9 +277,8 @@ export function WeatherUpdatedWidget() {
 
   const saveDraft = useCallback(() => {
     setSettings(draft);
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(draft));
     setShowSettings(false);
-  }, [draft]);
+  }, [draft, setSettings]);
 
   const tempSymbol = settings.tempUnit === "f" ? "F" : "C";
   const windLabel = settings.windUnit === "mph" ? "mph" : "km/h";
@@ -284,7 +289,7 @@ export function WeatherUpdatedWidget() {
   /* ─── core weather values ─── */
   const c = weatherData?.current;
   const weatherCode = c?.weather_code ?? null;
-  const WmoIcon = getWmoIcon(weatherCode);
+  const wmoIcon = (props: { size: number; style?: CSSProperties }) => createElement(getWmoIcon(weatherCode), props);
   const conditionLabel = getWmoLabel(weatherCode);
   const temp = c?.temperature_2m ?? null;
   const feelsLike = c?.apparent_temperature ?? null;
@@ -314,7 +319,7 @@ export function WeatherUpdatedWidget() {
         <button onClick={openSettings} style={{ background: "var(--accent-orange)", border: "none", color: "var(--badge-text)", cursor: "pointer", fontFamily: "var(--font-jetbrains-mono), monospace", fontSize: "0.52rem", padding: "4px 12px", borderRadius: 6, fontWeight: 500 }} type="button">
           Open Settings
         </button>
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </div>
     );
   }
@@ -353,7 +358,7 @@ export function WeatherUpdatedWidget() {
             {settings.locationName}
           </span>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <WmoIcon size={44} style={{ color: iconColor, flex: "none" }} />
+            {wmoIcon({ size: 44, style: { color: iconColor, flex: "none" } })}
             <span style={{ ...mono, fontSize: "2.4rem", fontWeight: 500, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {formatTemp(temp)}
             </span>
@@ -363,7 +368,7 @@ export function WeatherUpdatedWidget() {
           </span>
         </div>
         {isStale && <StaleIndicator />}
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </Root>
     );
   }
@@ -388,7 +393,7 @@ export function WeatherUpdatedWidget() {
             <span style={{ ...mono, fontSize: "2.8rem", fontWeight: 500, lineHeight: 1, letterSpacing: "-0.02em" }}>
               {formatTemp(temp)}
             </span>
-            <WmoIcon size={44} style={{ color: iconColor }} />
+            {wmoIcon({ size: 44, style: { color: iconColor } })}
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span style={{ ...dotGothic, ...uppercase, fontSize: "0.6rem", letterSpacing: "0.1em", color: "var(--accent-orange)" }}>
                 {conditionLabel}
@@ -448,7 +453,7 @@ export function WeatherUpdatedWidget() {
             </div>
           )}
         </div>
-        {showSettings && <SettingsOverlay />}
+        {showSettings && settingsOverlay()}
       </Root>
     );
   }
@@ -472,7 +477,7 @@ export function WeatherUpdatedWidget() {
         <div style={{ display: "flex", gap: 8, alignItems: "center", flex: "none" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "6px 10px", background: "var(--bg-nested)", borderRadius: 10, ...border }}>
             <span style={{ ...mono, fontSize: "3rem", fontWeight: 500, lineHeight: 1 }}>{formatTemp(temp)}</span>
-            <WmoIcon size={44} style={{ color: iconColor }} />
+            {wmoIcon({ size: 44, style: { color: iconColor } })}
             <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
               <span style={{ ...dotGothic, ...uppercase, fontSize: "0.65rem", letterSpacing: "0.1em", color: "var(--accent-orange)" }}>
                 {conditionLabel}
@@ -561,14 +566,20 @@ export function WeatherUpdatedWidget() {
           </button>
         </div>
       </div>
-      {showSettings && <SettingsOverlay />}
+      {showSettings && settingsOverlay()}
     </Root>
   );
 
   /* ─── internal sub-components ─── */
 
-  function SettingsOverlay() {
-    return (
+  // Portaled to <body>: the slot card sets `contain: layout paint`, which
+  // makes position: fixed resolve against (and clip to) the card, so an
+  // in-place overlay was trapped inside small widgets. Called as a plain
+  // function, not <SettingsOverlay />, because a component defined inside
+  // the render gets a new identity each render and remounts on every
+  // keystroke, dropping input focus.
+  function settingsOverlay() {
+    return createPortal(
       <div
         style={{
           position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 100,
@@ -580,7 +591,7 @@ export function WeatherUpdatedWidget() {
         <div
           style={{
             background: "var(--bg-card)", ...border, borderRadius: 14,
-            boxShadow: "6px 6px 0 var(--shadow)", width: 320, padding: 16,
+            boxShadow: "6px 6px 0 var(--shadow)", width: "min(320px, calc(100vw - 32px))", maxHeight: "calc(100vh - 32px)", overflowY: "auto", boxSizing: "border-box", padding: 16,
             display: "flex", flexDirection: "column", gap: 10,
           }}
           onClick={(e) => e.stopPropagation()}
@@ -621,7 +632,8 @@ export function WeatherUpdatedWidget() {
             Save Settings
           </button>
         </div>
-      </div>
+      </div>,
+      document.body,
     );
   }
 

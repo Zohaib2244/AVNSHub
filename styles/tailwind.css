@@ -1,0 +1,9 @@
+/* The only file that goes through @tailwindcss/postcss — keep every Tailwind
+   at-rule here and all hand-written CSS in globals.css (see its header for
+   why). Imported before globals.css so the cascade order is unchanged. */
+@import "tailwindcss";
+
+@theme inline {
+  --font-display: var(--font-dot-gothic);
+  --font-mono: var(--font-jetbrains-mono);
+}

@@ -7,10 +7,9 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Search, X } from "lucide-react";
 import { getManifest } from "@/config/widgets";
-import { minFootprint, type SlotRegionId } from "@/config/slotLayout";
-import { buildOccupancy, findFit } from "@/lib/grid/occupancy";
+import type { SlotRegionId } from "@/config/slotLayout";
 import { fuzzyFilter } from "@/lib/fuzzy";
-import { getSlotLayout, getUnplacedWidgets, placeWidget } from "@/lib/slotLayout";
+import { findPlacement, getSlotLayout, getUnplacedWidgets, placeWidget } from "@/lib/slotLayout";
 
 export function SlotPlacementPopover({
   region,
@@ -48,24 +47,10 @@ export function SlotPlacementPopover({
 
   const unplaced = getUnplacedWidgets();
   const slotLayout = getSlotLayout();
-  const candidates = unplaced.filter((id) => {
-    const dims = slotLayout.regionDims[region];
-    const occupancy = buildOccupancy(
-      dims,
-      slotLayout.widgets
-        .filter((w) => w.region === region)
-        .map((w) => ({ col: w.col, row: w.row, colSpan: w.colSpan, rowSpan: w.rowSpan })),
-    );
-    return findFit(dims, occupancy, minFootprint(id)) !== null;
-  });
+  const candidates = unplaced.filter((id) => findPlacement(id, region, slotLayout) !== null);
 
   const filtered = fuzzyFilter(candidates, query, (id) => getManifest(id)?.title ?? id);
   const clampedIndex = filtered.length ? Math.min(activeIndex, filtered.length - 1) : 0;
-
-  // reset the highlight to the top match whenever the result set changes
-  useEffect(() => {
-    setActiveIndex(0);
-  }, [query]);
 
   // keep the highlighted row scrolled into view as arrows move it
   useEffect(() => {
@@ -110,9 +95,14 @@ export function SlotPlacementPopover({
             <input
               type="text"
               className="drawer-search"
-              placeholder="search widgets..."
+              aria-label="search widgets"
+              placeholder="search widgets…"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                // a new query means a new result set: highlight the top match
+                setActiveIndex(0);
+              }}
               onKeyDown={handleSearchKeyDown}
               spellCheck={false}
               autoComplete="off"

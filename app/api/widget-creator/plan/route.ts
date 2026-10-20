@@ -7,8 +7,12 @@ import { streamHarnessChat } from "@/lib/nutbot/chatHarness";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { isSkillAvailable } from "@/lib/widget-creator/skillCheck";
 import { buildWidgetCatalogSection } from "@/lib/widget-creator/widgetCatalog";
+import { QUESTION_FORMAT } from "@/lib/widget-creator/question";
+import { presetCatalogText } from "@/lib/widget-creator/briefPresets";
 
 export const dynamic = "force-dynamic";
+
+import { readModelDefaults, resolveSession } from "@/lib/widget-creator/runStore";
 
 const REPO_ROOT = process.cwd();
 
@@ -51,7 +55,17 @@ ${buildWidgetCatalogSection()}
 
 When the user asks for suggestions ("what widget could I add?"), propose 2-4 concrete, novel ideas that aren't already covered by the list above — you already have everything you need to do this from the list, no exploration required.
 
-When the idea is vague, ask 1–2 focused questions — what data would it show, how often they'd glance at it, what size feels right (S = small badge/counter, M = medium data card, L = detailed panel).
+When the idea is vague, ask 1–2 focused questions — what data would it show, how often they'd glance at it. Ask them as a \`nutbot-question\` block (below) rather than as prose, so the user can answer with a click.
+
+## Size presets
+
+Every widget ships in one or more size presets: a shape with a size range, measured in cells of the default side grid (a cell ≈ 235×112px on a 1920×1080 screen). The user resizes the widget freely within the presets it declares; each preset is its own layout.
+
+${presetCatalogText()}
+
+The user decides the presets. Before the first brief, unless they already said which shapes they want, ask with a \`multiSelect\` question: one option per preset that makes sense for this widget, labelled with the preset name, and a description saying what that preset would show for THIS widget. Recommend the smallest honest set: don't offer panel unless there's genuinely more to show. Offer \`hero\` only if the user asks for a widget that fills a whole region, and tell them a hero must be fully fluid or use fill "scale". Only ask about fill when it matters: "reflow" (the default: extra space grows text a little and shows more content) or "scale" (fixed artwork like a clock face or pixel art, drawn at the preset's min size and scaled up to fit).
+
+${QUESTION_FORMAT}
 
 When the concept is specific, produce a structured brief in this exact format — only valid JSON inside the backtick block:
 
@@ -60,11 +74,14 @@ When the concept is specific, produce a structured brief in this exact format �
   "title": "Human Readable Title",
   "slug": "kebab-case-slug",
   "icon": "LucideIconName",
-  "sizes": ["S", "M"],
+  "presets": ["badge", "card"],
+  "defaultPreset": "card",
+  "fill": "reflow",
   "requirements": "THE MASTER RECORD — the complete widget spec. Everything the user asked for: what the widget is, its purpose, every field/control/button with its exact label, every behavior and interaction, data handling, persistence, formatting rules, empty/error states, edge cases, things to avoid. Written as a numbered list, one requirement per line (\\n-separated inside this JSON string).",
-  "sContent": "how S presents this — which parts of the requirements it shows, laid out top to bottom",
-  "mContent": "how M presents this — which parts of the requirements it shows, laid out top to bottom",
-  "lContent": "how L presents this — omit key if L is not useful",
+  "presetContent": {
+    "badge": "how the badge presents this — which parts of the requirements it shows, laid out top to bottom",
+    "card": "how the card presents this — which parts of the requirements it shows, laid out top to bottom"
+  },
   "dataSource": "URL or API the widget polls (empty string if static)",
   "dataShape": "JSON shape of the response (empty string if static)",
   "concept": "One or two sentences describing the widget's purpose",
@@ -74,7 +91,8 @@ When the concept is specific, produce a structured brief in this exact format �
 
 The brief is the ONLY thing the downstream mockup and build stages receive — they never see this conversation. Anything you leave out of the brief is lost. So:
 - \`requirements\` must capture EVERY requirement the user stated across the whole conversation, verbatim where they gave specifics — exact field names, labels, example values, formats. Never compress a list the user actually gave into "e.g." or "etc.". Before emitting, re-read the conversation and check nothing they asked for is missing.
-- The per-size content fields don't repeat the requirements — they divide them up: which requirements appear at that size and in what order, so each size is a purpose-built view, not a summary. The builder should be able to lay out each size from its content field plus the requirements list, with zero guessing.
+- \`presets\` lists only presets the user agreed to, and \`presetContent\` has exactly one entry per listed preset. \`defaultPreset\` is the one a new placement starts at, and must be in \`presets\`.
+- The \`presetContent\` entries don't repeat the requirements — they divide them up: which requirements appear in that preset and in what order, so each preset is a purpose-built view for its shape, not a summary. The builder should be able to lay out each preset from its entry plus the requirements list, with zero guessing.
 - When the user asks for a change to an existing brief, re-emit the FULL updated brief block — every field, with \`requirements\` updated to reflect the change (added, amended, or removed) — so the latest block is always the complete spec.
 
 After the brief, invite the user to refine any field or explore alternatives. Keep replies concise. Do not write code or TSX.`;
@@ -96,10 +114,15 @@ export async function POST(req: Request) {
     );
   }
 
+  if (!["claude", "codex", "opencode"].includes(harness)) return Response.json({ error: "Invalid provider" }, { status: 400 });
+  const modelChoice = (await readModelDefaults())[harness];
+  const validSession = await resolveSession(sessionId, harness, modelChoice.model);
   const stream = streamHarnessChat({
+    modelChoice,
+    stage: "plan",
     harness,
     message,
-    sessionId,
+    sessionId: validSession,
     persona: buildPlanPersona(harness),
     history,
   });

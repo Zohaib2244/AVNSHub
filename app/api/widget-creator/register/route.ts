@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { isValidCustomWidgetId, registerCustomWidget } from "@/lib/widget-creator/customRegistry";
+import { isValidCustomWidgetId, registerCustomWidget, setRegistryFlag } from "@/lib/widget-creator/customRegistry";
+import { readVerifyWarning } from "@/lib/widget-creator/verifyWidget";
 
 // Commits a brand-new widget the generate route deliberately left unregistered
 // (see the comment above registerCustomWidget() in lib/widget-creator/customRegistry.ts).
@@ -9,7 +10,16 @@ import { isValidCustomWidgetId, registerCustomWidget } from "@/lib/widget-creato
 // so the resulting full reload is deliberate and user-triggered here instead of
 // tearing down the generate SSE stream mid-flight.
 export async function POST(req: Request) {
-  let body: { slug?: string; name?: string; icon?: string; sizes?: string[]; orientations?: string[] };
+  let body: {
+    slug?: string;
+    name?: string;
+    icon?: string;
+    sizes?: string[];
+    orientations?: string[];
+    presets?: unknown[];
+    defaultPreset?: unknown;
+    fill?: unknown;
+  };
   try {
     body = await req.json();
   } catch {
@@ -27,11 +37,17 @@ export async function POST(req: Request) {
     icon: body.icon,
     sizes: body.sizes,
     orientations: body.orientations,
+    presets: body.presets,
+    defaultPreset: body.defaultPreset,
+    fill: body.fill,
   });
 
   if (!result.ok) {
     return NextResponse.json({ error: result.error ?? "registration failed" }, { status: 400 });
   }
+
+  // a widget whose build didn't pass verify installs flagged
+  setRegistryFlag(slug, "verifyWarning", (await readVerifyWarning(slug)) ?? undefined);
 
   return NextResponse.json({ ok: true });
 }

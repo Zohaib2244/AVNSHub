@@ -1,0 +1,8 @@
+{
+  "title": "claude usage",
+  "iconName": "Database",
+  "sizes": ["S", "M"],
+  "orientations": ["h"],
+  "defaults": { "size": "M", "orientation": "h" },
+  "settings": []
+}
