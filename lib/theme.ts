@@ -13,9 +13,11 @@
 // attributes) and notify this store's own listeners, both handled by the
 // subscribeCanvases() callback below.
 
-import { DEFAULT_PALETTE, isPaletteId, type PaletteId } from "@/config/themes";
+import { DEFAULT_PALETTE, WALLPAPER_PALETTE, isPaletteId, type PaletteId } from "@/config/themes";
 import { canvasScopedKey, getActiveCanvasId, subscribeCanvases } from "@/lib/canvases";
 import { pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
+import { subscribeWallpaper } from "@/lib/wallpaper";
+import { ensureWallpaperPalette } from "@/lib/wallpaperPalette";
 
 export type ThemeMode = "light" | "dark" | "auto";
 
@@ -27,8 +29,8 @@ function themeKey(): string {
   return canvasScopedKey(STORAGE_KEY, getActiveCanvasId());
 }
 
-function paletteKey(): string {
-  return canvasScopedKey(PALETTE_KEY, getActiveCanvasId());
+function paletteKey(canvasId: string = getActiveCanvasId()): string {
+  return canvasScopedKey(PALETTE_KEY, canvasId);
 }
 
 export function getThemeMode(): ThemeMode {
@@ -66,6 +68,9 @@ export function applyPalette() {
   } else {
     document.documentElement.dataset.palette = id;
   }
+  // the "auto" pack's tokens are generated from the wallpaper — make sure the
+  // injected style matches this canvas's current one (cheap when cached)
+  if (id === WALLPAPER_PALETTE) ensureWallpaperPalette();
 }
 
 export function applyThemeSettings() {
@@ -80,8 +85,8 @@ export function setThemeMode(mode: ThemeMode) {
   listeners.forEach((listener) => listener());
 }
 
-export function getPalette(): PaletteId {
-  const stored = localStorage.getItem(paletteKey());
+export function getPalette(canvasId: string = getActiveCanvasId()): PaletteId {
+  const stored = localStorage.getItem(paletteKey(canvasId));
   return isPaletteId(stored) ? stored : DEFAULT_PALETTE;
 }
 
@@ -102,6 +107,13 @@ export function subscribeTheme(listener: () => void) {
     listeners.delete(listener);
   };
 }
+
+// the auto palette follows the wallpaper: replacing or clearing it re-derives
+// (or drops) the tokens. The wallpaper store also notifies for backdrop and
+// parallax changes; ensureWallpaperPalette() is a cache hit for those.
+subscribeWallpaper(() => {
+  if (getPalette() === WALLPAPER_PALETTE) ensureWallpaperPalette();
+});
 
 // re-skin the page whenever the active canvas changes — each canvas's theme
 // mode/palette is independent (see themeKey/paletteKey above), so switching

@@ -5,6 +5,7 @@
 // converges on the same prefs instead of each being stuck with its own.
 
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "./widget-creator/harnessAdapters";
+import { DEFAULT_MODELS, sanitizeModelDefaults, type ModelDefaults } from "./widget-creator/models";
 import { pollWhileVisible, pullFromServer, pushToServer } from "./serverSync";
 
 export type ChatBackend = "auto" | "bonfire" | HarnessId | "off";
@@ -14,6 +15,10 @@ export type Prefs = {
   pollingEnabled: boolean;
   /** false = skip the boot-sequence intro entirely */
   bootSequence: boolean;
+  /** true = play a short synthesized chime when the boot sequence completes */
+  bootChime: boolean;
+  /** true = make a quiet synthesized blip for NutBot's streamed token frames */
+  chatTokenBlips: boolean;
   /** NutBot chat backend selector */
   chatBackend: ChatBackend;
   /** false = hide the widget creator without probing/spawning harnesses */
@@ -22,15 +27,24 @@ export type Prefs = {
   activeHarness: HarnessId;
   /** ordered fallback chain for rate-limit auto-switching */
   harnessChain: HarnessId[];
+  /** model + reasoning effort for the Widget Creator (Build/Plan/Ideate) */
+  modelDefaults: ModelDefaults;
+  /** model + reasoning effort for NutBot Chat, independent of the Creator's
+      modelDefaults above — picked inline in chat via the Agents menu */
+  chatModelDefaults: ModelDefaults;
 };
 
 export const DEFAULT_PREFS: Prefs = {
   pollingEnabled: true,
   bootSequence: true,
+  bootChime: false,
+  chatTokenBlips: false,
   chatBackend: "auto",
   creatorEnabled: true,
   activeHarness: "claude",
   harnessChain: [...HARNESS_CHAIN_DEFAULT],
+  modelDefaults: DEFAULT_MODELS,
+  chatModelDefaults: DEFAULT_MODELS,
 };
 
 const STORAGE_KEY = "nutmag-prefs";
@@ -57,11 +71,15 @@ function sanitize(raw: unknown): Prefs {
     pollingEnabled:
       typeof stored.pollingEnabled === "boolean" ? stored.pollingEnabled : DEFAULT_PREFS.pollingEnabled,
     bootSequence: typeof stored.bootSequence === "boolean" ? stored.bootSequence : DEFAULT_PREFS.bootSequence,
+    bootChime: typeof stored.bootChime === "boolean" ? stored.bootChime : DEFAULT_PREFS.bootChime,
+    chatTokenBlips: typeof stored.chatTokenBlips === "boolean" ? stored.chatTokenBlips : DEFAULT_PREFS.chatTokenBlips,
     chatBackend: isChatBackend(stored.chatBackend) ? stored.chatBackend : DEFAULT_PREFS.chatBackend,
     creatorEnabled:
       typeof stored.creatorEnabled === "boolean" ? stored.creatorEnabled : DEFAULT_PREFS.creatorEnabled,
     activeHarness: isHarnessId(stored.activeHarness) ? stored.activeHarness : DEFAULT_PREFS.activeHarness,
     harnessChain: chain.length > 0 ? chain : DEFAULT_PREFS.harnessChain,
+    modelDefaults: sanitizeModelDefaults(stored.modelDefaults),
+    chatModelDefaults: sanitizeModelDefaults(stored.chatModelDefaults),
   };
 }
 

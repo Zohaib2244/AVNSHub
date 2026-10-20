@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
+import { orientationsForPresets } from "@/lib/widget-creator/briefPresets";
 import {
   updateProject,
   getWorkingProjectId,
@@ -103,11 +104,17 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
       slug: brief.slug,
       icon: brief.icon ?? project.buildSettings?.icon,
       sizes: brief.sizes ?? ["S", "M"],
-      orientations: ["h"],
+      orientations: brief.presets?.length ? orientationsForPresets(brief.presets) : ["h"],
       requirements: brief.requirements,
       sDescription: brief.sContent,
       mDescription: brief.mContent,
       lDescription: brief.lContent,
+      // set explicitly (even to undefined) so a brief without presets clears
+      // any left over in buildSettings from an earlier plan
+      presets: brief.presets?.length ? brief.presets : undefined,
+      defaultPreset: brief.presets?.length ? brief.defaultPreset : undefined,
+      fill: brief.presets?.length ? brief.fill : undefined,
+      presetContent: brief.presets?.length ? brief.presetContent : undefined,
       dataShape: brief.dataShape,
       notes: brief.notes,
     };
@@ -145,6 +152,25 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
         ...(project.buildSettings ?? EMPTY_SETTINGS),
         ...briefPatch,
         designReferenceHtml: html,
+        editSlug: undefined,
+      },
+    });
+  }
+
+  /** Leave Ideate without picking a mockup — either nothing generated (a
+   *  broken harness, a refusal), or the user changed their mind after
+   *  entering Ideate. Same handoff as handleFinalize minus the design
+   *  reference, and `hasIdeateRounds` is deliberately left alone so the
+   *  project doesn't claim rounds it never produced. Any reference attached
+   *  by an earlier finalize is kept rather than silently discarded. */
+  function handleSkipToBuild() {
+    const briefPatch = project.brief ? buildSettingsFromBrief(project.brief) : {};
+    updateProject(project.id, {
+      activeMode: "build",
+      workflowMode: "build",
+      buildSettings: {
+        ...(project.buildSettings ?? EMPTY_SETTINGS),
+        ...briefPatch,
         editSlug: undefined,
       },
     });
@@ -242,6 +268,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
             <input
               ref={nameRef}
               className="cr-name-input"
+              aria-label="widget name"
               value={nameValue}
               onChange={(e) => setNameValue(e.target.value)}
               onBlur={commitName}
@@ -371,6 +398,7 @@ export function CreatorWorkspace({ project, onBack, activeHarness, harnessChain 
                   activeHarness={activeHarness}
                   harnessChain={harnessChain}
                   onFinalize={handleFinalize}
+                  onSkipToBuild={handleSkipToBuild}
                   brief={project.brief}
                   ideateSessionId={project.ideateSessionId}
                   readOnly={isReviewMode}

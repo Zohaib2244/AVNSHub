@@ -24,9 +24,11 @@ import {
   type RegionDims,
   type SlotRegionId,
 } from "@/config/slotLayout";
-import { WIDGETS, getManifest, resolveSettings, type SettingsValues } from "@/config/widgets";
+import { WIDGETS, getManifest, resolvePresetConfig, resolveSettings, type SettingsValues } from "@/config/widgets";
 import { CUSTOM_WIDGETS } from "@/config/customWidgets";
 import { buildOccupancy, canPlace, findFit, isValidPlacement, type Rect } from "@/lib/grid/occupancy";
+import { placementFootprints } from "@/lib/grid/presetFit";
+import { regionGeometry } from "@/lib/grid/regionMetrics";
 import { DEFAULT_CANVAS_ID, getActiveCanvasId, slotLayoutKey, subscribeCanvases } from "@/lib/canvases";
 import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
 
@@ -106,16 +108,16 @@ function buildDefaultState(): SlotLayoutState {
         entry("now-playing",    "left",   1, 2, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
         entry("nutbot",         "center", 0, 0, 1, 1, { hoverExpand: false, hoverExpandAxis: "both" }),
         entry("github",         "base",   0, 0, 2, 2, { hoverExpand: true,  hoverExpandAxis: "width", flyoutCommits: 5 }),
-        entry("dot-matrix",     "base",   2, 0, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, colorMode: "orange", interaction: "repel" }),
+        entry("dot-matrix",     "base",   2, 0, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", headerStyle: "ghost", colorMode: "orange", interaction: "repel" }),
         entry("network-stats",  "left",   1, 3, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
         entry("disk-storage",   "left",   1, 4, 1, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
         entry("identity",       "left",   0, 2, 1, 3, { hoverExpand: true,  hoverExpandAxis: "width", displayName: "AVN Hub", tagline: "front page to your life", initials: "AVN" }),
-        entry("glyph-matrix",   "right",  0, 2, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, animation: "pulse", speed: "normal", color: "orange", dotSize: "medium" }),
+        entry("glyph-matrix",   "right",  0, 2, 1, 2, { hoverExpand: false, hoverExpandAxis: "both", headerStyle: "ghost", animation: "pulse", speed: "normal", color: "orange", dotSize: "medium" }),
         entry("notes",          "right",  0, 4, 2, 2, { hoverExpand: false, hoverExpandAxis: "both" }),
         entry("dictionary",     "right",  0, 0, 1, 2, { hoverExpand: true,  hoverExpandAxis: "both", defaultWord: "serendipity", showSuggestions: true, showSentence: true, showPronunciation: true }),
         entry("server-stats",   "left",   0, 5, 2, 1, { hoverExpand: true,  hoverExpandAxis: "height" }),
-        entry("verlet-sim",     "left",   1, 6, 1, 1, { hoverExpand: false, hoverExpandAxis: "both", showHeader: false, segments: 16, gravity: 0.36, stiffness: 6, anchor: "suspended", trails: true }),
-        entry("ambient-data",   "right",  1, 0, 1, 4, { hoverExpand: true,  hoverExpandAxis: "width", showHeader: false }),
+        entry("verlet-sim",     "left",   1, 6, 1, 1, { hoverExpand: false, hoverExpandAxis: "both", headerStyle: "ghost", segments: 16, gravity: 0.36, stiffness: 6, anchor: "suspended", trails: true }),
+        entry("ambient-data",   "right",  1, 0, 1, 4, { hoverExpand: true,  hoverExpandAxis: "width", headerStyle: "ghost" }),
       ].filter((w): w is SlotWidgetInstance => w !== null),
     };
   }
@@ -366,6 +368,33 @@ export function getUnplacedWidgets(): string[] {
   return [...builtIn, ...custom];
 }
 
+/** where `id` would land in `region`: the first of its placement footprints
+    (default size preset first, see placementFootprints) that fits, at
+    `preferredCell` if possible. null if the region has no room for any. */
+export function findPlacement(
+  id: string,
+  region: SlotRegionId,
+  layout: SlotLayoutState = getSlotLayout(),
+  preferredCell?: { col: number; row: number },
+): { col: number; row: number; colSpan: number; rowSpan: number } | null {
+  const manifest = getManifest(id);
+  if (!manifest) return null;
+  const dims = layout.regionDims[region];
+  const occupancy = buildOccupancy(dims, layout.widgets.filter((w) => w.region === region).map(rectOf));
+  const { presets, defaultPreset } = resolvePresetConfig(manifest);
+  const { sc, pitch } = regionGeometry(region, dims, layout.frameRatios);
+  const floor = minFootprint(id);
+  for (const candidate of placementFootprints(presets, defaultPreset, dims, pitch, sc)) {
+    const footprint = {
+      colSpan: Math.max(candidate.colSpan, floor.colSpan),
+      rowSpan: Math.max(candidate.rowSpan, floor.rowSpan),
+    };
+    const spot = findFit(dims, occupancy, footprint, preferredCell);
+    if (spot) return { ...spot, ...footprint };
+  }
+  return null;
+}
+
 /** place an unplaced widget at `preferredCell` if it fits, otherwise the
     first available cell in `region`; no-op if already placed or region is full */
 export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { col: number; row: number }): boolean {
@@ -375,17 +404,14 @@ export function placeWidget(id: string, region: SlotRegionId, preferredCell?: { 
   const manifest = getManifest(id);
   if (!manifest) return false;
 
-  const dims = current.regionDims[region];
-  const occupancy = buildOccupancy(dims, current.widgets.filter((w) => w.region === region).map(rectOf));
-  const footprint = minFootprint(id);
-  const spot = findFit(dims, occupancy, footprint, preferredCell);
-  if (!spot) return false;
+  const placement = findPlacement(id, region, current, preferredCell);
+  if (!placement) return false;
 
   commit({
     ...current,
     widgets: [
       ...current.widgets,
-      { id, region, col: spot.col, row: spot.row, colSpan: footprint.colSpan, rowSpan: footprint.rowSpan, settings: resolveSettings(manifest) },
+      { id, region, ...placement, settings: resolveSettings(manifest) },
     ],
   });
   return true;
@@ -395,12 +421,7 @@ export function getRegionsThatFitWidget(id: string, layout: SlotLayoutState = ge
   if (layout.widgets.some((w) => w.id === id)) return [];
   if (!getManifest(id)) return [];
 
-  const footprint = minFootprint(id);
-  return REGION_IDS.filter((region) => {
-    const dims = layout.regionDims[region];
-    const occupancy = buildOccupancy(dims, layout.widgets.filter((w) => w.region === region).map(rectOf));
-    return findFit(dims, occupancy, footprint) !== null;
-  });
+  return REGION_IDS.filter((region) => findPlacement(id, region, layout) !== null);
 }
 
 /** try to place an unplaced widget in the first region that has room;
@@ -452,6 +473,29 @@ export function setWidgetRect(id: string, rect: Rect) {
   commit({
     ...current,
     widgets: current.widgets.map((w) => (w.id === id ? { ...w, ...rect } : w)),
+  });
+}
+
+/** move two widgets of the same region at once (a drag dropped onto a
+    neighbour trades places with it) — one commit, so there's never a
+    persisted in-between state where either rect overlaps the other. Both
+    rects must be in bounds, clear of every other widget and of each other. */
+export function swapWidgetRects(idA: string, rectA: Rect, idB: string, rectB: Rect) {
+  const current = getSlotLayout();
+  const a = current.widgets.find((w) => w.id === idA);
+  const b = current.widgets.find((w) => w.id === idB);
+  if (!a || !b || a.region !== b.region) return;
+
+  const dims = current.regionDims[a.region];
+  const others = current.widgets.filter((w) => w.region === a.region && w.id !== idA && w.id !== idB).map(rectOf);
+  const occupancy = buildOccupancy(dims, others);
+  if (!canPlace(rectA, dims, occupancy)) return;
+  const withA = buildOccupancy(dims, [...others, rectA]);
+  if (!canPlace(rectB, dims, withA)) return;
+
+  commit({
+    ...current,
+    widgets: current.widgets.map((w) => (w.id === idA ? { ...w, ...rectA } : w.id === idB ? { ...w, ...rectB } : w)),
   });
 }
 

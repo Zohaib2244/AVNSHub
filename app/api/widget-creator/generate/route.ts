@@ -1,28 +1,59 @@
-﻿import { spawn } from "child_process";
 import { randomUUID } from "crypto";
-import { copyFileSync, existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { HARNESS_CHAIN_DEFAULT, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { runHarnessChain, sendEvent, type SSEWriter } from "@/lib/widget-creator/harnessRunner";
+import { parseQuestions, QUESTION_PROTOCOL } from "@/lib/widget-creator/question";
+import { SIZE_PRESETS, type FillMode, type PresetId } from "@/config/sizePresets";
+import { presetRange } from "@/lib/widget-creator/briefPresets";
 import {
   readRegistry,
   componentName,
   findComponentModule,
   sanitizeComponentMap,
   registerCustomWidget,
+  syncComponentMapEntry,
   isValidCustomWidgetId,
+  listParkedWidgetIds,
+  entryFromDisk,
+  setRegistryFlag,
 } from "@/lib/widget-creator/customRegistry";
+import {
+  describeFailures,
+  makeShotsDir,
+  removeShotsDir,
+  saveVerifyOutcome,
+  verifyWidget,
+  type VerifyResult,
+} from "@/lib/widget-creator/verifyWidget";
 import { checkSkillOrError } from "@/lib/widget-creator/skillCheck";
 import { acquireGenerationLock, releaseGenerationLock, describeBusyError } from "@/lib/widget-creator/generationLock";
 import { snapshotGitStatus, unexpectedChanges } from "@/lib/widget-creator/gitAudit";
 import { readProjectSpec, writeProjectSpec, buildProjectSpecMarkdown, type ProjectSpecMeta } from "@/lib/widget-creator/projectSpec";
+import {
+  applyDeletes,
+  applyWrites,
+  commitBase,
+  discardDraft,
+  listWorkbenchSlugs,
+  planApply,
+  prepareWorkbench,
+  restoreLiveEscapes,
+  revertOutsideChanges,
+  runWorkbenchTsc,
+  snapshotTree,
+  workbenchCustomDir,
+} from "@/lib/widget-creator/workbench";
+import { finishRun, getRun, setRunStage, startRun } from "@/lib/widget-creator/runStatus";
 
 const REPO_ROOT = process.cwd();
 
-function readExistingWidget(slug: string): string {
+/** the widget's .tsx sources as one annotated block — read from the widget's
+    workbench (its draft), not the live tree */
+function readExistingWidget(slug: string, customDir: string): string {
   try {
-    const dir = join(REPO_ROOT, "components/widgets/custom", slug);
+    const dir = join(customDir, slug);
     const files = readdirSync(dir).filter((f) => f.endsWith(".tsx"));
     return files.map((f) => `// ${f}\n${readFileSync(join(dir, f), "utf-8")}`).join("\n\n");
   } catch {
@@ -30,49 +61,12 @@ function readExistingWidget(slug: string): string {
   }
 }
 
-// --- Edit-mode file safety: backup before run, restore if .tsx goes missing --
-// The harness may delete a .tsx to "rewrite from scratch" and then get cut off
-// before writing the replacement (rate limit, error). The backup lets us put
-// the working file back so the site never reaches a "module not found" state.
-
-function backupWidgetFiles(slug: string): void {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx"))) {
-      copyFileSync(join(dir, f), join(dir, f + ".bak"));
-    }
-  } catch {}
-}
-
-// Restores a .tsx.bak → .tsx only when the .tsx is missing (file was deleted
-// by the harness but never replaced). If the .tsx still exists — even broken —
-// it's left alone so the next "fix" turn can repair it. Returns true if any
-// file was restored.
-function restoreMissingWidgetFiles(slug: string): boolean {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  let restored = false;
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
-      const tsx = join(dir, f.slice(0, -4)); // strip ".bak"
-      const bak = join(dir, f);
-      if (!existsSync(tsx)) {
-        copyFileSync(bak, tsx);
-        restored = true;
-      }
-      unlinkSync(bak);
-    }
-  } catch {}
-  return restored;
-}
-
-function deleteWidgetBackups(slug: string): void {
-  const dir = join(REPO_ROOT, "components/widgets/custom", slug);
-  try {
-    for (const f of readdirSync(dir).filter((f) => f.endsWith(".tsx.bak"))) {
-      unlinkSync(join(dir, f));
-    }
-  } catch {}
-}
+// All harness writes happen in the widget's workbench (lib/widget-creator/
+// workbench.ts, docs/design/WIDGET_WORKBENCH.md): a private mirror of the project
+// outside the repo. The live tree changes only when a finished draft passes
+// the TypeScript gate, so a half-written or deleted-then-re-added file can
+// never reach the dev server. This replaced the old .tsx.bak backups and the
+// componentKeepAlive watcher that raced Turbopack to undo deletions.
 
 // --- Attached image delivery -------------------------------------------
 // Data-URL images (chat attachments + the per-size visual refs) are written
@@ -115,18 +109,58 @@ function cleanupImageTempFiles(paths: string[]): void {
 // Core user-facing prompt. The authoring guide itself lives in the
 // "avn-widget-build" harness skill (.claude/skills/, .agents/skills/ — see
 // scripts/sync-widget-skill.mjs, which regenerates it from
-// docs/CREATING_WIDGETS.md) rather than being embedded here: claude, codex,
+// lib/widget-creator/prompts/) rather than being embedded here: claude, codex,
 // and opencode all discover and load project-local skills in their headless
 // invocation modes (verified directly against each CLI), so there's no need
 // to pass ~6K tokens of guide text on every single turn.
-function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string {
+/** Where the headless verifier loads the hub: $AVNHUB_VERIFY_URL, else the
+    origin this request came in on. `next dev` only serves hydration assets to
+    allowed dev origins (next.config.ts) — the user's own origin is one by
+    definition, while e.g. 127.0.0.1 is not and never hydrates. */
+function verifyBaseUrl(req: Request): string {
+  const override = process.env.AVNHUB_VERIFY_URL;
+  if (override) return override.replace(/\/+$/, "");
+  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? url.host;
+  const proto = (req.headers.get("x-forwarded-proto") ?? url.protocol.replace(/:$/, "")).split(",")[0].trim();
+  return `${proto}://${host}`;
+}
+
+/** the one repair turn verify gets: what didn't fit, and the screenshots */
+function verifyRepairPrompt(result: VerifyResult): string {
+  const shots = result.status === "failed"
+    ? result.shots.filter((s) => s.problems.length && s.screenshot).map((s) => s.screenshot!)
+    : [];
+  return `Verification rendered the widget alone at each of its size presets' smallest box, largest box and readability floor (the card's box in px at 1920×1080). These boxes have content the user can't see or reach:
+${describeFailures(result).map((f) => `- ${f}`).join("\n")}
+${shots.length ? `\nScreenshots of those boxes — Read each one before changing anything:\n${shots.map((p) => `- ${p}`).join("\n")}\n` : ""}
+Fix the layout so each preset fits every box in its range: nothing cut off, nothing outside the card. In small boxes show less (drop secondary rows, shorten text with an ellipsis, or let a list scroll) rather than shrinking text below the type scale. Keep the widget's behaviour and content otherwise unchanged. Don't ask questions: make the fix and stop.`;
+}
+
+/** the Plan's size presets as build instructions — what each preset is, its
+    range, what it shows, and how the component tells them apart */
+function presetSummary(settings: GenerateSettings): string {
+  const presets = settings.presets ?? [];
+  const lines = presets.map((id) => {
+    const content = settings.presetContent?.[id];
+    const floor = SIZE_PRESETS[id].floorPx;
+    return `- ${id}${id === settings.defaultPreset ? " (default)" : ""}: ${presetRange(id)}${floor ? `, and still readable down to ${floor.width}×${floor.height}px on small screens` : ""}${content ? `. Shows: ${content}` : ""}`;
+  });
+  const legacy = presets.map((id) => `${id} → "${SIZE_PRESETS[id].legacy.size}"`).join(", ");
+  return `Size presets (the widget's real sizing — the user picked these in the plan; the per-preset "Shows" entries divide the requirements above):
+${lines.join("\n")}
+Each preset is its own purpose-built layout for its shape. Branch on \`useWidget().preset\` (${presets.map((id) => `"${id}"`).join(" | ")}). It is undefined outside Slot Layout, so fall back to \`useWidget().size\` there (${legacy}). A preset's layout must work across its whole range: design it at the range's smallest box, use no fixed heights, and let extra space show more content. When you finish, the widget is rendered at every preset's smallest box, largest box and small-screen floor, and anything cut off or outside the card comes back to you to fix.${settings.fill === "scale" ? ` Fill is "scale": the widget is fixed artwork, so draw each preset at its smallest box and make it scale to the cell (an SVG viewBox or similar) instead of reflowing.` : ""}`;
+}
+
+function buildCorePrompt(settings: GenerateSettings, userPrompt: string, customDir: string): string {
   const existingIds = Object.keys(readRegistry());
 
   const isEdit = Boolean(settings.editSlug);
   const slug = settings.editSlug ?? settings.slug ?? "";
   const comp = slug ? componentName(slug) : "<Pascal>Widget";
-  const existingCode = isEdit ? readExistingWidget(settings.editSlug!) : "";
-  const existingSpec = isEdit ? readProjectSpec(settings.editSlug!) : null;
+  const existingCode = isEdit ? readExistingWidget(settings.editSlug!, customDir) : "";
+  const existingSpec = isEdit ? readProjectSpec(settings.editSlug!, customDir) : null;
+  const hasPresets = Boolean(settings.presets?.length);
 
   // In edit mode the only settings that still apply are slug + the freeform
   // description/data fields actually describing this edit — name/icon/sizes/
@@ -137,7 +171,7 @@ function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string
     !isEdit && settings.name && `Widget name: "${settings.name}"`,
     (settings.slug || settings.editSlug) && `Slug (id): "${settings.slug || settings.editSlug}"`,
     !isEdit && settings.icon && `Lucide icon: ${settings.icon}`,
-    !isEdit && settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
+    !isEdit && !hasPresets && settings.sizes?.length && `Sizes: ${settings.sizes.join(", ")}`,
     !isEdit && settings.orientations?.length && `Orientations: ${settings.orientations.join(", ")}`,
     !isEdit && settings.hoe && `HOE (Hover On Expand): enabled, mode: ${settings.hoeMode ?? "default"}`,
     !isEdit && settings.requirements && `Full requirements (the complete spec — every listed field/control/behavior must be implemented; the per-size content fields below only divide these across sizes):\n${settings.requirements}`,
@@ -146,9 +180,11 @@ function buildCorePrompt(settings: GenerateSettings, userPrompt: string): string
     // edit turns they'd contradict the current code and tempt the model into
     // resurrecting already-removed elements. Edit turns rely on existingCode +
     // SPEC.md + the fresh user prompt instead.
-    !isEdit && settings.sDescription && `S size content: ${settings.sDescription}`,
-    !isEdit && settings.mDescription && `M size content: ${settings.mDescription}`,
-    !isEdit && settings.lDescription && `L size content: ${settings.lDescription}`,
+    // with presets, the S/M/L content is just a derived copy of presetContent
+    !isEdit && hasPresets && presetSummary(settings),
+    !isEdit && !hasPresets && settings.sDescription && `S size content: ${settings.sDescription}`,
+    !isEdit && !hasPresets && settings.mDescription && `M size content: ${settings.mDescription}`,
+    !isEdit && !hasPresets && settings.lDescription && `L size content: ${settings.lDescription}`,
     settings.sImageRef && `S size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
     settings.mImageRef && `M size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
     settings.lImageRef && `L size visual reference: [image attached — see "Attached reference images" below for the file to Read]`,
@@ -212,6 +248,8 @@ ${settings.designReferenceHtml}
 
 ${userPrompt}
 
+${QUESTION_PROTOCOL}
+
 ## Required output
 
 1. Write \`components/widgets/custom/${slug || "<slug>"}/${comp}.tsx\` with the full widget component, exported as \`export function ${comp}() { ... }\` (named export - the file basename and export name must both be \`${comp}\`).
@@ -223,19 +261,22 @@ ${userPrompt}
   "iconName": "${settings.icon ?? "Box"}",
   "sizes": ${JSON.stringify(settings.sizes?.length ? settings.sizes : ["S", "M", "L"])},
   "orientations": ${JSON.stringify(settings.orientations?.length ? settings.orientations : ["h"])},
-  "defaults": { "size": "M", "orientation": "h" },
+  "defaults": { "size": "${hasPresets && settings.defaultPreset ? SIZE_PRESETS[settings.defaultPreset].legacy.size : "M"}", "orientation": "h" },${hasPresets ? `
+  "presets": ${JSON.stringify(settings.presets)},
+  "defaultPreset": "${settings.defaultPreset ?? settings.presets![0]}",
+  "fill": "${settings.fill ?? "reflow"}",` : ""}
   "settings": [
     { "key": "example", "label": "example", "type": "text", "default": "" }
   ]
 }
 \`\`\`
-\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) - use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
+${hasPresets ? "Copy `sizes`, `orientations`, `defaults`, `presets`, `defaultPreset` and `fill` exactly as shown — the user chose them in the plan.\n" : ""}\`iconName\` must be a valid lucide-react icon name (PascalCase). \`settings\` is the widget's own config schema (each field is one of: \`{type:"toggle",default:boolean}\`, \`{type:"select",default:string,options:[{value,label}]}\`, \`{type:"text",default:string,placeholder?}\`, \`{type:"number",default:number,min?,max?}\`) - use \`[]\` if the widget has no options. \`defaults.size\`/\`defaults.orientation\` must be members of \`sizes\`/\`orientations\`.
 
 3. If the widget needs an API route (for data fetching from an external source), also write \`app/api/${slug || "<slug>"}/route.ts\`.
 ${isEdit ? `
 4. Overwrite \`components/widgets/custom/${settings.editSlug}/SPEC.md\` so it stays an accurate description of the widget after this edit (see the note about this above).
 ` : ""}
-Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work — a dev server for this project is very likely already running, and a competing build process can corrupt its \`.next\` cache or fight over the port. Verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Just write the files and stop — do not attempt to compile or run anything to check your own work.
+Do NOT run \`npm run build\`, \`npm run dev\`, \`next build\`, \`next dev\`, or start any dev/build server yourself to verify your work. You are working in a private copy of the project; verification happens automatically after you stop: a deterministic \`tsc --noEmit\` check runs against exactly the files you wrote, and any errors come back to you on the next turn to fix. Only after that passes are your files copied into the live dashboard. Just write the files (using relative paths) and stop — do not attempt to compile or run anything to check your own work.
 
 Design rules to follow:
 - Use CSS variables for all colors: \`--text-primary\`, \`--text-muted\`, \`--accent-orange\`, \`--accent-cyan\`, \`--border\`, \`--bg-card\`, \`--bg-nested\`, \`--shadow\`
@@ -264,6 +305,13 @@ export type GenerateSettings = {
   sDescription?: string;
   mDescription?: string;
   lDescription?: string;
+  /** size presets from the Plan brief (config/sizePresets.ts). When set they
+      are the widget's real sizing; `sizes` / s/m/lDescription above are the
+      derived legacy view (lib/widget-creator/briefPresets.ts). */
+  presets?: PresetId[];
+  defaultPreset?: PresetId;
+  fill?: FillMode;
+  presetContent?: Partial<Record<PresetId, string>>;
   /** base64 data URL image references per size (for visual mockup context) */
   sImageRef?: string | null;
   mImageRef?: string | null;
@@ -296,6 +344,8 @@ export async function POST(req: Request) {
         the model continues from its existing context instead of re-reading the
         full authoring guide + widget spec. Absent on the first turn. */
     sessionId?: string;
+    sessionHarness?: HarnessId;
+    repairErrors?: string[];
     /** carried over from the project's Plan-mode brief, if any — folded into
         the widget's SPEC.md so intent survives independent of the harness
         session or the browser's localStorage */
@@ -332,7 +382,10 @@ export async function POST(req: Request) {
   // registration branch below and could re-register over an already-working
   // widget's entry. Determined from registry state, not the client's flags.
   const targetId = settings.editSlug ?? settings.slug;
-  const existedBeforeThisRun = Boolean(targetId && readRegistry()[targetId]);
+  if (!targetId) {
+    return sseError("pick a widget name or slug before generating — the widget's workbench is keyed by it");
+  }
+  const existedBeforeThisRun = Boolean(readRegistry()[targetId]);
   if (!settings.editSlug && settings.slug && existedBeforeThisRun) {
     return sseError(`A widget with id "${settings.slug}" already exists. Switch to edit mode to modify it instead of creating a new one.`);
   }
@@ -355,9 +408,8 @@ export async function POST(req: Request) {
     ...(settings.mImageRef ? [{ label: "M size visual reference", dataUrl: settings.mImageRef }] : []),
     ...(settings.lImageRef ? [{ label: "L size visual reference", dataUrl: settings.lImageRef }] : []),
   ]);
-  const promptWithImages = effectivePrompt + imageSection;
-
-  const corePrompt = buildCorePrompt(settings, promptWithImages);
+  const repairErrors = Array.isArray(body.repairErrors) ? body.repairErrors.filter((e): e is string => typeof e === "string").slice(0, 20).map((e) => e.slice(0, 1000)) : [];
+  const promptWithImages = effectivePrompt + imageSection + (repairErrors.length ? "\n\nCompiler diagnostics from the previous attempt:\n" + repairErrors.join("\n") : "");
 
   // Prefer top-level harness/chain (sent by ChatCanvas) over the legacy
   // settings.harness path — settings.harness was never reliably populated.
@@ -366,7 +418,7 @@ export async function POST(req: Request) {
 
   // The prompt only ever tells the harness to "load the avn-widget-build
   // skill" — it doesn't carry the authoring rules itself (see
-  // docs/CREATING_WIDGETS.md's skill section). If the skill file isn't
+  // docs/WIDGET_CREATOR.md). If the skill file isn't
   // actually there, generation must not silently proceed with a harness that
   // has no idea what the framework rules are.
   const skillError = checkSkillOrError("avn-widget-build", requestedHarness);
@@ -390,7 +442,7 @@ export async function POST(req: Request) {
 
   const stream = new ReadableStream({
     async start(controller) {
-      const write: SSEWriter = (data) => {
+      const send: SSEWriter = (data) => {
         try {
           controller.enqueue(encoder.encode(data));
         } catch {
@@ -398,148 +450,278 @@ export async function POST(req: Request) {
         }
       };
 
+      // Every stage change is mirrored into runStatus (lib/widget-creator/
+      // runStatus.ts) so a tab that didn't see this stream — reloaded, or
+      // another device — can still show what happened. harness_start and
+      // switch are emitted inside the runner, so they're picked up here.
+      const runId = randomUUID();
+      startRun(runId, targetId);
+      const write: SSEWriter = (data) => {
+        const harness = /"type":"harness_start","harness":"([a-z]+)"/.exec(data)?.[1]
+          ?? /^event: switch\ndata: .*"to":"([a-z]+)"/m.exec(data)?.[1];
+        if (harness) setRunStage(runId, targetId, "writing", harness);
+        send(data);
+      };
+      const stage = (name: "checking" | "applying") => {
+        setRunStage(runId, targetId, name);
+        sendEvent(write, "status", { type: name === "checking" ? "tsc_check" : "applying" });
+      };
+      const failRun = (message: string, extra: Record<string, unknown> = {}) => {
+        sendEvent(write, "error", { message, stage: getRun(targetId)?.stage, ...extra });
+        finishRun(runId, targetId, "error", { message });
+      };
+      sendEvent(write, "status", { type: "preparing", runId });
+
       try {
 
-      // For edits: snapshot the existing .tsx files before spawning the harness.
-      // If the harness deletes the file to "rewrite from scratch" and then gets
-      // cut off (rate limit, error), restoreMissingWidgetFiles() puts the last
-      // working version back so the site never reaches "module not found".
-      if (existedBeforeThisRun && targetId) backupWidgetFiles(targetId);
+      // Prepare (or refresh) this widget's workbench under the lock, then build
+      // the prompt from its draft — on a fix turn that's the harness's own
+      // previous attempt, not the live version.
+      const freshWorkbench = !listWorkbenchSlugs().includes(targetId);
+      const ws = await prepareWorkbench(targetId);
+      // Re-creating the slug of a widget that was deleted but not yet purged
+      // (its folder is parked until the next boot — see the delete route):
+      // start from an empty folder, not the deleted widget's files. Only on
+      // the first run; a fix turn keeps its draft.
+      if (!existedBeforeThisRun && freshWorkbench && listParkedWidgetIds().includes(targetId)) {
+        discardDraft(ws, { keepApi: false });
+      }
+      const wbCustomDir = workbenchCustomDir(ws);
+      if (ws.discardedDraft) {
+        sendEvent(write, "notice", {
+          text: `"${targetId}" was changed outside the creator while an unfinished draft was pending — that draft was discarded and this run starts from the current version.`,
+        });
+      }
+      const corePrompt = buildCorePrompt(settings, promptWithImages, wbCustomDir);
 
-      // Write-audit snapshot — taken after sanitizeComponentMap() and the
-      // backups above so this run's own bookkeeping never shows up in the diff.
+      // Write-audit snapshot of the LIVE tree — the harness now works in the
+      // workbench, so any change here during the run is an absolute-path write
+      // that escaped it.
       const gitBefore = await snapshotGitStatus();
+      const treeBefore = snapshotTree(ws.tree);
 
-      // On a mid-run harness switch, hand the fallback whatever this widget's
-      // files currently hold on disk (empty until something is written) so it
-      // resumes from that exact state instead of re-discovering it with a burst
-      // of Read/find/grep/git calls.
-      const partialWork = targetId ? () => readExistingWidget(targetId) : undefined;
+      // On a mid-run harness switch, hand the fallback whatever the draft
+      // currently holds so it resumes from that exact state.
+      const partialWork = () => readExistingWidget(targetId, wbCustomDir);
 
-      // resumePrompt: for claude --resume turns the model already has full
-      // context, so just send the bare user instruction (plus any attached
-      // image pointers). Full prompt is still used for fallback harnesses
-      // that don't share the claude session.
-      const resumePrompt = incomingSessionId
-        ? promptWithImages
-        : undefined;
+      // Claude stores sessions per working directory, so a session started
+      // before this workbench existed (e.g. in the repo root) can't resume
+      // here — start fresh with the full prompt instead of failing the resume.
+      const sessionId = ws.created ? undefined : incomingSessionId;
+      const resumePrompt = sessionId ? promptWithImages : undefined;
 
-      const { outcome, sessionId: outSessionId } = await runHarnessChain(
+      const { outcome, sessionId: outSessionId, harness: completedHarness, lastText } = await runHarnessChain(
         corePrompt, requestedHarness, chain, write, abortController.signal, partialWork,
-        { sessionId: incomingSessionId, resumePrompt }, targetId || undefined,
+        { sessionId: (body.sessionHarness ?? "claude") === requestedHarness ? sessionId : undefined, resumePrompt, stage: repairErrors.length ? "fix" : "build", cwd: ws.tree }, targetId,
       );
 
-      // Audit what the harness actually touched — the prompt tells it to stay
-      // inside the widget's own folders, but bypassPermissions enforces
-      // nothing. Runs before registration/SPEC writes so those never appear.
-      // A user abort skips it (a killed run's partial writes aren't a policy
-      // violation worth alarming about).
+      if (outSessionId) sendEvent(write, "session", { sessionId: outSessionId, harness: completedHarness, slug: targetId });
+
+      // Keep the mirror faithful: anything written outside the widget's own
+      // folders is put back and reported, never applied.
+      const outsideWorkbench = revertOutsideChanges(ws, treeBefore);
+
+      // A harness that wrote straight into the live tree (a CLI resolving
+      // paths against its own project root, or a model typing an absolute
+      // path) is undone here: the live files go back to what they were when
+      // this run started, with the harness's version kept under the
+      // workbench's escaped/ folder. Without this a broken write reaches
+      // Turbopack and 500s the dashboard — the whole point of the workbench.
+      const escapes = restoreLiveEscapes(ws);
+      if (escapes.length > 0) {
+        sendEvent(write, "notice", {
+          text: `the harness wrote directly into your live widget files instead of its workbench (${escapes.map((e) => e.rel).join(", ")}). Those writes were undone; a copy is kept at ${escapes[0].savedTo?.replace(/\/[^/]+$/, "") ?? "the workbench"}. Nothing broken reached your dashboard.`,
+        });
+      }
       if (outcome !== "aborted") {
         const gitAfter = await snapshotGitStatus();
-        const unexpected = unexpectedChanges(gitBefore, gitAfter, [
-          ...(targetId ? [`components/widgets/custom/${targetId}/`, `app/api/${targetId}/`] : []),
-          "config/customRegistry.json",
-          "config/customComponentMap.tsx",
-          ".nutbot-ideate/",
-        ]);
-        if (unexpected.length > 0) {
-          sendEvent(write, "audit", { unexpectedFiles: unexpected });
-        }
+        const escaped = unexpectedChanges(gitBefore, gitAfter, [".nutbot-ideate/"]);
+        const unexpected = [...new Set([...outsideWorkbench, ...escaped])].sort();
+        if (unexpected.length > 0) sendEvent(write, "audit", { unexpectedFiles: unexpected });
       }
 
-      if (outcome !== "done") {
-        // Harness chain failed (or was stopped) — restore the backup so a
-        // previously working edit stays working rather than disappearing.
-        if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
-      }
+      // A turn that ends in a question is paused, not finished: the draft stays
+      // in the workbench unchecked and unapplied, and the answer resumes it.
+      const questions = outcome === "done" ? parseQuestions(lastText ?? "") : null;
+      if (questions) {
+        finishRun(runId, targetId, "question", { message: "waiting for your answer" });
+        sendEvent(write, "question", { questions, slug: targetId });
+      } else if (outcome === "done") {
+        const registerInput = {
+          id: targetId,
+          name: settings.name,
+          icon: settings.icon,
+          sizes: settings.sizes,
+          orientations: settings.orientations,
+          presets: settings.presets,
+          defaultPreset: settings.defaultPreset,
+          fill: settings.fill,
+        };
 
-      if (outcome === "done") {
-        // done cleanly — the harness wrote the component + manifest.json.
-        // Whether to wire it into the registry now is driven by
-        // `existedBeforeThisRun` (actual prior registry state captured before
-        // any mutation), NOT `settings.editSlug` — a desynced/stale client
-        // flag must never be trusted here.
-        //
-        // - Already-committed widget (a real edit): re-register immediately.
-        //   This only rewrites customRegistry.json (JSON data), which Fast
-        //   Refresh hot-updates without a full reload, so it's safe to apply
-        //   mid-chat exactly like before.
-        // - Brand-new widget: do NOT register here. Wiring a new id into
-        //   customComponentMap.tsx is the one write Fast Refresh can't
-        //   hot-swap (full reload), which would tear down this SSE stream
-        //   before the "done" event below ever reaches the client — the
-        //   actual bug this split fixes. Registration for a new widget is
-        //   deferred to POST /api/widget-creator/register, fired by the
-        //   client's explicit "add to layout" click, so any number of
-        //   refinement turns in this chat can run reload-free first.
-        let ok = true;
-        if (existedBeforeThisRun) {
-          const wired = registerCustomWidget({
-            id: targetId!,
-            name: settings.name,
-            icon: settings.icon,
-            sizes: settings.sizes,
-            orientations: settings.orientations,
-          });
-          if (!wired.ok) {
-            sendEvent(write, "error", { message: `widget generated but registration failed: ${wired.error}` });
-            ok = false;
+        // Type-check the workbench draft and apply it to the live tree.
+        // Returns why it didn't land, or null once it's applied. On the first
+        // pass a failure ends the run; on a verify repair pass the version
+        // that's already live stays, so the caller only reports it.
+        const verifying = (detail: string) => {
+          setRunStage(runId, targetId, "verifying");
+          sendEvent(write, "status", { type: "verifying", detail });
+        };
+        const checkAndApply = async (pass: "first" | "repair"): Promise<string | null> => {
+          if (!findComponentModule(targetId, wbCustomDir)) {
+            return `no component .tsx file was written in components/widgets/custom/${targetId}/ — nothing was applied`;
           }
-        } else if (!findComponentModule(targetId!)) {
-          sendEvent(write, "error", { message: `widget generated but no component .tsx file was created in components/widgets/custom/${targetId}/` });
-          ok = false;
-        }
-
-        if (!ok && existedBeforeThisRun && targetId) {
-          // Registration failed or component file missing after a claimed-done run.
-          // Restore the backup so the site stays in a working state.
-          restoreMissingWidgetFiles(targetId);
-        }
-
-        if (ok) {
-          sendEvent(write, "status", { type: "tsc_check" });
-          const tscResult = await runTscCheck(targetId);
+          // a repair pass reports through the verify step, which is still running
+          const step = (name: "checking" | "applying") => {
+            if (pass === "first") stage(name);
+            else verifying(name === "checking" ? "type-checking the repair" : "applying the repair");
+          };
+          step("checking");
+          const tscResult = await runWorkbenchTsc(ws);
           if (tscResult.errors.length > 0) {
+            // The draft stays in the workbench for the next fix turn; the live
+            // widget is untouched and keeps working.
             sendEvent(write, "tsc_errors", { errors: tscResult.errors });
-            // Restore the backup if the harness left the .tsx missing (deleted
-            // to rewrite but never finished). If the .tsx exists but is broken
-            // TypeScript, leave it on disk so the next "fix" turn can repair it.
-            if (existedBeforeThisRun && targetId) restoreMissingWidgetFiles(targetId);
-            sendEvent(write, "error", {
-              message: existedBeforeThisRun
-                ? "TypeScript errors in edited code — check the errors above and re-submit to fix."
-                : "TypeScript errors in generated code — fix the errors above, then re-submit to try again.",
-            });
-          } else {
-            // tsc clean — safe to drop the safety backup
-            if (existedBeforeThisRun && targetId) deleteWidgetBackups(targetId);
-            const doneSlug = settings.editSlug ?? settings.slug ?? null;
-            // Write SPEC.md fresh only on the initial create — `settings` is
-            // accurate at that point. On an edit turn, `settings` still holds
-            // whatever per-size descriptions/notes were set back at Plan/Ideate
-            // time (never kept in sync with chat-only edits since), so
-            // regenerating SPEC.md from it here would re-bake stale text as
-            // "authoritative" on every turn. The edit-mode prompt instead asks
-            // the harness to update SPEC.md itself as part of its own output,
-            // so it stays in sync with what actually changed — if it doesn't,
-            // leaving the last-known-good SPEC.md alone is still safer than
-            // overwriting it with stale settings.
-            if (doneSlug && !existedBeforeThisRun) {
-              writeProjectSpec(doneSlug, buildProjectSpecMarkdown(doneSlug, settings, projectMeta));
-            }
-            // Include sessionId so ChatCanvas can --resume on the next
-            // refinement turn instead of re-sending the full ~6K-token prompt.
-            sendEvent(write, "status", {
-              type: "done",
-              slug: doneSlug,
-              registered: existedBeforeThisRun,
-              sessionId: outSessionId,
-            });
+            if (pass === "repair") return "the repair didn't pass the type check";
+            return existedBeforeThisRun
+              ? "type check failed — nothing was applied, your widget still runs the previous version. The draft is kept: describe the fix and resubmit."
+              : "type check failed — nothing was installed. The draft is kept: describe the fix and resubmit.";
           }
+
+          // Write SPEC.md fresh only on the initial create — `settings` is
+          // accurate at that point. On an edit turn, `settings` still holds
+          // whatever per-size descriptions/notes were set back at Plan/Ideate
+          // time (never kept in sync with chat-only edits since), so
+          // regenerating SPEC.md from it would re-bake stale text as
+          // "authoritative" on every turn; the edit prompt asks the harness to
+          // update SPEC.md itself instead. Written into the draft so it applies
+          // together with the component.
+          if (pass === "first" && !existedBeforeThisRun) {
+            writeProjectSpec(targetId, buildProjectSpecMarkdown(targetId, settings, projectMeta), wbCustomDir);
+          }
+
+          step("applying");
+          const applied = planApply(ws);
+          if (!applied.ok) {
+            return `"${targetId}" was changed outside the creator during this run (${applied.conflicts.join(", ")}) — nothing was applied. Resubmit to rebuild on top of the current version.`;
+          }
+          // New and changed files land first (atomic per file), then an
+          // already-registered widget's registry entry and map line are
+          // refreshed, and only then are removed files deleted — so the
+          // component map never points at a file that isn't there.
+          applyWrites(ws, applied.plan);
+          let registerError: string | null = null;
+          if (existedBeforeThisRun) {
+            // - Already-committed widget (a real edit): re-register now. This
+            //   rewrites customRegistry.json (JSON Fast Refresh hot-updates)
+            //   and repoints the map line only if the component file changed.
+            // - Brand-new widget: registration is deferred to POST
+            //   /api/widget-creator/register ("add to layout"), because
+            //   wiring a new id into customComponentMap.tsx forces a full
+            //   reload that would tear down this SSE stream.
+            const wired = registerCustomWidget(registerInput);
+            if (!wired.ok) registerError = `the widget's files were applied but registration failed: ${wired.error}`;
+          }
+          // Also covers a parked slug being re-created: its map line still
+          // points at the deleted widget's component, which the deletes below
+          // may remove. No-op for an id that isn't in the map.
+          syncComponentMapEntry(targetId);
+          applyDeletes(applied.plan);
+          commitBase(ws);
+          return registerError;
+        };
+
+        const firstError = await checkAndApply("first");
+        if (firstError) {
+          failRun(firstError);
+        } else {
+          // Verify (docs/design/WIDGET_SIZE_PRESETS.md §10): render the applied widget
+          // at each declared preset; problems get one repair turn, then the
+          // widget installs either way, flagged if it still doesn't fit.
+          const entry = entryFromDisk(registerInput, readRegistry()[targetId]);
+          // a repair turn may continue on a new session; the client resumes the latest
+          let finalSession = { id: outSessionId, harness: completedHarness };
+          if (entry.presets?.length && process.env.AVNHUB_VERIFY !== "off") {
+            const shotsDir = makeShotsDir();
+            try {
+              const baseUrl = verifyBaseUrl(req);
+              verifying("rendering each size preset to check it fits");
+              let result = await verifyWidget({ slug: targetId, entry, baseUrl, outDir: shotsDir, signal: abortController.signal });
+
+              if (result.status === "failed") {
+                const failures = describeFailures(result);
+                sendEvent(write, "notice", {
+                  text: `verify: ${failures.length} size box${failures.length === 1 ? "" : "es"} didn't fit — sending it back to the builder once:\n${failures.map((f) => `- ${f}`).join("\n")}`,
+                });
+                verifying("the builder is fixing what didn't fit");
+                const repairPrompt = verifyRepairPrompt(result);
+                const before = snapshotTree(ws.tree);
+                const repair = await runHarnessChain(
+                  `${corePrompt}\n\n## Fix after verification\n\n${repairPrompt}`, completedHarness ?? requestedHarness, chain, write, abortController.signal, partialWork,
+                  { sessionId: outSessionId, resumePrompt: repairPrompt, stage: "fix", cwd: ws.tree }, targetId,
+                );
+                revertOutsideChanges(ws, before);
+                restoreLiveEscapes(ws);
+                if (repair.sessionId) finalSession = { id: repair.sessionId, harness: repair.harness };
+
+                const repairError = repair.outcome === "done"
+                  ? await checkAndApply("repair")
+                  : "the repair turn didn't finish";
+                if (repairError) {
+                  // the first version stays live; start the next turn from it
+                  discardDraft(ws);
+                  sendEvent(write, "notice", { text: `verify: ${repairError}, so the first version stays installed (flagged in the Widget Manager).` });
+                } else {
+                  verifying("checking the repaired widget");
+                  result = await verifyWidget({ slug: targetId, entry: entryFromDisk(registerInput, readRegistry()[targetId]), baseUrl, outDir: shotsDir, signal: abortController.signal });
+                }
+              }
+
+              if (result.status === "skipped") {
+                sendEvent(write, "notice", { text: `verify skipped: ${result.reason}` });
+              } else {
+                const failures = describeFailures(result);
+                const warning = failures.length
+                  ? `${failures.length} size box${failures.length === 1 ? "" : "es"} don't fit: ${result.shots.filter((s) => s.problems.length).map((s) => s.label).join(", ")}`
+                  : null;
+                await saveVerifyOutcome(targetId, warning);
+                setRegistryFlag(targetId, "verifyWarning", warning ?? undefined);
+                sendEvent(write, "notice", {
+                  text: warning
+                    ? `verify: still doesn't fit — installed with a warning:\n${failures.map((f) => `- ${f}`).join("\n")}`
+                    : `verify: fits every size preset (${result.shots.length} boxes checked)`,
+                });
+              }
+            } catch (error) {
+              // stopped mid-check: the widget is already applied, just unverified
+              if (!abortController.signal.aborted) throw error;
+              sendEvent(write, "notice", { text: "verify stopped — the widget is installed but wasn't checked" });
+            } finally {
+              removeShotsDir(shotsDir);
+            }
+          }
+
+          // Include sessionId so ChatCanvas can --resume on the next
+          // refinement turn instead of re-sending the full ~6K-token prompt.
+          finishRun(runId, targetId, "done", { registered: existedBeforeThisRun });
+          sendEvent(write, "status", {
+            type: "done",
+            slug: targetId,
+            registered: existedBeforeThisRun,
+            sessionId: finalSession.id,
+            harness: finalSession.harness,
+          });
         }
       }
 
+      } catch (err) {
+        failRun(`widget creator failed: ${err instanceof Error ? err.message : String(err)}`);
       } finally {
+        // Whatever path ended the run, the record must not stay "running".
+        const run = getRun(targetId);
+        if (run?.runId === runId && !run.finishedAt) {
+          if (abortController.signal.aborted) finishRun(runId, targetId, "aborted", { message: "stopped before finishing — nothing was applied; the partial draft is kept for your next message" });
+          else finishRun(runId, targetId, "error", { message: "the harness run ended without a result — nothing was applied" });
+        }
         // Always release — a client abort flows cancel() → abort → the chain
         // resolves ("aborted") → here, so the lock can't leak on disconnect.
         releaseGenerationLock();
@@ -559,43 +741,5 @@ export async function POST(req: Request) {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     },
-  });
-}
-
-async function runTscCheck(targetId?: string): Promise<{ errors: string[] }> {
-  return new Promise((resolve) => {
-    const child = spawn("npx", ["tsc", "--noEmit", "--pretty", "false"], {
-      cwd: REPO_ROOT,
-      stdio: ["ignore", "pipe", "pipe"],
-      // npx is npx.cmd on Windows — needs the shell to resolve (ENOENT otherwise)
-      shell: process.platform === "win32",
-    });
-
-    let output = "";
-    child.stdout.on("data", (d: Buffer) => (output += d.toString()));
-    child.stderr.on("data", (d: Buffer) => (output += d.toString()));
-
-    child.on("close", (code) => {
-      if (code === 0) {
-        resolve({ errors: [] });
-      } else {
-        // Only surface errors that actually point at this widget's own tree —
-        // a non-zero exit can come from pre-existing/unrelated project errors
-        // (e.g. a stale .next/types/validator.ts referencing a route deleted by
-        // a previous widget). Those must NOT count against this widget, or a
-        // perfectly valid generation gets its registration rolled back for an
-        // error it didn't cause. The widget's own generated app/api/<slug>
-        // route IS part of its tree (the prompt invites writing one), so its
-        // errors must not slip past this gate.
-        const lines = output.split("\n").filter((l) =>
-          l.includes("components/widgets/custom")
-          || l.includes("config/custom")
-          || (targetId ? l.includes(`app/api/${targetId}/`) : false),
-        );
-        resolve({ errors: lines });
-      }
-    });
-
-    child.on("error", () => resolve({ errors: [] }));
   });
 }

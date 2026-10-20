@@ -32,6 +32,7 @@ export type WallpaperKind = "image" | "video";
 const CANVAS_MODE_KEY = "nutmag-backdrop";
 const WIDGET_MODE_KEY = "nutmag-widget-backdrop";
 const PARALLAX_KEY = "nutmag-parallax";
+const CANVAS_BORDER_KEY = "nutmag-canvas-border";
 const WALLPAPER_META_KEY = "nutmag-wallpaper-meta";
 const listeners = new Set<() => void>();
 
@@ -61,6 +62,10 @@ function widgetModeKey(canvasId: string): string {
 
 function parallaxKey(canvasId: string): string {
   return canvasScopedKey(PARALLAX_KEY, canvasId);
+}
+
+function canvasBorderKey(canvasId: string): string {
+  return canvasScopedKey(CANVAS_BORDER_KEY, canvasId);
 }
 
 function kindOf(blob: Blob): WallpaperKind {
@@ -114,6 +119,12 @@ export function getServerWallpaperUrl(): null {
   return null;
 }
 
+/** the wallpaper's version stamp (changes on every replace), or null if this
+    canvas has no wallpaper — lib/wallpaperPalette.ts keys its cache on it */
+export function getWallpaperVersion(canvasId: string = getActiveCanvasId()): number | null {
+  return readMeta(canvasId)?.version ?? null;
+}
+
 /** "image" | "video" | null (no wallpaper set) — drives whether
     WallpaperLayer renders a <video> or a background-image div */
 export function getWallpaperKind(canvasId: string = getActiveCanvasId()): WallpaperKind | null {
@@ -157,6 +168,23 @@ export function getServerParallax(): boolean {
 export function setParallax(canvasId: string, enabled: boolean) {
   localStorage.setItem(parallaxKey(canvasId), enabled ? "1" : "0");
   pushToServer(parallaxKey(canvasId), enabled);
+  listeners.forEach((listener) => listener());
+}
+
+/** whether .frame (the canvas bezel) shows its border - on by default, so an
+    unset key (new canvas, first visit) matches the pre-existing look */
+export function getCanvasBorder(canvasId: string = getActiveCanvasId()): boolean {
+  return localStorage.getItem(canvasBorderKey(canvasId)) !== "0";
+}
+
+export function getServerCanvasBorder(): boolean {
+  return true;
+}
+
+export function setCanvasBorder(canvasId: string, visible: boolean) {
+  localStorage.setItem(canvasBorderKey(canvasId), visible ? "1" : "0");
+  pushToServer(canvasBorderKey(canvasId), visible);
+  applyCanvasBorder();
   listeners.forEach((listener) => listener());
 }
 
@@ -204,12 +232,27 @@ export function setWidgetBackdropMode(canvasId: string, mode: BackdropMode) {
   listeners.forEach((listener) => listener());
 }
 
-/** apply the active canvas's backdrop modes to <html data-backdrop> /
-    data-widget-backdrop> — cheap to call repeatedly, only touches the DOM
-    when a value actually changes */
+/** apply the active canvas's border visibility to <html data-canvas-border> -
+    same on/off-attribute convention as applyMode (visible is the default, so
+    only the "hidden" case sets anything) */
+export function applyCanvasBorder() {
+  const visible = getCanvasBorder();
+  const current = document.documentElement.dataset.canvasBorder;
+  if (visible) {
+    if (current !== undefined) delete document.documentElement.dataset.canvasBorder;
+  } else if (current !== "hidden") {
+    document.documentElement.dataset.canvasBorder = "hidden";
+  }
+}
+
+/** apply the active canvas's backdrop modes (+ border visibility) to
+    <html data-backdrop> / data-widget-backdrop> / data-canvas-border> —
+    cheap to call repeatedly, only touches the DOM when a value actually
+    changes */
 export function applyBackdropModes() {
   applyMode("backdrop", getBackdropMode());
   applyMode("widgetBackdrop", getWidgetBackdropMode());
+  applyCanvasBorder();
 }
 
 export function subscribeWallpaper(listener: () => void) {
@@ -233,15 +276,16 @@ subscribeCanvases(() => {
   syncWallpaperMeta();
 });
 
-// Reconcile the active canvas's backdrop modes + parallax flag with the
-// server: on load, on canvas switch (above), and every 15s thereafter
-// (skipped while the tab is hidden).
+// Reconcile the active canvas's backdrop modes + parallax flag + canvas
+// border visibility with the server: on load, on canvas switch (above), and
+// every 15s thereafter (skipped while the tab is hidden).
 async function syncModesWithServer() {
   const canvasId = getActiveCanvasId();
-  const [remoteMode, remoteWidgetMode, remoteParallax] = await Promise.all([
+  const [remoteMode, remoteWidgetMode, remoteParallax, remoteCanvasBorder] = await Promise.all([
     pullFromServer<BackdropMode>(canvasModeKey(canvasId)),
     pullFromServer<BackdropMode>(widgetModeKey(canvasId)),
     pullFromServer<boolean>(parallaxKey(canvasId)),
+    pullFromServer<boolean>(canvasBorderKey(canvasId)),
   ]);
 
   const isMode = (v: unknown): v is BackdropMode => v === "solid" || v === "blur" || v === "transparent" || v === "glass";
@@ -265,6 +309,13 @@ async function syncModesWithServer() {
     pushToServer(parallaxKey(canvasId), getParallax(canvasId));
   } else if (typeof remoteParallax === "boolean" && remoteParallax !== getParallax(canvasId)) {
     localStorage.setItem(parallaxKey(canvasId), remoteParallax ? "1" : "0");
+    changed = true;
+  }
+
+  if (remoteCanvasBorder === undefined) {
+    pushToServer(canvasBorderKey(canvasId), getCanvasBorder(canvasId));
+  } else if (typeof remoteCanvasBorder === "boolean" && remoteCanvasBorder !== getCanvasBorder(canvasId)) {
+    localStorage.setItem(canvasBorderKey(canvasId), remoteCanvasBorder ? "1" : "0");
     changed = true;
   }
 

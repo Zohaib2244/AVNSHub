@@ -1,5 +1,7 @@
 "use client";
 
+import { confirmProviderSwitch } from "@/lib/widget-creator/confirmSwitch";
+
 import { useEffect, useRef, useState } from "react";
 import { Download, Maximize2, Paperclip, PlusCircle, Send, Square, Map, Wand2, ChevronDown, ChevronUp, X } from "lucide-react";
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
@@ -7,11 +9,8 @@ import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWidgetCreated, emitWorking } from "@/lib/nutbotSignal";
 import {
   placeWidgetAuto,
-  unplaceWidgetTemporarily,
-  restorePlacementSnapshot,
   getPlacementSnapshot,
   getRegionsThatFitWidget,
-  type PlacementSnapshot,
 } from "@/lib/slotLayout";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { getManifest } from "@/config/widgets";
@@ -31,25 +30,68 @@ import {
 } from "@/lib/widget-creator/projectStore";
 import { MockupLightbox } from "./MockupLightbox";
 import { renderMessageText } from "./ToolChipLine";
+import { QuestionCard } from "./QuestionCard";
+import { CallCard, callResolution, type CallFn, type CallMessage, type CallResult } from "./CallCard";
+import { stripQuestions, type HarnessQuestion } from "@/lib/widget-creator/question";
+import {
+  RunActivity,
+  RunSteps,
+  STAGE_TO_STEP,
+  activityFromChunk,
+  advanceRun,
+  failRun,
+  formatElapsed,
+  isRunActive,
+  newRun,
+  useTicker,
+  type RunView,
+} from "./RunProgress";
 
 type Phase =
   | { id: "idle" }
   | { id: "connecting"; harness: HarnessId }
+  | { id: "preparing" }
   | { id: "generating"; harness: HarnessId }
   | { id: "tsc" }
+  | { id: "applying" }
   | { id: "done" }
   | { id: "error"; message: string };
+
+const RUNNING_PHASES: ReadonlySet<Phase["id"]> = new Set(["connecting", "preparing", "generating", "tsc", "applying"]);
+
+function isPhaseRunning(phase: Phase): boolean {
+  return RUNNING_PHASES.has(phase.id);
+}
 
 type Message =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
+  | { role: "question"; questions: HarnessQuestion[] }
   | { role: "switch"; from: HarnessId; to: HarnessId; reason: string }
   | { role: "tsc_errors"; errors: string[] }
   | { role: "audit"; files: string[] }
   | { role: "sibling_read"; paths: string[] }
   | { role: "ok"; text: string }
+  | { role: "notice"; text: string }
   | { role: "error"; text: string }
-  | { role: "action"; text: string; action: "reload" | "open-widget-manager" | "sync-skills" };
+  | CallMessage;
+
+/** Chats saved before call cards existed hold `role: "action"` lines for the
+    same three calls. Converted on load so they get the live treatment too —
+    the reload line's text opens with the slug; the open-manager line's with
+    the widget's title, which is no slug, so that one falls back to the chat's
+    own widget. */
+function normalizeMessages(list: Message[]): Message[] {
+  return list.map((m) => {
+    const legacy = m as unknown as { role: string; action?: string; text?: string };
+    if (legacy.role !== "action") return m;
+    const text = legacy.text ?? "";
+    if (legacy.action === "reload") {
+      return { role: "call", fn: "reload-page", slug: text.match(/^"([a-z0-9-]+)"/)?.[1], text };
+    }
+    return { role: "call", fn: legacy.action === "open-widget-manager" ? "open-widget-manager" : "sync-skills", text };
+  });
+}
 
 type DoneRecord = { slug: string; registered: boolean };
 
@@ -67,29 +109,90 @@ type Props = {
   entryMode?: ProjectMode;
   /** Build-mode CLI session from the synced project record, tagged with the
       target slug it belongs to so remounts can resume safely. */
-  buildSession?: { id: string; forSlug: string | null };
+  buildSession?: { id: string; forSlug: string | null; harness?: HarnessId };
   /** Finished-but-not-fully-installed build state from the project record. */
   pendingInstall?: DoneRecord;
 };
 
 const PHASE_LABEL: Record<Phase["id"], string> = {
   idle: "ready",
-  connecting: "connecting...",
-  generating: "generating...",
-  tsc: "checking types...",
+  connecting: "connecting",
+  preparing: "preparing workbench",
+  generating: "writing",
+  tsc: "checking types",
+  applying: "applying",
   done: "done",
   error: "error",
 };
+
+// runs this browser has already reported (seen live, or surfaced once from
+// the server's run status) — so a finished run is never announced twice
+const SEEN_RUNS_KEY = "nutmag-creator-seen-runs";
+
+function seenRuns(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(SEEN_RUNS_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+type ServerRun = {
+  runId: string;
+  slug: string;
+  stage: "preparing" | "writing" | "checking" | "applying";
+  harness?: string;
+  startedAt: number;
+  stageStartedAt: number;
+  finishedAt?: number;
+  outcome?: "done" | "error" | "aborted" | "question";
+  failedStage?: "preparing" | "writing" | "checking" | "applying";
+  message?: string;
+  registered?: boolean;
+};
+
+const PHASE_FOR_STAGE: Record<ServerRun["stage"], Phase["id"]> = {
+  preparing: "preparing",
+  writing: "generating",
+  checking: "tsc",
+  applying: "applying",
+};
+
+/** the server's run record as a RunView, on this browser's clock (`skew` = local − server) */
+function runViewFromServer(r: ServerRun, skew: number): RunView {
+  let view = newRun(r.startedAt + skew, true);
+  view.steps.prepare = { status: "active" };
+  view.harness = r.harness;
+  const step = STAGE_TO_STEP[r.stage];
+  view = advanceRun(view, step, r.stageStartedAt + skew);
+  if (!r.finishedAt) return view;
+  const end = r.finishedAt + skew;
+  if (r.outcome === "done") return advanceRun(view, "done", end);
+  return failRun(view, end, r.outcome === "aborted" ? "stopped" : "error", r.failedStage ? STAGE_TO_STEP[r.failedStage] : undefined);
+}
+
+function markRunSeen(runId: string) {
+  try {
+    const ids = seenRuns().filter((id) => id !== runId);
+    localStorage.setItem(SEEN_RUNS_KEY, JSON.stringify([...ids, runId].slice(-30)));
+  } catch {}
+}
 
 // Pending-add key is global (not per-project) since only one install can be
 // in flight at a time. Includes projectId in the value so the mount effect
 // only fires for the matching project.
 const PENDING_ADD_KEY = "nutmag-creator-pending-add";
 
-function StatusBar({ phase, modeLabel }: { phase: Phase; modeLabel: string }) {
-  const isActive = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
-  const harness = (phase as { harness?: HarnessId }).harness;
-  const label = phase.id === "idle" || phase.id === "done" ? `${modeLabel} mode · ${PHASE_LABEL[phase.id]}` : PHASE_LABEL[phase.id];
+function StatusBar({ phase, modeLabel, run, now }: { phase: Phase; modeLabel: string; run: RunView | null; now: number }) {
+  const isActive = isPhaseRunning(phase) || isRunActive(run);
+  const harness = (phase as { harness?: HarnessId }).harness ?? (isActive ? run?.harness : undefined);
+  const label = run?.remote && isActive
+    ? "running in another tab"
+    : phase.id === "idle" || phase.id === "done" ? `${modeLabel} mode · ${PHASE_LABEL[phase.id]}` : PHASE_LABEL[phase.id];
+  const elapsed = run && (isActive || run.finishedAt)
+    ? formatElapsed((run.finishedAt ?? now) - run.startedAt)
+    : null;
   return (
     <div className={`wc-status-bar${phase.id === "error" ? " error" : phase.id === "done" ? " done" : isActive ? " active" : ""}`}>
       {isActive && <span className="wc-status-dot" />}
@@ -98,6 +201,7 @@ function StatusBar({ phase, modeLabel }: { phase: Phase; modeLabel: string }) {
         {harness && ` · ${harness}`}
         {phase.id === "error" && ` · ${(phase as { message: string }).message}`}
       </span>
+      {elapsed && <span className="wc-status-time" title={isActive ? "elapsed" : "last run took"}>{elapsed}</span>}
     </div>
   );
 }
@@ -128,7 +232,7 @@ export function ChatCanvas({
   const pendingInstallSlug = pendingInstall?.slug ?? null;
   const pendingInstallRegistered = pendingInstall?.registered ?? false;
 
-  const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(MESSAGES_KEY) ?? []);
+  const [messages, setMessages] = useState<Message[]>(() => normalizeMessages(loadProjectBlob<Message[]>(MESSAGES_KEY) ?? []));
   const [prompt, setPrompt] = useState(initialPrompt ?? "");
   const [doneWidgetId, setDoneWidgetId] = useState<string | null>(() => pendingInstallSlug);
   const [pendingRegistration, setPendingRegistration] = useState(() => Boolean(pendingInstallSlug && !pendingInstallRegistered));
@@ -141,10 +245,13 @@ export function ChatCanvas({
     Boolean(pendingInstallSlug && getPlacementSnapshot(pendingInstallSlug).kind !== "none"),
   );
   const [adding, setAdding] = useState(false);
-  const [editHidden, setEditHidden] = useState(false);
-  const hiddenEditRef = useRef<{ slug: string; snapshot: PlacementSnapshot } | null>(null);
+  // progress of the current (or last) build run — see RunProgress.tsx
+  const [run, setRun] = useState<RunView | null>(null);
+  const runActive = isRunActive(run);
+  // ticks the elapsed timers only while a run is in progress
+  const now = useTicker(runActive);
   const { setInstalling, setHubCoreTab } = useLayout();
-  const { ref: bodyRef, onScroll: onBodyScroll } = useStickToBottom<HTMLDivElement>([messages, phase]);
+  const { ref: bodyRef, onScroll: onBodyScroll } = useStickToBottom<HTMLDivElement>([messages, phase, run?.activity]);
   // Chat image attachments (data URLs) for the next send — screenshots and
   // design references the harness views via its Read tool. Not persisted.
   const [attachedImages, setAttachedImages] = useState<string[]>([]);
@@ -166,16 +273,18 @@ export function ChatCanvas({
     const manifest = getManifest(slug);
     if (!manifest) {
       return {
-        role: "action",
-        action: "reload",
+        role: "call",
+        fn: "reload-page",
+        slug,
         text: `"${slug}" was installed, but it is not in the loaded registry yet.`,
       };
     }
 
     if (getRegionsThatFitWidget(slug).length === 0) {
       return {
-        role: "action",
-        action: "open-widget-manager",
+        role: "call",
+        fn: "open-widget-manager",
+        slug,
         text: `"${manifest.title}" is installed, but no canvas region has room for it.`,
       };
     }
@@ -187,28 +296,47 @@ export function ChatCanvas({
   }
 
   function reportPlacementFailure(slug: string) {
-    setMessages((prev) => [...prev, placementFailureMessage(slug)]);
+    const next = placementFailureMessage(slug);
+    setMessages((prev) => {
+      // one open offer per call is enough: a placement retry that fails the
+      // same way must not stack a second identical card
+      const open = next.role === "call" && prev.some(
+        (m) => m.role === "call" && m.fn === next.fn && m.slug === next.slug && callResolution(m, m.slug ?? null) === null,
+      );
+      return open ? prev : [...prev, next];
+    });
   }
 
-  async function runMessageAction(action: "reload" | "open-widget-manager" | "sync-skills") {
-    if (action === "reload") {
+  /** run a chat call. reload and open-manager are fire-and-forget (the card
+      reads the app's live state for whether they were still needed); only
+      sync-skills reports a result worth keeping. */
+  async function runCall(fn: CallFn): Promise<CallResult> {
+    if (fn === "reload-page") {
       window.location.reload();
-    } else if (action === "open-widget-manager") {
-      setHubCoreTab("widgets");
-    } else if (action === "sync-skills") {
-      try {
-        const res = await fetch("/api/widget-creator/sync-skills", { method: "POST" });
-        const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-        setMessages((prev) => [
-          ...prev,
-          body.ok
-            ? { role: "ok", text: "[ok] skills regenerated. resubmit your prompt." }
-            : { role: "error", text: body.error ?? `skill regeneration failed (${res.status})` },
-        ]);
-      } catch (error) {
-        setMessages((prev) => [...prev, { role: "error", text: `skill regeneration failed: ${(error as Error).message}` }]);
-      }
+      return { ok: true };
     }
+    if (fn === "open-widget-manager") {
+      setHubCoreTab("widgets");
+      return { ok: true };
+    }
+    try {
+      const res = await fetch("/api/widget-creator/sync-skills", { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      return body.ok
+        ? { ok: true, detail: "skills regenerated, resubmit your prompt" }
+        : { ok: false, detail: body.error ?? `skill regeneration failed (${res.status})` };
+    } catch (error) {
+      return { ok: false, detail: `skill regeneration failed: ${(error as Error).message}` };
+    }
+  }
+
+  /** keep a finished sync-skills call in the transcript, so reopening the
+      chat doesn't offer to regenerate skills that already were */
+  function settleCall(index: number, result: CallResult) {
+    if (!result.ok) return;
+    setMessages((prev) =>
+      prev.map((m, j) => (j === index && m.role === "call" && m.fn === "sync-skills" ? { ...m, result } : m)),
+    );
   }
 
   // if this canvas is unmounted mid-generation (e.g. canvas switch), abort and clear the lock
@@ -229,8 +357,9 @@ export function ChatCanvas({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const remote = await pullProjectBlob<Message[]>(MESSAGES_KEY);
-      if (cancelled || !remote || !Array.isArray(remote)) return;
+      const pulled = await pullProjectBlob<Message[]>(MESSAGES_KEY);
+      if (cancelled || !pulled || !Array.isArray(pulled)) return;
+      const remote = normalizeMessages(pulled);
       setMessages((current) => {
         if (current.length > remote.length) return current;
         if (JSON.stringify(current) === JSON.stringify(remote)) return current;
@@ -269,9 +398,125 @@ export function ChatCanvas({
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
 
-  async function generate() {
-    const inFlight = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
-    const promptText = prompt.trim();
+  // Sync with the server's record of this widget's last build run
+  // (lib/widget-creator/runStatus.ts) for runs this tab didn't stream: one
+  // running in another tab or device is shown live until it ends, and a run
+  // that finished or was interrupted (a reload cancels the stream, which
+  // stops the run) while nobody was watching is reported once.
+  const targetSlug = (settings.editSlug || settings.slug || "").trim();
+  useEffect(() => {
+    if (!targetSlug || !isValidSlug(targetSlug)) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let watching = false;
+
+    const poll = async () => {
+      // our own stream is live — it is the source of truth; check back later
+      if (abortRef.current) {
+        timer = setTimeout(poll, 3000);
+        return;
+      }
+      let data: { run: ServerRun | null; now: number } | null = null;
+      try {
+        const res = await fetch(`/api/widget-creator/run-status?slug=${encodeURIComponent(targetSlug)}`);
+        if (res.ok) data = await res.json();
+      } catch {}
+      if (cancelled || !data?.run) return;
+      const r = data.run;
+      const skew = Date.now() - data.now;
+      if (!r.finishedAt) {
+        if (seenRuns().includes(r.runId)) return;
+        watching = true;
+        setRun(runViewFromServer(r, skew));
+        setPhase(r.stage === "writing" && r.harness ? { id: "generating", harness: r.harness as HarnessId } : { id: PHASE_FOR_STAGE[r.stage] ?? "preparing" } as Phase);
+        timer = setTimeout(poll, 1500);
+        return;
+      }
+      const recent = Date.now() - skew - r.finishedAt < 30 * 60 * 1000;
+      if (seenRuns().includes(r.runId) || (!watching && !recent)) return;
+      markRunSeen(r.runId);
+      setRun(runViewFromServer(r, skew));
+      if (r.outcome === "done") {
+        onRunDone(r.slug, Boolean(r.registered), null, (r.harness as HarnessId) ?? null);
+      } else if (r.outcome === "question") {
+        // asked in another tab — its transcript (with the question) is in the project blob
+        setRun(null);
+        setPhase({ id: "idle" });
+        const pulled = await pullProjectBlob<Message[]>(MESSAGES_KEY);
+        if (!cancelled && Array.isArray(pulled)) {
+          const remote = normalizeMessages(pulled);
+          setMessages((current) => (remote.length > current.length ? remote : current));
+        }
+      } else if (r.outcome === "aborted") {
+        setPhase({ id: "idle" });
+        setMessages((prev) => [...prev, {
+          role: "notice",
+          text: watching
+            ? `the run for "${r.slug}" was stopped in another tab — nothing was applied; its partial draft is kept for your next message.`
+            : `the last run for "${r.slug}" was interrupted before it finished (the page was reloaded or closed) — nothing was applied; its partial draft is kept for your next message.`,
+        }]);
+      } else {
+        setPhase({ id: "error", message: r.message ?? "the last run failed" });
+        setMessages((prev) => [...prev, { role: "error", text: `the last run for "${r.slug}" failed: ${r.message ?? "unknown error"}` }]);
+      }
+    };
+
+    void poll();
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // onRunDone/setters are stable enough for a poll that restarts per widget
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetSlug]);
+
+  /** shared by the live stream and the run-status poller */
+  function onRunDone(slug: string | null, registered: boolean, sessionId: string | null, harness: HarnessId | null) {
+    if (sessionId) {
+      updateProject(projectId, { buildSession: { id: sessionId, forSlug: slug, harness: harness ?? activeHarness } });
+    }
+    setPhase({ id: "done" });
+    setMessages((prev) => {
+      const updated = [...prev];
+      const idx = assistantIdxRef.current;
+      if (idx >= 0 && updated[idx]?.role === "assistant") {
+        updated[idx] = { ...(updated[idx] as { role: "assistant"; text: string }), streaming: false };
+      }
+      return [
+        ...updated,
+        {
+          role: "ok",
+          text: registered
+            ? `[ok] widget updated — the checked changes are live on your canvas. keep chatting here to iterate.`
+            : `[ok] widget written — it passed the type check and was saved. click "install widget" below to add it to your dashboard.`,
+        },
+      ];
+    });
+    clearSignal();
+    setWorkingProjectId(null);
+
+    if (slug) {
+      setDoneWidgetId(slug);
+      setAdded(registered && getPlacementSnapshot(slug).kind !== "none");
+      setPendingRegistration(!registered);
+      emitWidgetCreated(slug);
+      updateProject(projectId, { pendingInstall: { slug, registered } });
+      // promote project to Created in the store
+      updateProject(projectId, {
+        hasBuildOutput: true,
+        slug,
+        displayName: settings.name ?? slug,
+        activeMode: "build",
+        workflowMode: "build",
+      });
+      onSettingsChange({ editSlug: slug });
+    }
+  }
+
+  /** `answer`: a reply to the harness's question card, sent instead of the typed prompt */
+  async function generate(answer?: string) {
+    const inFlight = isPhaseRunning(phase) || runActive;
+    const promptText = (answer ?? prompt).trim();
     if ((!promptText && !hasDesignReference) || inFlight) return;
 
     const validationError = validateSettings(settings);
@@ -280,14 +525,20 @@ export function ChatCanvas({
       return;
     }
 
-    const imagesForRequest = attachedImages;
+    const imagesForRequest = answer === undefined ? attachedImages : [];
     const userText = (promptText || "(build from the finalized design reference)")
       + (imagesForRequest.length ? `  [+${imagesForRequest.length} image${imagesForRequest.length > 1 ? "s" : ""}]` : "");
-    setPrompt("");
-    setAttachedImages([]);
+    if (answer === undefined) {
+      setPrompt("");
+      setAttachedImages([]);
+    }
 
+    // the last type-check result: errors are sent along so the harness fixes them
+    const lastValidation = messages.findLast((m) => m.role === "tsc_errors" || (m.role === "ok" && (m.text.includes("widget updated") || m.text.includes("widget written"))));
     const attemptedSlug = (settings.editSlug || settings.slug || "").trim() || null;
     let hadTscErrors = false;
+    // set once the stream reported a terminal outcome (done / error / stop)
+    let settled = false;
 
     setDoneWidgetId(null);
     setAdded(false);
@@ -300,20 +551,25 @@ export function ChatCanvas({
       updateProject(projectId, { buildSession: undefined });
     }
 
+    // Without a session to resume (opencode, or an expired one) the harness
+    // starts fresh from the full prompt, so an answer alone would lose the
+    // request it answers.
+    const askedFor = answer !== undefined && !sessionForRequest
+      ? messages.findLast((m): m is Extract<Message, { role: "user" }> => m.role === "user" && !m.text.startsWith("Answers to your question"))?.text
+      : undefined;
+    const requestPrompt = askedFor ? `${askedFor}\n\n${promptText}` : promptText;
+
     assistantIdxRef.current = -1;
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setPhase({ id: "connecting", harness: activeHarness });
+    setRun(newRun(Date.now()));
     emitWorking();
     setWorkingProjectId(projectId);
 
-    if (settings.editSlug) {
-      const editSlug = settings.editSlug;
-      const snapshot = unplaceWidgetTemporarily(editSlug);
-      if (snapshot.kind !== "none") {
-        hiddenEditRef.current = { slug: editSlug, snapshot };
-        setEditHidden(true);
-      }
-    }
+    // The widget being edited stays on the canvas: the harness works in the
+    // widget's server-side workbench and the live files only change once the
+    // checked draft is applied (docs/design/WIDGET_WORKBENCH.md), so there's no
+    // half-written state to hide anymore.
 
     const abort = new AbortController();
     abortRef.current = abort;
@@ -324,10 +580,12 @@ export function ChatCanvas({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings,
-          prompt: promptText,
+          prompt: requestPrompt,
           harness: activeHarness,
           harnessChain,
           sessionId: sessionForRequest ?? undefined,
+          sessionHarness: buildSession?.harness ?? "claude",
+          repairErrors: lastValidation?.role === "tsc_errors" ? lastValidation.errors : undefined,
           projectMeta: { concept: brief?.concept, entryMode },
           images: imagesForRequest.length ? imagesForRequest : undefined,
         }),
@@ -361,62 +619,36 @@ export function ChatCanvas({
 
           if (event === "status") {
             const type = payload.type as string;
-            if (type === "harness_start") {
-              setPhase({ id: "generating", harness: payload.harness as HarnessId });
+            if (type === "preparing") {
+              if (typeof payload.runId === "string") markRunSeen(payload.runId);
+              setPhase({ id: "preparing" });
+            } else if (type === "harness_start") {
+              const harness = payload.harness as HarnessId;
+              setPhase({ id: "generating", harness });
+              setRun((r) => r && { ...advanceRun(r, "write", Date.now()), harness, activity: undefined });
             } else if (type === "tsc_check") {
               setPhase({ id: "tsc" });
+              setRun((r) => r && advanceRun(r, "check", Date.now()));
+            } else if (type === "applying") {
+              setPhase({ id: "applying" });
+              setRun((r) => r && advanceRun(r, "apply", Date.now()));
+            } else if (type === "verifying") {
+              const detail = typeof payload.detail === "string" ? payload.detail : undefined;
+              setRun((r) => r && { ...advanceRun(r, "verify", Date.now()), activity: detail });
             } else if (type === "done") {
-              const slug = (payload.slug as string | null) ?? null;
-              const registered = Boolean(payload.registered);
-              const newSessionId = (payload.sessionId as string | null) ?? null;
-              if (newSessionId) {
-                updateProject(projectId, { buildSession: { id: newSessionId, forSlug: slug } });
-              }
-              setPhase({ id: "done" });
-              setMessages((prev) => {
-                const updated = [...prev];
-                const idx = assistantIdxRef.current;
-                if (idx >= 0 && updated[idx]?.role === "assistant") {
-                  updated[idx] = { ...(updated[idx] as { role: "assistant"; text: string }), streaming: false };
-                }
-                return [
-                  ...updated,
-                  {
-                    role: "ok",
-                    text: registered
-                      ? "[ok] widget updated. keep chatting here to iterate on it."
-                      : "[ok] widget written — click '+ add to layout' below. keep chatting here to iterate on it.",
-                  },
-                ];
-              });
-              clearSignal();
-              setWorkingProjectId(null);
-
-              let restoredOk = false;
-              if (slug && hiddenEditRef.current?.slug === slug) {
-                restoredOk = restorePlacementSnapshot(slug, hiddenEditRef.current.snapshot);
-                hiddenEditRef.current = null;
-                setEditHidden(false);
-              }
-              if (slug) {
-                setDoneWidgetId(slug);
-                setAdded(restoredOk);
-                setPendingRegistration(!registered);
-                emitWidgetCreated(slug);
-                updateProject(projectId, { pendingInstall: { slug, registered } });
-                // promote project to Created in the store
-                updateProject(projectId, {
-                  hasBuildOutput: true,
-                  slug,
-                  displayName: settings.name ?? slug,
-                  activeMode: "build",
-                  workflowMode: "build",
-                });
-                onSettingsChange({ editSlug: slug });
-              }
+              settled = true;
+              setRun((r) => r && advanceRun(r, "done", Date.now()));
+              onRunDone(
+                (payload.slug as string | null) ?? null,
+                Boolean(payload.registered),
+                (payload.sessionId as string | null) ?? null,
+                (payload.harness as HarnessId | null) ?? null,
+              );
             }
           } else if (event === "chunk") {
             const text = payload.text as string;
+            const activity = activityFromChunk(text);
+            if (activity) setRun((r) => r && { ...r, activity });
             setMessages((prev) => {
               const idx = assistantIdxRef.current;
               if (idx === -1 || prev[idx]?.role !== "assistant") {
@@ -428,12 +660,27 @@ export function ChatCanvas({
               updated[idx] = { ...msg, text: msg.text + text };
               return updated;
             });
+          } else if (event === "question") {
+            // the run paused for an answer: nothing was checked or applied
+            settled = true;
+            setRun(null);
+            setPhase({ id: "idle" });
+            clearSignal();
+            setWorkingProjectId(null);
+            setMessages((prev) => [...prev, { role: "question", questions: payload.questions as HarnessQuestion[] }]);
+          } else if (event === "session") {
+            updateProject(projectId, { buildSession: { id: payload.sessionId as string, forSlug: payload.slug as string | null, harness: payload.harness as HarnessId } });
+          } else if (event === "switch_required") {
+            confirmProviderSwitch(payload, abort.signal);
           } else if (event === "switch") {
             const from = payload.from as HarnessId;
             const to = payload.to as HarnessId;
             setMessages((prev) => [...prev, { role: "switch", from, to, reason: payload.reason as string }]);
             setPhase({ id: "connecting", harness: to });
+            setRun((r) => r && { ...r, harness: to, activity: `switching to ${to}` });
             assistantIdxRef.current = -1;
+          } else if (event === "notice") {
+            setMessages((prev) => [...prev, { role: "notice", text: payload.text as string }]);
           } else if (event === "tsc_errors") {
             hadTscErrors = true;
             setMessages((prev) => [...prev, { role: "tsc_errors", errors: payload.errors as string[] }]);
@@ -452,41 +699,50 @@ export function ChatCanvas({
               return [...prev, { role: "sibling_read", paths: [path] }];
             });
           } else if (event === "error") {
+            settled = true;
+            const failedStep = typeof payload.stage === "string" ? STAGE_TO_STEP[payload.stage] : undefined;
+            setRun((r) => r && failRun(r, Date.now(), "error", failedStep));
             clearSignal();
             setWorkingProjectId(null);
             if (payload.code === "skill-missing") {
               const message = payload.message as string;
               setPhase({ id: "error", message });
-              setMessages((prev) => [...prev, { role: "action", action: "sync-skills", text: message }]);
+              setMessages((prev) => [...prev, { role: "call", fn: "sync-skills", text: message }]);
             } else {
               fail(payload.message as string);
             }
-            if (hadTscErrors && attemptedSlug) {
+            if (hadTscErrors && attemptedSlug && !settings.editSlug) {
               onSettingsChange({ editSlug: attemptedSlug });
               setMessages((prev) => [
                 ...prev,
-                { role: "ok", text: `[info] switched to edit mode for "${attemptedSlug}" — describe the fix and resubmit` },
-              ]);
-            }
-            if (hiddenEditRef.current) {
-              setMessages((prev) => [
-                ...prev,
-                { role: "ok", text: `[info] "${hiddenEditRef.current!.slug}" is still off the canvas — fix and resubmit to restore it automatically, or use "restore to canvas" below.` },
+                { role: "notice", text: `switched to edit mode for "${attemptedSlug}" — describe the fix and resubmit` },
               ]);
             }
           }
         }
       }
     } catch (err) {
+      settled = true;
       clearSignal();
       setWorkingProjectId(null);
       if ((err as Error).name === "AbortError") {
         setPhase({ id: "idle" });
+        setRun((r) => r && !r.finishedAt ? failRun(r, Date.now(), "stopped") : r);
+        setMessages((prev) => [...prev, { role: "notice", text: "stopped — nothing was applied. whatever the harness had written is kept in the draft for your next message." }]);
       } else {
+        setRun((r) => r && !r.finishedAt ? failRun(r, Date.now(), "error") : r);
         fail((err as Error).message ?? "request failed");
       }
     } finally {
       abortRef.current = null;
+      if (!settled) {
+        // the stream closed without done/error — e.g. the hub restarted mid-run
+        setRun((r) => (r && !r.finishedAt ? failRun(r, Date.now(), "error") : r));
+        setPhase({ id: "error", message: "stream ended" });
+        setMessages((prev) => [...prev, { role: "error", text: "the build stream ended without a result — the hub may have restarted. nothing was applied." }]);
+        clearSignal();
+        setWorkingProjectId(null);
+      }
       setMessages((prev) => {
         const idx = assistantIdxRef.current;
         if (idx < 0) return prev;
@@ -508,11 +764,12 @@ export function ChatCanvas({
   }
 
   function clearChat() {
-    if (phase.id !== "idle" && phase.id !== "done" && phase.id !== "error") return;
+    if (isPhaseRunning(phase) || runActive) return;
     const keepInstall = doneWidgetId
       ? { slug: doneWidgetId, registered: !pendingRegistration }
       : pendingInstall;
     setMessages([]);
+    setRun(null);
     setPhase(keepInstall ? { id: "done" } : { id: "idle" });
     setDoneWidgetId(keepInstall?.slug ?? null);
     setAdded((current) => keepInstall ? current : false);
@@ -590,6 +847,9 @@ export function ChatCanvas({
           icon: settings.icon,
           sizes: settings.sizes,
           orientations: settings.orientations,
+          presets: settings.presets,
+          defaultPreset: settings.defaultPreset,
+          fill: settings.fill,
         }),
       });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
@@ -649,21 +909,13 @@ export function ChatCanvas({
     }
   }
 
-  function restoreHiddenEditWidget() {
-    const pending = hiddenEditRef.current;
-    if (!pending) return;
-    if (restorePlacementSnapshot(pending.slug, pending.snapshot)) {
-      hiddenEditRef.current = null;
-      setEditHidden(false);
-    }
-  }
-
-  const isGenerating = phase.id === "connecting" || phase.id === "generating" || phase.id === "tsc";
+  const isGenerating = isPhaseRunning(phase) || runActive;
   const isDoneOrError = phase.id === "done" || phase.id === "error";
 
   return (
     <div className="wc-chat">
-      <StatusBar phase={phase} modeLabel={modeLabel} />
+      <StatusBar phase={phase} modeLabel={modeLabel} run={run} now={now} />
+      {run && <RunSteps run={run} now={now} />}
 
       {(brief || settings.designReferenceHtml) && (
         <div className="wc-handoff-strip">
@@ -716,12 +968,6 @@ export function ChatCanvas({
           </div>
         )}
 
-        {messages.length === 0 && isGenerating && (
-          <div className="wc-chat-empty wc-status-bar active">
-            <span className="wc-status-dot" />
-            <span className="wc-status-label">writing the widget...</span>
-          </div>
-        )}
 
         {messages.map((msg, i) => {
           if (msg.role === "user") {
@@ -730,8 +976,19 @@ export function ChatCanvas({
           if (msg.role === "assistant") {
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <div className="wc-code">{renderMessageText(msg.text)}</div>
+                <div className="wc-code">{renderMessageText(stripQuestions(msg.text))}</div>
                 {msg.streaming && <span className="wc-cursor">▍</span>}
+              </div>
+            );
+          }
+          if (msg.role === "question") {
+            return (
+              <div key={i} className="wc-msg wc-msg-assistant">
+                <QuestionCard
+                  questions={msg.questions}
+                  active={!isGenerating && !messages.slice(i + 1).some((m) => m.role === "user")}
+                  onAnswer={(text) => void generate(text)}
+                />
               </div>
             );
           }
@@ -745,7 +1002,7 @@ export function ChatCanvas({
           if (msg.role === "tsc_errors") {
             return (
               <div key={i} className="wc-msg wc-msg-tsc">
-                <div className="wc-msg-tsc-head">[tsc errors — re-sending for self-repair]</div>
+                <div className="wc-msg-tsc-head">[type errors — nothing was applied; these are sent with your next message]</div>
                 {msg.errors.slice(0, 6).map((e, j) => (
                   <div key={j} className="wc-tsc-line">{e}</div>
                 ))}
@@ -755,7 +1012,7 @@ export function ChatCanvas({
           if (msg.role === "audit") {
             return (
               <div key={i} className="wc-msg wc-msg-audit">
-                <div className="wc-msg-audit-head">[write audit] the run touched files outside the widget&apos;s own folders — review before trusting this build:</div>
+                <div className="wc-msg-audit-head">[write audit] the run tried to change files outside this widget&apos;s own folders — those changes were discarded, not applied:</div>
                 {msg.files.map((f, j) => (
                   <div key={j} className="wc-audit-line">{f}</div>
                 ))}
@@ -775,6 +1032,13 @@ export function ChatCanvas({
           if (msg.role === "ok") {
             return <div key={i} className="wc-msg wc-msg-ok">{msg.text}</div>;
           }
+          if (msg.role === "notice") {
+            return (
+              <div key={i} className="wc-msg wc-msg-notice">
+                <span className="wc-msg-notice-tag">[info]</span> {msg.text}
+              </div>
+            );
+          }
           if (msg.role === "error") {
             return (
               <div key={i} className="wc-msg wc-msg-error">
@@ -782,31 +1046,24 @@ export function ChatCanvas({
               </div>
             );
           }
-          if (msg.role === "action") {
-            const label = msg.action === "reload"
-              ? "reload"
-              : msg.action === "open-widget-manager"
-                ? "open widget manager"
-                : "regenerate skills";
+          if (msg.role === "call") {
             return (
-              <div key={i} className="wc-msg wc-msg-action">
-                <span>{msg.text}</span>
-                <button type="button" className="wc-msg-action-btn" onClick={() => void runMessageAction(msg.action)}>
-                  {label}
-                </button>
-              </div>
+              <CallCard
+                key={i}
+                call={msg}
+                fallbackSlug={doneWidgetId ?? (targetSlug || null)}
+                // skills are regenerated once; a later message means the user
+                // has already resubmitted
+                superseded={msg.fn === "sync-skills" && messages.slice(i + 1).some((m) => m.role === "user")}
+                onCall={runCall}
+                onSettled={(result) => settleCall(i, result)}
+              />
             );
           }
           return null;
         })}
 
-        {isGenerating && (
-          <div className="wc-generating-hint">
-            <span className="wc-dot-pulse" />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.2s" }} />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.4s" }} />
-          </div>
-        )}
+        {run && runActive && <RunActivity run={run} now={now} />}
       </div>
 
       {attachedImages.length > 0 && (
@@ -878,12 +1135,6 @@ export function ChatCanvas({
             {added && <span className="wc-added-hint">added ✓</span>}
           </>
         )}
-        {editHidden && !isGenerating && (
-          <button type="button" className="wc-add-btn" onClick={restoreHiddenEditWidget}>
-            <PlusCircle size={11} strokeWidth={2} />
-            restore to canvas
-          </button>
-        )}
         <textarea
           className="wc-chat-input"
           placeholder={
@@ -909,9 +1160,11 @@ export function ChatCanvas({
         <button
           type="button"
           className={`wc-send-btn${isGenerating ? " stop" : ""}`}
-          onClick={isGenerating ? stop : generate}
+          onClick={isGenerating ? stop : () => void generate()}
           aria-label={isGenerating ? "stop" : "generate"}
-          disabled={!isGenerating && !prompt.trim() && !hasDesignReference}
+          // a run streamed by another tab can only be stopped from that tab
+          disabled={(!isGenerating && !prompt.trim() && !hasDesignReference) || Boolean(run?.remote && runActive)}
+          title={run?.remote && runActive ? "this run was started in another tab — stop it there" : undefined}
         >
           {isGenerating ? <Square size={10} strokeWidth={2} fill="currentColor" /> : <Send size={12} strokeWidth={2} />}
         </button>

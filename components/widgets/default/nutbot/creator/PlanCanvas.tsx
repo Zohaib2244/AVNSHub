@@ -6,6 +6,10 @@ import type { HarnessId } from "@/lib/widget-creator/harnessAdapters";
 import { clearSignal, emitWorking } from "@/lib/nutbotSignal";
 import { useEffect } from "react";
 import { useStickToBottom } from "@/lib/widget-creator/useStickToBottom";
+import { ActivityLine, formatElapsed, useTicker } from "./RunProgress";
+import { QuestionCard } from "./QuestionCard";
+import { isQuestionStreaming, parseQuestions, stripQuestions } from "@/lib/widget-creator/question";
+import { parseBrief } from "@/lib/widget-creator/briefPresets";
 import {
   updateProject,
   setWorkingProjectId,
@@ -24,14 +28,22 @@ type Message =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; streaming?: boolean }
   | { role: "brief"; brief: WidgetBrief }
+  | { role: "notice"; text: string }
   | { role: "error"; text: string };
+
+/** what the planner is doing, from the text streamed so far */
+function planActivity(text: string): string {
+  if (!text) return "thinking";
+  if (text.includes("```widget-brief")) return "drafting the widget brief";
+  if (isQuestionStreaming(text)) return "writing a question";
+  return "replying";
+}
 
 const BRIEF_RE = /```widget-brief\s*\n([\s\S]*?)```/;
 
 function extractBrief(text: string): WidgetBrief | null {
   const match = text.match(BRIEF_RE);
-  if (!match) return null;
-  try { return JSON.parse(match[1].trim()) as WidgetBrief; } catch { return null; }
+  return match ? parseBrief(match[1].trim()) : null;
 }
 
 function hasBriefBlock(text: string): boolean {
@@ -39,7 +51,12 @@ function hasBriefBlock(text: string): boolean {
 }
 
 function stripBrief(text: string): string {
-  return extractBrief(text) ? text.replace(/```widget-brief[\s\S]*?```/g, "").trim() : text;
+  if (extractBrief(text)) return text.replace(/```widget-brief[\s\S]*?```/g, "").trim();
+  // a brief still streaming in: hide the half-written JSON (the activity line
+  // says "drafting the widget brief"); a finished-but-unparseable block stays
+  // visible via the error path, which only runs once the reply is done
+  const open = text.indexOf("```widget-brief");
+  return open !== -1 && !/```widget-brief[\s\S]*?```/.test(text) ? text.slice(0, open).trim() : text;
 }
 
 function historyFromMessages(messages: Message[]): Array<{ role: "user" | "assistant"; text: string }> {
@@ -66,6 +83,11 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
   const [messages, setMessages] = useState<Message[]>(() => loadProjectBlob<Message[]>(msgsKey) ?? []);
   const [prompt, setPrompt] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  // when the current request started, and the latest reply text (for the activity line)
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [lastDuration, setLastDuration] = useState<number | null>(null);
+  const [streamedText, setStreamedText] = useState("");
+  const now = useTicker(isLoading);
   const { ref: bodyRef, onScroll: onBodyScroll, scrollToBottom: scrollBottom } = useStickToBottom<HTMLDivElement>([messages]);
   const abortRef = useRef<AbortController | null>(null);
   const assistantIdxRef = useRef(-1);
@@ -97,12 +119,16 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
     removeProjectBlob(msgsKey);
   }
 
-  async function send() {
-    if (!prompt.trim() || isLoading || readOnly) return;
-    const userText = prompt.trim();
-    setPrompt("");
+  async function send(answer?: string) {
+    const userText = (answer ?? prompt).trim();
+    if (!userText || isLoading || readOnly) return;
+    if (answer === undefined) setPrompt("");
     setMessages((prev) => [...prev, { role: "user", text: userText }]);
     setIsLoading(true);
+    const requestStartedAt = Date.now();
+    setStartedAt(requestStartedAt);
+    setLastDuration(null);
+    setStreamedText("");
     emitWorking();
     setWorkingProjectId(projectId);
     scrollBottom(true);
@@ -155,6 +181,7 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
           if (frame.type === "token") {
             const token = frame.data as string;
             accText += token;
+            setStreamedText(accText);
             setMessages((prev) => {
               const idx = assistantIdxRef.current;
               if (idx === -1 || prev[idx]?.role !== "assistant") {
@@ -193,10 +220,17 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
         }
       }
     } catch (err) {
-      if ((err as Error).name !== "AbortError") {
+      if ((err as Error).name === "AbortError") {
+        setMessages((prev) => [...prev, {
+          role: "notice",
+          text: accText ? "stopped — the partial reply above is kept, but no plan was saved from it." : "stopped before the planner replied.",
+        }]);
+      } else {
         setMessages((prev) => [...prev, { role: "error", text: (err as Error).message ?? "request failed" }]);
       }
     } finally {
+      setLastDuration(Date.now() - requestStartedAt);
+      setStartedAt(null);
       setIsLoading(false);
       clearSignal();
       setWorkingProjectId(null);
@@ -215,8 +249,8 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
   }
 
   function stop() {
+    // the send() catch/finally records the stop and resets loading state
     abortRef.current?.abort();
-    setIsLoading(false);
     clearSignal();
     setWorkingProjectId(null);
   }
@@ -232,6 +266,8 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
               ? "plan mode — review only"
               : "plan mode — describe a widget idea to get started"}
         </span>
+        {isLoading && startedAt !== null && <span className="wc-status-time" title="elapsed">{formatElapsed(now - startedAt)}</span>}
+        {!isLoading && lastDuration !== null && <span className="wc-status-time" title="last reply took">{formatElapsed(lastDuration)}</span>}
       </div>
 
       {readOnly && (
@@ -247,12 +283,6 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
           </div>
         )}
 
-        {messages.length === 0 && isLoading && (
-          <div className="wc-chat-empty wc-status-bar active">
-            <span className="wc-status-dot" />
-            <span className="wc-status-label">thinking...</span>
-          </div>
-        )}
 
         {messages.map((msg, i) => {
           if (msg.role === "user") {
@@ -260,11 +290,19 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
           }
 
           if (msg.role === "assistant") {
-            const displayText = stripBrief(msg.text);
+            const displayText = stripQuestions(stripBrief(msg.text));
+            const questions = msg.streaming ? null : parseQuestions(msg.text);
             return (
               <div key={i} className="wc-msg wc-msg-assistant">
-                <pre className="wc-code">{displayText}</pre>
+                {displayText && <pre className="wc-code">{displayText}</pre>}
                 {msg.streaming && <span className="wc-cursor">▍</span>}
+                {questions && (
+                  <QuestionCard
+                    questions={questions}
+                    active={!isLoading && !readOnly && !messages.slice(i + 1).some((m) => m.role === "user")}
+                    onAnswer={(text) => void send(text)}
+                  />
+                )}
               </div>
             );
           }
@@ -273,6 +311,14 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
             return (
               <div key={i} className="wc-msg wc-msg-ok">
                 &ldquo;{msg.brief.title}&rdquo; plan updated — review it in the panel on the left.
+              </div>
+            );
+          }
+
+          if (msg.role === "notice") {
+            return (
+              <div key={i} className="wc-msg wc-msg-notice">
+                <span className="wc-msg-notice-tag">[info]</span> {msg.text}
               </div>
             );
           }
@@ -288,13 +334,7 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
           return null;
         })}
 
-        {isLoading && (
-          <div className="wc-generating-hint">
-            <span className="wc-dot-pulse" />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.2s" }} />
-            <span className="wc-dot-pulse" style={{ animationDelay: "0.4s" }} />
-          </div>
-        )}
+        {isLoading && <ActivityLine text={`${planActivity(streamedText)} · ${activeHarness}`} />}
       </div>
 
       <div className="wc-chat-footer">
@@ -320,7 +360,7 @@ export function PlanCanvas({ projectId, activeHarness, planSessionId, readOnly =
         <button
           type="button"
           className={`wc-send-btn${isLoading ? " stop" : ""}`}
-          onClick={isLoading ? stop : send}
+          onClick={isLoading ? stop : () => void send()}
           aria-label={isLoading ? "stop" : "send"}
           disabled={readOnly || (!isLoading && !prompt.trim())}
         >

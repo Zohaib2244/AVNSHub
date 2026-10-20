@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { RealShell } from "@/components/widgets/default/nutbot/RealShell";
 
@@ -16,7 +16,9 @@ export function ShellsScreen() {
   ]);
   const [activeId, setActiveId] = useState("shell-1");
   const activeRef = useRef(activeId);
-  activeRef.current = activeId;
+  useEffect(() => {
+    activeRef.current = activeId;
+  }, [activeId]);
 
   function addSession() {
     _shellCounter += 1;

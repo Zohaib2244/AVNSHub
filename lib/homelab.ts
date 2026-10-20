@@ -43,6 +43,10 @@ export type HostTelemetry = {
     tx_rate_bps: number;
   };
   uptime_seconds: number;
+  /** data mounts listed in /etc/fstab (under /mnt or /media) that aren't
+      currently mounted — e.g. a USB drive that dropped off the bus. Linux only;
+      absent elsewhere. */
+  missing_mounts?: string[];
 };
 
 type RawService = {
@@ -129,6 +133,7 @@ async function fetchRaw(): Promise<RawResponse | null> {
     return rawCache.data;
   }
 
+  // dev-only stand-in for machines with no homelab access
   if (process.env.HOMELAB_MOCK_DATA === "true") {
     const data = mockRawResponse();
     rawCache = { data, expiresAt: Date.now() + CACHE_TTL_MS };

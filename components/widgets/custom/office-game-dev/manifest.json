@@ -1,6 +1,6 @@
 {
-  "title": "office game dev",
-  "iconName": "Zap",
+  "title": "game ops",
+  "iconName": "Gamepad2",
   "sizes": ["S", "M", "L"],
   "orientations": ["h"],
   "defaults": { "size": "M", "orientation": "h" },

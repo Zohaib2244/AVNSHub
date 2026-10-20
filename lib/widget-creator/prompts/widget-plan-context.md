@@ -13,19 +13,23 @@ The canvas is a Slot Layout grid split into regions the user can resize:
 plus **center** ("Central Base", usually the NutBot terminal). A widget is
 placed into ONE region, occupying a rectangle of cells.
 
-## Size semantics (S / M / L x horizontal / vertical)
+## Size presets
 
-- **S** - a single glanceable stat, badge, or counter. One thing, at a glance.
-- **M** - the default, standard-density card. The "normal" view of the widget.
-- **L** - a detailed panel: more rows, history, controls, or a richer layout.
-  Only worth offering if the widget genuinely has more to show at this size -
-  don't force an L just to have one.
-- Orientation (**h**/**v**) is the card's shape, independent of size - a
-  widget can support one or both.
+A widget ships in one or more **size presets**, and the user picks which. Each
+preset is a shape with a size range, measured in cells of the default side
+grid, so it looks the same size whatever grid the user sets up:
 
-A widget should feel like a **purpose-built layout per size**, not the same
-content just scaled up - S/M/L are different views, not different zoom
-levels.
+- **badge** - one glanceable thing: a stat, a status, a tiny control.
+- **strip** - wide and short: a ticker, a progress bar, stats side by side.
+- **column** - tall and narrow: a vertical list, a gauge, a timeline.
+- **card** - the standard card and the usual default.
+- **panel** - a detailed view: more rows, history, controls. Only worth
+  offering if the widget genuinely has more to show - don't force one.
+- **hero** - fills a whole region. Only when the user asks for it.
+
+The exact ranges come with the planner's instructions. A widget should feel
+like a **purpose-built layout per preset**, not the same content scaled up -
+presets are different views for different shapes, not zoom levels.
 
 ## What makes a good suggestion here
 
@@ -37,4 +41,4 @@ levels.
   always provided fresh, separately from this context - never suggest a
   duplicate of something already on that list.
 - Sized honestly: if the idea is genuinely a one-stat glance, don't pad it
-  into requiring an L size just to seem more substantial.
+  into requiring a panel just to seem more substantial.

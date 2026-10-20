@@ -1,8 +1,9 @@
 {
   "name": "avn-hub",
-  "version": "2.3.0-alpha.2",
+  "version": "2.4.0",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/sync-widget-skill.mjs",
     "predev": "npm run db:setup",
     "dev": "next dev --disable-source-maps",
     "dev:debug": "npm run db:setup && next dev",

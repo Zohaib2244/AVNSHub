@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
-import { NUTBOT_PERSONA, NUTBOT_PERSONA_NSFW, type PersonaPreset } from "@/lib/nutbot/persona";
-import { streamHarnessChat } from "@/lib/nutbot/chatHarness";
+import { NUTBOT_PERSONA, NUTBOT_PERSONA_NSFW, NUTBOT_WORK_PROMPT, type PersonaPreset } from "@/lib/nutbot/persona";
+import { streamHarnessChat, type ChatMode } from "@/lib/nutbot/chatHarness";
+import { liveContextBlock, shouldAttachLiveContext } from "@/lib/nutbot/liveContext";
 import { HARNESS_ADAPTERS, type HarnessId } from "@/lib/widget-creator/harnessAdapters";
+
+import { readChatModelDefaults, resolveSession } from "@/lib/widget-creator/runStore";
 
 // NutBot's chat brain: proxies to a self-hosted Bonfire instance
 // (github.com/shahwaizse/bonfire) running a local Dolphin 3.0 model behind
@@ -99,6 +102,7 @@ export async function POST(request: Request) {
     nsfw?: boolean;
     searchEnabled?: boolean;
     backend?: "bonfire" | HarnessId;
+    mode?: ChatMode;
     history?: Array<{ role: "user" | "assistant"; text: string }>;
   };
 
@@ -107,16 +111,35 @@ export async function POST(request: Request) {
   }
 
   const backend = body.backend ?? "bonfire";
+  const mode: ChatMode = body.mode === "work" ? "work" : "chill";
+  // Host data is retrieval context, not background conversation. Loading it
+  // for every Chill turn made a normal chat feel like a server-status bot and
+  // also leaked fresh system facts into unrelated replies. Work mode has a
+  // real shell and investigates the host itself.
+  const snapshot = mode === "chill" && shouldAttachLiveContext(body.message)
+    ? await liveContextBlock().catch(() => "")
+    : "";
+  const message = snapshot
+    ? `[${snapshot}]\n\nUser question about the server: ${body.message}`
+    : `[This is an ordinary, non-server chat request. Reply naturally and do not volunteer host, homelab, container, service, or system-status details.]\n\n${body.message}`;
+  // work mode is an agent with a shell — Bonfire's local model has no tools
+  if (mode === "work" && backend === "bonfire") {
+    return NextResponse.json({ error: "work mode needs a cli harness backend" }, { status: 400 });
+  }
   if (backend !== "bonfire") {
     if (!isHarnessId(backend)) {
       return NextResponse.json({ error: "invalid chat backend" }, { status: 400 });
     }
+    const modelChoice = (await readChatModelDefaults())[backend];
+    const sessionId = await resolveSession(body.conversationId, backend, modelChoice.model);
     return new Response(
       streamHarnessChat({
+        mode,
+        modelChoice,
         harness: backend,
-        message: body.message,
-        sessionId: body.conversationId ?? null,
-        persona: NUTBOT_PERSONA.system_prompt,
+        message,
+        sessionId,
+        persona: mode === "work" ? NUTBOT_WORK_PROMPT : NUTBOT_PERSONA.system_prompt,
         history: Array.isArray(body.history) ? body.history : [],
       }),
       { headers: { "Content-Type": "application/x-ndjson" } },
@@ -131,7 +154,7 @@ export async function POST(request: Request) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         conversation_id: body.conversationId ?? null,
-        message: body.message,
+        message,
         search_enabled: body.searchEnabled ?? true,
         preset_id: body.nsfw ? presetIds.nsfw : presetIds.sfw,
       }),

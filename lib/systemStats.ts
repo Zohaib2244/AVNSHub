@@ -9,11 +9,17 @@
 // throughput, so this uses `systeminformation` (works on Linux — the
 // homelab/Docker target — as well as macOS and Windows for local dev).
 
-import { loadavg, uptime } from "os";
+import { readFile } from "fs/promises";
+import { loadavg, networkInterfaces, uptime } from "os";
 import si from "systeminformation";
 import type { HostTelemetry } from "@/lib/homelab";
 
-const CACHE_TTL_MS = 10_000;
+// The three widgets on this endpoint (ServerStats/DiskStorage/NetworkStats)
+// all poll at 60s. The TTL sits just under that so each poll still refreshes,
+// while concurrent clients (extra tabs, other devices, the boot sequence)
+// share one sample instead of each triggering their own read.
+const WIDGET_POLL_MS = 60_000;
+const CACHE_TTL_MS = WIDGET_POLL_MS - 5_000;
 let cache: { data: HostTelemetry; expiresAt: number } | null = null;
 let inFlight: Promise<HostTelemetry> | null = null;
 
@@ -48,8 +54,40 @@ async function readDrives(): Promise<HostTelemetry["drives"]> {
     }));
 }
 
+// Virtual/container interface name prefixes. On a Docker host every container
+// contributes a `veth*` pair and often a `br-*` bridge, and their traffic is
+// ALSO counted on the physical uplink it ultimately crosses — so summing them
+// double- (or triple-) counts. Tunnels (tailscale/wg/tun) are excluded for the
+// same reason: their payload is re-counted, encapsulated, on the real NIC.
+// Trailing entries are the macOS equivalents, for local dev.
+const VIRTUAL_IFACE_PREFIXES = [
+  "veth", "br-", "docker", "virbr", "tailscale", "tun", "tap", "wg", "zt", "cni", "flannel", "kube",
+  "dummy", "podman", "nerdctl", "bridge", "utun", "awdl", "llw", "anpi", "gif", "stf", "ap",
+];
+
+// Both `si.networkStats("*")` and `si.networkInterfaces()` enumerate every
+// interface on the box, which on this host means 62 of them and ~5 SECONDS of
+// blocking work per call. Node's own os.networkInterfaces() returns the same
+// names in ~1ms, so the filtering is done there and only the surviving names
+// are handed to systeminformation.
+async function realInterfaceNames(): Promise<string[]> {
+  const names = Object.entries(networkInterfaces())
+    .filter(([name, addrs]) =>
+      (addrs ?? []).some((a) => !a.internal) && !VIRTUAL_IFACE_PREFIXES.some((p) => name.startsWith(p)))
+    .map(([name]) => name);
+  // The default-route interface is by definition real traffic, so it is kept
+  // even if a future prefix here would have excluded it. It is also the
+  // fallback for hosts whose naming this filter doesn't recognize.
+  const fallback = await si.networkInterfaceDefault();
+  if (fallback && !names.includes(fallback)) names.push(fallback);
+  return names;
+}
+
 async function readNetwork(): Promise<HostTelemetry["network"]> {
-  const interfaces = await si.networkStats("*");
+  const names = await realInterfaceNames();
+  const zero = { rx_bytes: 0, tx_bytes: 0, rx_rate_bps: 0, tx_rate_bps: 0 };
+  if (names.length === 0) return zero;
+  const interfaces = await si.networkStats(names.join(","));
   const active = interfaces.filter((i) => i.iface !== "lo" && !i.iface.startsWith("lo"));
   return active.reduce(
     (sum, i) => ({
@@ -58,16 +96,38 @@ async function readNetwork(): Promise<HostTelemetry["network"]> {
       rx_rate_bps: sum.rx_rate_bps + (i.rx_sec ?? 0),
       tx_rate_bps: sum.tx_rate_bps + (i.tx_sec ?? 0),
     }),
-    { rx_bytes: 0, tx_bytes: 0, rx_rate_bps: 0, tx_rate_bps: 0 },
+    zero,
   );
 }
 
+/** fstab data mounts that aren't mounted right now. Reads /proc/self/mounts
+    rather than the filtered drive list, so a mount hidden from `drives` isn't
+    misreported as missing. Linux-only; returns [] anywhere it can't read. */
+async function readMissingMounts(): Promise<string[]> {
+  try {
+    const [fstab, mounts] = await Promise.all([readFile("/etc/fstab", "utf8"), readFile("/proc/self/mounts", "utf8")]);
+    const mounted = new Set(mounts.split("\n").map((line) => line.split(/\s+/)[1]).filter(Boolean));
+    return fstab
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line && !line.startsWith("#"))
+      .map((line) => line.split(/\s+/))
+      .filter(([, mountPoint, type, options = ""]) =>
+        !!mountPoint && /^\/(mnt|media)\//.test(mountPoint) && type !== "swap" && !options.split(",").includes("noauto"))
+      .map(([, mountPoint]) => mountPoint)
+      .filter((mountPoint) => !mounted.has(mountPoint));
+  } catch {
+    return [];
+  }
+}
+
 async function readHostTelemetry(): Promise<HostTelemetry> {
-  const [load, mem, drives, network] = await Promise.all([
+  const [load, mem, drives, network, missingMounts] = await Promise.all([
     si.currentLoad(),
     si.mem(),
     readDrives(),
     readNetwork(),
+    readMissingMounts(),
   ]);
 
   const usedMem = mem.total - mem.available;
@@ -87,6 +147,7 @@ async function readHostTelemetry(): Promise<HostTelemetry> {
     drives,
     network,
     uptime_seconds: uptime(),
+    missing_mounts: missingMounts,
   };
 }
 

@@ -20,6 +20,17 @@
      card background for the terminal's dense small type — every "muted" use
      inside NutBot goes through this instead */
   --nb-muted: color-mix(in srgb, var(--text-muted) 52%, var(--text-primary));
+  /* control surface. Buttons in here were mostly transparent, and the few
+     that weren't used --bg-nested — which is *darker* than --bg-card in every
+     dark palette, so a filled button read as a recess rather than something
+     raised. At these sizes a 1px border alone didn't say "button" either, so
+     controls get their own surface, mixed away from the nested background
+     toward the text colour: that lifts in dark palettes and deepens in light
+     ones, staying distinct from both --bg-card and --bg-nested in each.
+     Derived with color-mix (like --nb-muted above) so all eight palettes and
+     both modes get it without redefining any tokens. */
+  --nb-btn-bg: color-mix(in srgb, var(--bg-nested) 86%, var(--text-primary));
+  --nb-btn-bg-hover: color-mix(in srgb, var(--bg-nested) 76%, var(--text-primary));
   /* mono content runs at weight 500 for legibility; DotGothic16 only ships
      400 — block synthetic bold so the pixel-font labels don't render smeared */
   font-synthesis: none;
@@ -37,48 +48,16 @@
   min-height: 60px;
 }
 
-/* ── single combined row: title + tabs + controls ────────────── */
-
-.term-row {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 6px;
-  flex-shrink: 0;
-  min-width: 0;
-}
-
-.term-title {
-  font-family: var(--font-dot-gothic), monospace;
-  font-size: calc(0.62rem * var(--nb-scale, 1));
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--nb-muted, var(--text-muted));
-  padding: 0 10px 0 2px;
-  white-space: nowrap;
-  flex-shrink: 0;
-  opacity: 0.9;
-  border-right: 1px solid var(--border);
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-}
-
-.term-tabs {
-  display: flex;
-  align-items: stretch;
-  flex: 1;
-  min-width: 0;
-}
-
-.term-row-right {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 0 4px 8px;
-  border-left: 1px solid var(--border);
-  flex-shrink: 0;
-}
+/* NutBot 2.4: identity/actions above a dedicated navigation row. */
+.term-header { flex-shrink: 0; min-width: 0; margin-bottom: 8px; }
+.term-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px 12px; padding: 2px 2px 8px; }
+.term-identity, .term-actions { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.term-mascot-slot { width: 56px; height: 49px; flex: 0 0 56px; display: grid; place-items: center; }
+.term-title { display: flex; align-items: center; gap: 8px; font-family: var(--font-dot-gothic), monospace; font-size: calc(.75rem * var(--nb-scale, 1)); letter-spacing: .1em; color: var(--text-primary); white-space: nowrap; }
+.term-version { color: var(--nb-muted, var(--text-muted)); font-family: var(--font-jetbrains-mono), monospace; font-size: .65em; letter-spacing: 0; padding: 3px 5px; border: 1px solid var(--border); border-radius: 5px; }
+.term-actions .term-focus-btn { width: 30px; height: 30px; display: grid; place-items: center; }
+.term-actions .model-settings-trigger { height: 30px; }
+.term-tabs { position: relative; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); min-width: 0; padding: 3px; gap: 2px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--bg-nested); }
 
 /* ── tab button (pill indicator style) ───────────────────────── */
 
@@ -91,7 +70,7 @@
   font-size: calc(0.64rem * var(--nb-scale, 1));
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  padding: 0 11px;
+  padding: 0 4px;
   height: calc(34px * var(--nb-scale, 1));
   border: none;
   background: transparent;
@@ -110,14 +89,25 @@
   color: var(--accent-orange);
 }
 
-/* animated background pill (motion.div with layoutId="term-tab-bg") */
-.term-tab-bg {
+/* one highlight pill for the whole bar: it travels to the active tab instead
+   of each tab fading its own in (which read as the highlight teleporting).
+   Position/width come from the active button, measured in NutBotTerminal.tsx. */
+.term-tab-indicator {
   position: absolute;
-  inset: 5px 3px;
+  top: 3px;
+  left: 0;
+  bottom: 3px;
+  width: 0;
+  opacity: 0;
   border-radius: 6px;
   background: color-mix(in srgb, var(--accent-orange) 11%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent-orange) 22%, transparent);
   pointer-events: none;
+  transition: transform .28s cubic-bezier(.2,.8,.2,1), width .28s cubic-bezier(.2,.8,.2,1), opacity .18s ease;
+}
+
+.term-tab-indicator.ready {
+  opacity: 1;
 }
 
 /* tab label + icon sit above the bg */
@@ -143,6 +133,8 @@
 .term-body {
   height: 112px;
   overflow-y: auto;
+  /* The whole surface fades out before its geometry changes. Do not tween
+     padding on fade-in: that makes the incoming monitor visibly stretch. */
   font-size: calc(0.8rem * var(--nb-scale, 1));
   /* JetBrains Mono variable — 500 reads much better at these sizes; DotGothic
      labels are protected by font-synthesis: none on .nutbot-terminal above */
@@ -164,7 +156,12 @@
 /* ── tab panel — the animated wrapper around each tab's content ─── */
 
 .term-tab-panel {
+  /* was missing `display: flex` while setting flex-direction — the log panel
+     rendered as a block and the property did nothing. Inactive panels get an
+     inline `display: none` from the component (never animated). */
+  display: flex;
   min-height: 0;
+  min-width: 0;
   width: 100%;
   flex-direction: column;
 }
@@ -203,7 +200,76 @@
 .term-tag-ok    { color: var(--accent-cyan); }
 .term-tag-info  { color: var(--accent-orange); }
 .term-tag-warn,
+.term-tag-err,
 .term-tag-error { color: var(--status-down, #c0392b); }
+/* stdout lines are quoted container output, not hub commentary — muted so the
+   lifecycle events stay the thing your eye lands on when both sources are on */
+.term-tag-log   { color: var(--text-muted); }
+
+/* ─── realtime service feed ─────────────────────────────────────────── */
+
+.term-svc {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.term-repeat {
+  margin-left: 6px;
+  padding: 0 5px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.85em;
+  color: var(--accent-orange);
+}
+
+.term-age {
+  margin-left: 6px;
+  font-size: 0.85em;
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
+.term-feed-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.85em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.term-feed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex: none;
+}
+
+.term-feed-status.live .term-feed-dot {
+  background: var(--accent-cyan);
+  animation: term-feed-pulse 2s ease-in-out infinite;
+}
+
+.term-feed-status.live { color: var(--accent-cyan); }
+
+.term-feed-empty {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+@keyframes term-feed-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .term-feed-status.live .term-feed-dot { animation: none; }
+}
 
 /* blinking block caret at the end of the log */
 .term-caret {
@@ -239,7 +305,7 @@
   padding: 3px 7px;
   border-radius: 4px;
   border: 1px solid var(--accent-orange);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--accent-orange);
   cursor: pointer;
 }
@@ -341,7 +407,7 @@
   padding: 2px 7px;
   border-radius: 4px;
   border: 1px solid var(--border);
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   font-family: var(--font-dot-gothic), monospace;
   font-size: calc(0.58rem * var(--nb-scale, 1));
@@ -406,7 +472,7 @@
   height: 14px;
   border-radius: 3px;
   border: none;
-  background: transparent;
+  background: var(--nb-btn-bg, var(--bg-nested));
   color: var(--nb-muted, var(--text-muted));
   cursor: pointer;
   opacity: 0;
@@ -420,7 +486,7 @@
 }
 
 .shells-row-close:hover {
-  color: #c0392b;
+  color: var(--status-down);
 }
 
 .shells-main {
@@ -580,3 +646,7 @@
   color: var(--nb-muted, var(--text-muted));
   flex-shrink: 0;
 }
+
+.term-tab:focus-visible, .term-actions button:focus-visible { outline: 2px solid var(--accent-orange); outline-offset: 2px; }
+@container widget (max-width: 280px) { .term-tab-icon { display: none; } .term-title { gap: 5px; } .term-identity { gap: 4px; } }
+@media (prefers-reduced-motion: reduce) { .term-tab-indicator, .term-body { transition: none; } }

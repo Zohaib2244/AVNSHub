@@ -48,3 +48,8 @@ next-env.d.ts
 
 # uploaded wallpaper/media blobs (shared hub data — lives on the host, not in git)
 /data/uploads/
+
+# Widget Creator harness skills: generated from lib/widget-creator/prompts/ by
+# `npm run sync:widget-skill` (runs automatically on `npm install`)
+/.claude/skills/
+/.agents/skills/

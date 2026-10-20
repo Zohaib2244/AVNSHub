@@ -127,11 +127,15 @@ export function CreatorEntryPicker({ onPick, onBack }: Props) {
             className={`cr-entry-card cr-entry-card--${mode}`}
             onClick={() => handlePick(mode)}
           >
-            <div className="cr-entry-icon">
-              <Icon size={18} strokeWidth={1.75} />
-            </div>
-            <div className="cr-entry-label">{label}</div>
-            <p className="cr-entry-desc">{desc}</p>
+            <span className="cr-entry-head">
+              <span className="cr-entry-icon">
+                <Icon size={18} strokeWidth={1.75} />
+              </span>
+              <span className="cr-entry-label">{label}</span>
+            </span>
+            <span className="cr-entry-desc-reveal">
+              <span className="cr-entry-desc">{desc}</span>
+            </span>
           </button>
         ))}
       </div>

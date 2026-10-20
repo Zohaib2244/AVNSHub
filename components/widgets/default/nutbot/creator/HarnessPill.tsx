@@ -102,7 +102,7 @@ export function HarnessPill() {
             <span className="hp-item-label">off</span>
             {creatorOff && <span className="hp-badge active">active</span>}
           </div>
-          <div className="hp-popover-hint">drag to reorder fallback chain</div>
+          <div className="hp-popover-hint">drag to reorder suggested providers · switching asks first</div>
         </div>
       )}
     </div>

@@ -1,191 +1,76 @@
-# Setup And Deployment
+# Setup
 
-AVN Hub is designed for a single-user, self-hosted, full-trust environment. The usual path is to run it on your own machine or homelab host, then expose it privately through Tailscale.
+AVN Hub is built for one trusted user on their own machine or homelab. It has no login of its own, so keep it on localhost, a LAN, or a private network such as Tailscale.
 
-## Runtime Model
+## Why it runs `next dev`
 
-AVN Hub runs the Next.js dev server (`next dev`, Turbopack) as its actual runtime. This is deliberate.
-
-NutBot's Widget Creator writes real `.tsx` files into the source tree at runtime and depends on:
-
-1. The dev server file watcher and HMR, so generated widgets appear without rebuilding.
-2. The TypeScript toolchain, so generated widgets can be validated before registration.
-3. The full source tree plus an authenticated CLI harness (`claude`, `codex`, or `opencode`).
-
-A slim `next build` / `next start` production image does not have those properties. AVN Hub is not meant to be a multi-tenant public service; it is a trusted personal dashboard, so the dev-server runtime is the practical fit.
+The Widget Creator writes real `.tsx` files into the source tree while the app runs. That needs the dev server's file watcher (new widgets appear with no rebuild), the TypeScript toolchain (drafts are type-checked before they touch the live tree), the full source tree, and an authenticated agent CLI. A `next build` / `next start` image has none of those, so `npm run dev` is the runtime.
 
 ## Requirements
 
-- Node.js 20.9+
-- npm
-- No separate database server — shared hub data lives in a bundled SQLite
-  database (via Prisma), set up automatically the first time you run the app.
-  See [Database](#database) below.
-- Optional for Widget Creator: one authenticated CLI harness on the machine running AVN Hub:
-  - Claude Code (`claude`)
-  - Codex (`codex`)
-  - OpenCode (`opencode`)
-  - All three can also discover pre-built "skills" that speed up widget
-    generation — see [CREATING_WIDGETS.md](CREATING_WIDGETS.md#optional-turn-this-guide-into-a-harness-skill).
-    They ship with the repo; there's nothing extra to install.
-- Optional for NutBot chat: Bonfire plus llama.cpp only if you want a local-LLM chat backend; otherwise leave chat disabled or use the CLI fallback. See [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md).
-- Optional for private HTTPS: Tailscale
-- Optional for containerized runtime: Docker and Docker Compose
+- Node.js 20.9+ and npm (on Windows, `install.bat` checks this, installs packages and creates `.env.local`; `run.bat` starts the hub)
+- Optional, for the Widget Creator and NutBot chat: one signed-in agent CLI on the same machine - `claude`, `codex` or `opencode`
+- Optional: Docker, Tailscale, a local LLM (see [NUTBOT.md](NUTBOT.md))
 
-## Install
+There is no database server to install. Hub state (canvases, layout, theme, wallpaper settings) lives in a SQLite file at `prisma/hub.db`, created and migrated automatically by `npm run dev`. Uploaded wallpapers go to `data/uploads/`. Both are gitignored.
 
-On Windows, double-click `install.bat` once, then use `run.bat` to start AVN
-Hub. The scripts perform the same dependency, environment, database, and dev
-server steps shown below.
+## Install and run
 
 ```bash
-git clone https://github.com/Zohaib2244/AVN-Hub.git
-cd AVN-Hub
-npm install
+git clone https://github.com/Zohaib2244/AVNSHub.git
+cd AVNSHub
+npm install            # also generates the Widget Creator's agent skills
 cp .env.example .env.local
+npm run dev            # http://localhost:3000 (npm run dev:debug keeps server source maps)
 ```
 
-`.env.example` already sets `DATABASE_URL` to a sane default — that's the one
-variable AVN Hub actually needs to start (see [Database](#database)).
-Everything else in `.env.local` is optional: fill in server-side credentials
-for bundled integration widgets if you want them, or leave them blank and
-supply the same credentials per-widget through each widget's own
-gear/settings UI instead. Spotify and GitHub credentials are now typically
-entered in the widget settings rather than in `.env.local`.
+Stop it with `Ctrl+C`, or `npm run stop:hub` if it is running in the background.
 
-## Database
-
-AVN Hub keeps canvases, theme, layout, preferences, and wallpaper/backdrop
-settings in a small SQLite database (via Prisma) instead of only the
-browser's `localStorage` — this is what lets you open the same hub from
-different browsers or devices and see the same state, instead of each one
-being stuck with its own copy. Wallpaper images/videos are stored as files
-under `data/uploads/`, referenced from the database.
-
-- Lives at `prisma/hub.db` by default (path comes from `DATABASE_URL`),
-  gitignored — it's host state, not source, same as `data/uploads/`.
-- **Set up automatically.** `npm run dev` runs `npm run db:setup` first every
-  time (via a `predev` hook) — generates the Prisma client and applies any
-  pending migrations. In normal use you never touch this yourself, and it's
-  fast/idempotent when there's nothing to do.
-- Docker Compose gets this for free too, since its `CMD` is the same
-  `npm run dev`.
-- To run it by hand — troubleshooting, or right after cloning before your
-  first `npm run dev`:
-  ```bash
-  npm run db:setup
-  ```
-- If `DATABASE_URL` isn't set, this fails immediately with a clear error
-  (`The datasource.url property is required...`) instead of a confusing
-  crash later when a route tries to use the database.
-
-## Environment Variables
-
-```env
-# Shared hub database (see Database above) - the one variable AVN Hub
-# actually requires; .env.example already sets this default for you.
-DATABASE_URL="file:./prisma/hub.db"
-
-
-# Homelab
-HOMELAB_STATUS_URL=
-HOMELAB_MOCK_DATA=true
-
-# Optional: disable the integrated real host shell route
-NUTBOT_SHELL_DISABLED=
-
-# Optional: NutBot chat local LLM backend; leave unset to keep chat disabled/offline
-NUTBOT_CHAT_URL=http://127.0.0.1:8000
-
-```
-
-Notes:
-
-- `HOMELAB_MOCK_DATA=true` is dev-only and serves realistic mock telemetry.
-- `NUTBOT_SHELL_DISABLED=true` disables the integrated real host shell route.
-- `NUTBOT_CHAT_URL` is optional. If Bonfire is not reachable, chat can fall back to the shared CLI harness chain or be turned off, and the chat tab stays disabled/offline if you do not enable it.
-
-## Run Directly On The Host
-
-This is the recommended path when your CLI harness is already installed and authenticated on the host.
-
-```bash
-npm run dev
-```
-
-The first run sets up the database automatically (see [Database](#database)
-above) before the server starts. Open `http://localhost:3000`.
-
-## Run With Docker Compose
-
-The Docker setup runs the dev server and bind-mounts the project so generated widgets — and the SQLite database, and any uploaded wallpapers — persist on the host and HMR sees file changes.
+### Docker
 
 ```bash
 docker compose up -d --build
 ```
 
-If you want Widget Creator support inside Docker, the CLI harness must also be available and authenticated inside the container. The same applies to any CLI-backed NutBot chat fallback.
+The project is bind-mounted so generated widgets and the database persist on the host. The agent CLI must also be installed and signed in inside the container.
 
-## Stop Services
+## Configuration
 
-If AVN Hub is running in your current terminal, press `Ctrl+C`.
+Everything is optional. Copy `.env.example` to `.env.local` and fill in what you use.
 
-If it is running in the background or you forgot which terminal owns it:
+| Variable | What it does |
+| --- | --- |
+| `DATABASE_URL` | SQLite path. Already set in `.env.example`; the only required value. |
+| `ALLOWED_DEV_ORIGINS` | Comma-separated hosts (LAN IP, proxy hostname) allowed to load the dev server from another machine. Not needed on localhost. |
+| `UPTIME_KUMA_DB` / `UPTIME_KUMA_STATUS_PAGE` | Data source for the Homelab Status widget: path to Kuma's `kuma.db`, or a published status page URL (preferred when set). |
+| `HOMELAB_STATUS_URL` | Fallback status endpoint when Kuma is unavailable. |
+| `HOMELAB_MOCK_DATA=true` | Dev only: serve realistic mock homelab telemetry. |
+| `SPOTIFY_*`, `STEAM_*`, `GITHUB_TOKEN` | Fallback credentials for those widgets. You can enter them per widget in its gear popover instead. |
+| `NUTBOT_SHELL_DISABLED=true` | Turn off NutBot's real host shell. |
+| `NUTBOT_CHAT_URL` | Bonfire base URL for the local-LLM chat backend (default `http://127.0.0.1:8000`). |
 
-```bash
-npm run stop:hub
-```
+Credentials entered in widget settings are stored in the layout and sent to that widget's own API route, which falls back to the env vars above when a field is blank.
 
-To stop only the optional Bonfire/local LLM stack:
+## Running as a service
 
-```bash
-npm run stop:nutbot-llm
-```
+`deploy/avn-hub.service.example` is a systemd unit template. Replace `<USER>`, `<HOME>` and `<INSTALL_DIR>`, copy it to `/etc/systemd/system/avn-hub.service`, then `systemctl enable --now avn-hub`. Its `PATH` must include wherever your agent CLIs are installed, because systemd does not read your shell profile.
 
-That stops the process listening on `NUTBOT_CHAT_URL`'s port (Bonfire, default `8000`) and the llama.cpp port (default `8080`). Override the llama.cpp port with `NUTBOT_LLAMA_PORT` or `LLAMA_SERVER_PORT` if your setup uses something else.
-
-To stop both AVN Hub and the local LLM stack:
-
-```bash
-npm run stop:all
-```
-
-If you run AVN Hub through Docker Compose:
-
-```bash
-docker compose down
-```
-
-## Expose Over Tailscale
-
-Tailscale gives private HTTPS without buying a public domain or managing Let's Encrypt.
+## Private HTTPS with Tailscale
 
 ```bash
 tailscale serve https / http://localhost:3000
 ```
 
-Then open the generated `https://<host>.<tailnet>.ts.net` URL from devices in your tailnet.
+Then open `https://<host>.<tailnet>.ts.net` from any device on your tailnet.
 
-## Optional NutBot Chat Backends
+## Security
 
-NutBot chat does not have to be configured for AVN Hub to work.
+The NutBot shell and Work-mode chat give anyone who can load the hub a shell on the host as the server's user. Do not expose the hub to the internet without a login layer in front of it, or set `NUTBOT_SHELL_DISABLED=true`.
 
-- Local/custom LLM: run Bonfire against a llama.cpp GGUF model and point `NUTBOT_CHAT_URL` at it.
-- CLI fallback: install and authenticate `claude`, `codex`, or `opencode`.
-- Neither: chat shows an offline/disabled state; the rest of the dashboard is unaffected.
-
-Full details live in [NUTBOT_CHAT_SETUP.md](NUTBOT_CHAT_SETUP.md).
-
-## Useful Checks
+## Checks
 
 ```bash
 npx tsc --noEmit
+npm run lint
 npm run build
-npx eslint <touched files>
-```
-
-On Windows PowerShell, if script execution policy blocks `npx.ps1`, run the same command through `cmd /c`:
-
-```bash
-cmd /c npx tsc --noEmit
 ```

@@ -6,5 +6,5 @@ export const LOG_MESSAGES = [
   "[ok] jellyfin ... 2 active sessions",
   "[info] arr stack queue ... items pending",
   "[ok] storage apps ... nominal",
-  "[info] nutbot v2.3 ready",
+  "[info] nutbot v2.6 ready",
 ];

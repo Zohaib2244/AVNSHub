@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { Hammer, Wand2 } from "lucide-react";
 import type { WidgetBrief } from "@/lib/widget-creator/projectStore";
+import { PRESET_ORDER, type FillMode, type PresetId } from "@/config/sizePresets";
+import { PRESET_EXAMPLES, presetRange, presetsFromLegacyBrief, withPresetFields } from "@/lib/widget-creator/briefPresets";
 import { ModeInfoButton } from "./ModeInfoButton";
 
-const PLAN_INFO_TEXT = "Chat with AI to figure out what to build. Describe a use case or vague idea — get concept suggestions, then a structured plan appears here once one is ready. Review and finalize it here — build it directly, or continue to Ideate for a visual mockup first.";
-
-const SIZE_OPTIONS = ["S", "M", "L"] as const;
+const PLAN_INFO_TEXT = "Chat with AI to figure out what to build. Describe a use case or vague idea — get concept suggestions, then a structured plan appears here once one is ready. Review and finalize it here — pick the size presets it ships in, then build it directly, or continue to Ideate for a visual mockup first.";
 
 /** One requirement per line. Uses the model's own newlines when present;
     otherwise splits a run-on "1. ... 2. ... 3. ..." string at each number. */
@@ -24,27 +24,32 @@ type Draft = {
   title: string;
   slug: string;
   icon: string;
-  sizes: string[];
+  presets: PresetId[];
+  defaultPreset: PresetId;
+  fill: FillMode;
+  presetContent: Partial<Record<PresetId, string>>;
   concept: string;
   requirements: string;
-  sContent: string;
-  mContent: string;
-  lContent: string;
   dataShape: string;
   notes: string;
 };
 
 function draftFromBrief(brief: WidgetBrief): Draft {
+  // a brief from before presets gets one per legacy size, so editing it
+  // upgrades it in place
+  const { presets, presetContent } = brief.presets?.length
+    ? { presets: brief.presets, presetContent: brief.presetContent ?? {} }
+    : presetsFromLegacyBrief(brief);
   return {
     title: brief.title,
     slug: brief.slug ?? "",
     icon: brief.icon ?? "",
-    sizes: brief.sizes ?? [],
+    presets,
+    defaultPreset: brief.defaultPreset && presets.includes(brief.defaultPreset) ? brief.defaultPreset : presets.includes("card") ? "card" : presets[0],
+    fill: brief.fill ?? "reflow",
+    presetContent,
     concept: brief.concept,
     requirements: brief.requirements ?? "",
-    sContent: brief.sContent ?? "",
-    mContent: brief.mContent ?? "",
-    lContent: brief.lContent ?? "",
     dataShape: brief.dataShape ?? "",
     notes: brief.notes ?? "",
   };
@@ -99,28 +104,35 @@ export function PlanBriefPanel({ brief, hasBrief, locked, readOnly, onBuild, onV
     );
   }
 
-  function toggleSize(s: string) {
+  function togglePreset(id: PresetId) {
     if (!draft) return;
-    const next = draft.sizes.includes(s) ? draft.sizes.filter((x) => x !== s) : [...draft.sizes, s];
-    setDraft({ ...draft, sizes: next.length ? next : draft.sizes });
+    const on = draft.presets.includes(id);
+    if (on && draft.presets.length === 1) return; // a widget needs at least one
+    const presets = PRESET_ORDER.filter((p) => (p === id ? !on : draft.presets.includes(p)));
+    const defaultPreset = presets.includes(draft.defaultPreset)
+      ? draft.defaultPreset
+      : presets.includes("card") ? "card" : presets[0];
+    setDraft({ ...draft, presets, defaultPreset });
   }
 
   function save() {
     if (!draft || !brief) return;
-    const next: WidgetBrief = {
+    // withPresetFields re-derives sizes + s/m/lContent from the presets, so
+    // Ideate and Build (still S/M/L) see the edit too
+    const next = withPresetFields({
       ...brief,
       title: draft.title.trim() || brief.title,
       slug: draft.slug.trim() || brief.slug,
       icon: draft.icon.trim() || undefined,
-      sizes: draft.sizes.length ? draft.sizes : brief.sizes,
+      presets: draft.presets,
+      defaultPreset: draft.defaultPreset,
+      fill: draft.fill,
+      presetContent: Object.fromEntries(draft.presets.map((id) => [id, draft.presetContent[id]?.trim() ?? ""])),
       concept: draft.concept.trim() || brief.concept,
       requirements: draft.requirements.trim() || undefined,
-      sContent: draft.sContent.trim() || undefined,
-      mContent: draft.mContent.trim() || undefined,
-      lContent: draft.lContent.trim() || undefined,
       dataShape: draft.dataShape.trim() || undefined,
       notes: draft.notes.trim() || undefined,
-    };
+    });
     onSave(next);
     setDraft(draftFromBrief(next));
     setEditing(false);
@@ -134,23 +146,62 @@ export function PlanBriefPanel({ brief, hasBrief, locked, readOnly, onBuild, onV
           <input className="wc-input" value={draft.slug} onChange={(e) => setDraft({ ...draft, slug: e.target.value })} placeholder="slug" />
           <input className="wc-input" value={draft.icon} onChange={(e) => setDraft({ ...draft, icon: e.target.value })} placeholder="icon" />
         </div>
-        <div className="wc-toggle-group wc-brief-size-toggle">
-          {SIZE_OPTIONS.map((s) => (
+        <span className="wc-field-label">size presets</span>
+        <div className="wc-toggle-group wc-brief-size-toggle" role="group" aria-label="size presets">
+          {PRESET_ORDER.map((id) => (
             <button
-              key={s}
+              key={id}
               type="button"
-              className={`wc-toggle-btn${draft.sizes.includes(s) ? " active" : ""}`}
-              onClick={() => toggleSize(s)}
+              className={`wc-toggle-btn${draft.presets.includes(id) ? " active" : ""}`}
+              aria-pressed={draft.presets.includes(id)}
+              title={`${presetRange(id)} — ${PRESET_EXAMPLES[id]}`}
+              onClick={() => togglePreset(id)}
             >
-              {s}
+              {id}
             </button>
           ))}
         </div>
+        <div className="wc-brief-preset-opts">
+          <label className="wc-brief-preset-opt">
+            <span className="wc-field-label">default</span>
+            <select
+              className="wc-input"
+              value={draft.defaultPreset}
+              onChange={(e) => setDraft({ ...draft, defaultPreset: e.target.value as PresetId })}
+            >
+              {draft.presets.map((id) => <option key={id} value={id}>{id}</option>)}
+            </select>
+          </label>
+          <div className="wc-brief-preset-opt">
+            <span className="wc-field-label">fill</span>
+            <div className="wc-toggle-group" role="group" aria-label="fill mode">
+              {(["reflow", "scale"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className={`wc-toggle-btn${draft.fill === f ? " active" : ""}`}
+                  aria-pressed={draft.fill === f}
+                  title={f === "reflow" ? "extra space shows more content" : "drawn at the preset's min size, then scaled to fit — for fixed artwork"}
+                  onClick={() => setDraft({ ...draft, fill: f })}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
         <textarea className="wc-textarea" value={draft.concept} onChange={(e) => setDraft({ ...draft, concept: e.target.value })} rows={2} placeholder="concept" />
         <textarea className="wc-textarea" value={draft.requirements} onChange={(e) => setDraft({ ...draft, requirements: e.target.value })} rows={6} placeholder="requirements — the complete spec: every field, control, behavior, state" />
-        <textarea className="wc-textarea" value={draft.sContent} onChange={(e) => setDraft({ ...draft, sContent: e.target.value })} rows={2} placeholder="S content" />
-        <textarea className="wc-textarea" value={draft.mContent} onChange={(e) => setDraft({ ...draft, mContent: e.target.value })} rows={2} placeholder="M content" />
-        <textarea className="wc-textarea" value={draft.lContent} onChange={(e) => setDraft({ ...draft, lContent: e.target.value })} rows={2} placeholder="L content" />
+        {draft.presets.map((id) => (
+          <textarea
+            key={id}
+            className="wc-textarea"
+            value={draft.presetContent[id] ?? ""}
+            onChange={(e) => setDraft({ ...draft, presetContent: { ...draft.presetContent, [id]: e.target.value } })}
+            rows={2}
+            placeholder={`${id} content — what it shows, top to bottom (${presetRange(id)})`}
+          />
+        ))}
         <textarea className="wc-textarea" value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} rows={2} placeholder="additional notes — constraints, inspiration, anything else to carry forward" />
         <div className="wc-brief-actions">
           <button type="button" className="wc-brief-action-btn wc-brief-build-btn" onClick={save}>save</button>
@@ -175,14 +226,30 @@ export function PlanBriefPanel({ brief, hasBrief, locked, readOnly, onBuild, onV
         <div className="wc-brief-header">
           <span className="wc-brief-title">{brief.title}</span>
           <div className="wc-brief-meta">
-            {(brief.sizes ?? []).map((s) => (
-              <span key={s} className="wc-brief-tag">{s}</span>
-            ))}
+            {brief.presets?.length
+              ? brief.presets.map((id) => (
+                  <span key={id} className={`wc-brief-tag${id === brief.defaultPreset ? " default" : ""}`} title={id === brief.defaultPreset ? "default preset" : undefined}>{id}</span>
+                ))
+              : (brief.sizes ?? []).map((s) => <span key={s} className="wc-brief-tag">{s}</span>)}
             {brief.slug && <span className="wc-brief-tag">#{brief.slug}</span>}
           </div>
         </div>
         {brief.concept && (
           <p className="wc-brief-concept">{brief.concept}</p>
+        )}
+        {brief.presets?.length ? (
+          <div className="wc-brief-presets">
+            <span className="wc-field-label">size presets{brief.fill === "scale" ? " · scale to fit" : ""}</span>
+            {brief.presets.map((id) => (
+              <div key={id} className="wc-brief-preset-row">
+                <span className="wc-brief-preset-name">{id}{id === brief.defaultPreset ? " ·default" : ""}</span>
+                <span className="wc-brief-preset-range">{presetRange(id)}</span>
+                {brief.presetContent?.[id] && <p className="wc-brief-req-line">{brief.presetContent[id]}</p>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="wc-stage-lock-note">no size presets yet — edit to pick them (currently {(brief.sizes ?? ["S", "M"]).join("/")})</p>
         )}
         {brief.requirements && (
           <div className="wc-brief-requirements">

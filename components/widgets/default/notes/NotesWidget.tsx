@@ -6,9 +6,11 @@ import {
   useState,
   useSyncExternalStore,
 } from "react";
-import { Pin, PinOff, Plus, Square, Trash2 } from "lucide-react";
+import { Check, Copy, Pin, PinOff, Plus, Square, Trash2 } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { timeAgo } from "@/lib/format";
+import { createCanvasStore } from "@/lib/canvasStore";
+import { copyText } from "@/lib/clipboard";
 
 type Note = {
   id: string;
@@ -18,24 +20,7 @@ type Note = {
   updatedAt: number;
 };
 
-const STORAGE_KEY = "nutmag-notes";
 const EMPTY_NOTES: Note[] = [];
-const listeners = new Set<() => void>();
-
-let notes: Note[] | null = null;
-
-function emit() {
-  listeners.forEach((listener) => listener());
-}
-
-function persist() {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notes ?? EMPTY_NOTES));
-  } catch {
-    // Keep the in-memory snapshot when storage is unavailable.
-  }
-}
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
@@ -59,33 +44,30 @@ function parseNote(value: unknown): Note | null {
   };
 }
 
-function readStoredNotes(): Note[] {
-  if (typeof window === "undefined") return EMPTY_NOTES;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return EMPTY_NOTES;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return EMPTY_NOTES;
-    return parsed.map(parseNote).filter((note): note is Note => note !== null);
-  } catch {
-    return EMPTY_NOTES;
-  }
+function sanitizeNotes(raw: unknown): Note[] | null {
+  if (!Array.isArray(raw)) return null;
+  return raw.map(parseNote).filter((note): note is Note => note !== null);
 }
 
+// canvas-scoped + DB-synced (app/api/hub-data) — see lib/canvasStore.ts.
+// Canvas A's notes are invisible on canvas B, and every write mirrors to the
+// shared-hub DB so the same notes show up from any browser/device.
+const notesStore = createCanvasStore<Note[]>({
+  baseKey: "nutmag-notes",
+  buildDefault: () => EMPTY_NOTES,
+  sanitize: sanitizeNotes,
+});
+
 function getNotes(): Note[] {
-  if (notes === null) notes = readStoredNotes();
-  return notes;
+  return notesStore.get();
 }
 
 function getServerNotes(): Note[] {
-  return EMPTY_NOTES;
+  return notesStore.getServerSnapshot();
 }
 
 function subscribeNotes(listener: () => void) {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
+  return notesStore.subscribe(listener);
 }
 
 function sortNotes(noteList: Note[]): Note[] {
@@ -114,9 +96,7 @@ function addNote(text: string): Note | null {
     createdAt: now,
     updatedAt: now,
   };
-  notes = [note, ...getNotes()];
-  persist();
-  emit();
+  notesStore.set([note, ...getNotes()]);
   return note;
 }
 
@@ -125,42 +105,32 @@ function updateNote(id: string, text: string) {
   if (!cleanText) return;
   const current = getNotes();
   let changed = false;
-  notes = current.map((note) => {
+  const next = current.map((note) => {
     if (note.id !== id) return note;
     changed = true;
     return { ...note, text: cleanText, updatedAt: Date.now() };
   });
-  if (!changed) {
-    notes = current;
-    return;
-  }
-  persist();
-  emit();
+  if (!changed) return;
+  notesStore.set(next);
 }
 
 function deleteNote(id: string) {
   const current = getNotes();
   const next = current.filter((note) => note.id !== id);
   if (next.length === current.length) return;
-  notes = next;
-  persist();
-  emit();
+  notesStore.set(next);
 }
 
 function togglePinned(id: string) {
   const current = getNotes();
   let changed = false;
-  notes = current.map((note) => {
+  const next = current.map((note) => {
     if (note.id !== id) return note;
     changed = true;
     return { ...note, pinned: !note.pinned, updatedAt: Date.now() };
   });
-  if (!changed) {
-    notes = current;
-    return;
-  }
-  persist();
-  emit();
+  if (!changed) return;
+  notesStore.set(next);
 }
 
 const monoStyle: CSSProperties = { fontFamily: "var(--font-jetbrains-mono), monospace" };
@@ -321,6 +291,7 @@ export function NotesWidget() {
   const savedNotes = useSyncExternalStore(subscribeNotes, getNotes, getServerNotes);
   const sortedNotes = useMemo(() => sortNotes(savedNotes), [savedNotes]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const isLarge = size === "L";
   const selectedNote = sortedNotes.find((note) => note.id === selectedId) ?? sortedNotes[0] ?? null;
@@ -344,6 +315,16 @@ export function NotesWidget() {
   function handleTogglePinned() {
     if (!selectedNote) return;
     togglePinned(selectedNote.id);
+  }
+
+  async function handleCopy() {
+    if (!selectedNote) return;
+    // the textarea holds the live text, which can be ahead of the saved note
+    // until it blurs — copy what the user is looking at
+    const live = document.querySelector<HTMLTextAreaElement>("textarea[aria-label='selected note']");
+    if (!(await copyText(live?.value ?? selectedNote.text))) return;
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1200);
   }
 
   function handleDelete(id: string) {
@@ -474,6 +455,21 @@ export function NotesWidget() {
             type="button"
           >
             {selectedNote?.pinned ? <PinOff size={13} strokeWidth={1.8} /> : <Pin size={13} strokeWidth={1.8} />}
+          </button>
+          <button
+            aria-label={copied ? "copied" : "copy note"}
+            disabled={!selectedNote}
+            onClick={handleCopy}
+            style={{
+              ...iconButtonStyle,
+              color: copied ? "var(--accent-cyan)" : "var(--text-muted)",
+              cursor: selectedNote ? "pointer" : "default",
+              opacity: selectedNote ? 1 : 0.45,
+            }}
+            title={copied ? "Copied" : "Copy note"}
+            type="button"
+          >
+            {copied ? <Check size={13} strokeWidth={1.8} /> : <Copy size={13} strokeWidth={1.8} />}
           </button>
           <button
             aria-label="delete note"

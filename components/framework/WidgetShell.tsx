@@ -11,16 +11,21 @@
 // transient preview boxes handled by SlotRegion/SlotWidgetCell; the shell only
 // receives a boolean so existing detail UI can reveal while expanded.
 
-import { Component, Suspense, type ReactNode } from "react";
+import { Component, Suspense, useSyncExternalStore, type ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
+  headerInitials,
+  isHeaderStyle,
   resolveSettings,
+  type HeaderStyle,
   type Orientation,
   type SettingsValues,
   type WidgetManifest,
   type WidgetSize,
 } from "@/config/widgets";
 import type { RegionId } from "@/config/slotLayout";
+import type { PresetId } from "@/config/sizePresets";
+import { getHeaderStyle, getServerHeaderStyle, subscribeHeaderStyle } from "@/lib/headerStyle";
 import { WidgetContext } from "@/components/framework/WidgetContext";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 
@@ -82,6 +87,10 @@ export type ShellConfig = {
   hoverExpanded?: boolean;
   /** Slot Layout only — passed through to useWidget().slot, see WidgetContext */
   slot?: { region: RegionId; colSpan: number; rowSpan: number };
+  /** Slot Layout only — passed through to useWidget(), see WidgetContext */
+  preset?: PresetId;
+  box?: { width: number; height: number };
+  belowFloor?: boolean;
 };
 
 export function WidgetShell({
@@ -111,7 +120,18 @@ export function WidgetShell({
   const isFocused = keyboardFocusWidgetId === manifest.id;
 
   const hoverExpanded = config?.hoverExpanded ?? false;
-  const ctx = { id: manifest.id, size, orientation, settings, hoverExpanded, slot: config?.slot, isFocused };
+  const ctx = {
+    id: manifest.id,
+    size,
+    orientation,
+    preset: config?.preset,
+    box: config?.box,
+    belowFloor: config?.belowFloor,
+    settings,
+    hoverExpanded,
+    slot: config?.slot,
+    isFocused,
+  };
 
   const blockClasses = ["block", flags.accent ? "accent-left" : "", flags.className ?? ""].filter(Boolean).join(" ");
   // "auto" inherits the global widget backdrop default (independent from the
@@ -119,12 +139,50 @@ export function WidgetShell({
   // (globals.css) — only set the attribute for an explicit per-widget override
   const cardBackdrop = settings.cardBackdrop !== "auto" ? (settings.cardBackdrop as string) : undefined;
 
+  // ghost = no name/icon, stamp = the small uppercase label bar every widget
+  // has used until now, crest = the namecard's boxed mark + large title.
+  // customHeader widgets render their own header, so none of this applies.
+  //
+  // "auto" (the default) defers to the canvas-wide dial in Hub Core >
+  // Appearance, so changing that restyles every non-overridden widget at once.
+  const globalHeaderStyle = useSyncExternalStore(
+    subscribeHeaderStyle,
+    getHeaderStyle,
+    getServerHeaderStyle,
+  );
+  const storedHeaderStyle = settings.headerStyle;
+  const headerStyle: HeaderStyle = isHeaderStyle(storedHeaderStyle)
+    ? storedHeaderStyle
+    : globalHeaderStyle;
+
+  // Slot Layout cells have a hard size budget, so the name/icon must not take
+  // height from the content there: it becomes a small tag on the card's
+  // top-left border, shown only on hover and in edit mode (CSS:
+  // .block-hover-tag). Stamp and crest both use the tag; ghost shows nothing.
+  // Graph Layout's rows grow with content, so it keeps the in-flow header.
+  const hoverTag = Boolean(config?.slot);
+  const hoverTagEl = hoverTag && !flags.customHeader && headerStyle !== "ghost" && (
+    <div className="block-hover-tag" aria-hidden="true">
+      <Icon size={12} strokeWidth={1.75} />
+      <span>{manifest.title}</span>
+    </div>
+  );
+
   const body = (
     <>
-      {!flags.customHeader && settings.showHeader !== false && (
+      {!hoverTag && !flags.customHeader && headerStyle === "stamp" && (
         <div className="block-label">
           <Icon size={14} strokeWidth={1.75} />
           {manifest.title}
+        </div>
+      )}
+      {!hoverTag && !flags.customHeader && headerStyle === "crest" && (
+        <div className="block-crest">
+          <div className="block-crest-mark" aria-hidden="true">
+            <Icon size={16} strokeWidth={1.75} />
+            <span>{headerInitials(manifest.title)}</span>
+          </div>
+          <div className="block-crest-title">{manifest.title}</div>
         </div>
       )}
       <WidgetErrorBoundary id={manifest.id} resetKey={`${size}|${orientation}|${JSON.stringify(settings)}`}>
@@ -156,6 +214,8 @@ export function WidgetShell({
       id={manifest.id}
       className="capsule"
       data-size={size}
+      data-preset={config?.preset}
+      data-below-floor={config?.belowFloor ? "true" : undefined}
       data-kb-widget={manifest.id}
       data-kb-focus={isFocused ? "true" : undefined}
       onPointerDown={() => setKeyboardFocusWidgetId(manifest.id)}
@@ -175,6 +235,7 @@ export function WidgetShell({
       }}
     >
       <WidgetContext.Provider value={ctx}>
+        {hoverTagEl}
         {flags.plainChrome ? body : (
           <div className={blockClasses} data-backdrop={cardBackdrop}>
             {body}

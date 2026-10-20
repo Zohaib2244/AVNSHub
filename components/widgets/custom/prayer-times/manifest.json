@@ -1,0 +1,14 @@
+{
+  "title": "Prayer Times",
+  "iconName": "Moon",
+  "sizes": ["S"],
+  "orientations": ["h", "v"],
+  "defaults": { "size": "S", "orientation": "h" },
+  "presets": ["badge", "column"],
+  "defaultPreset": "column",
+  "fill": "reflow",
+  "settings": [
+    { "key": "manualCity", "label": "manual city / country", "type": "text", "default": "", "placeholder": "Karachi, PK" },
+    { "key": "notify", "label": "notify at prayer time", "type": "toggle", "default": true }
+  ]
+}

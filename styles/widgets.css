@@ -9,7 +9,7 @@
   padding: 7px 10px;
   margin-bottom: 10px;
   font-family: var(--font-jetbrains-mono), monospace;
-  font-size: 0.75rem;
+  font-size: var(--fs-body);
   color: var(--text-primary);
   background: var(--bg-nested);
   border: 1px solid var(--border);
@@ -29,7 +29,7 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.65rem;
+  font-size: var(--fs-micro);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 4px 12px;
@@ -64,7 +64,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
 }
 
@@ -82,7 +82,7 @@
 
 .more-head {
   font-family: var(--font-dot-gothic), monospace;
-  font-size: 0.6rem;
+  font-size: var(--fs-label);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-muted-dim);
@@ -95,7 +95,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-primary);
   padding: 3px 0;
   white-space: nowrap;
@@ -130,7 +130,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  font-size: 0.75rem;
+  font-size: var(--fs-label);
   color: var(--text-primary);
 }
 
@@ -141,7 +141,7 @@
 }
 
 .sub-row-meta {
-  font-size: 0.7rem;
+  font-size: var(--fs-body);
   color: var(--text-muted);
   flex-shrink: 0;
 }

@@ -14,19 +14,19 @@
 // same local-preview-then-commit-on-release pattern as SlotWidgetCell's
 // per-widget resize handles.
 
-import { useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { HubCorePanel } from "@/components/dashboard/HubCorePanel";
 import { FRAME_RATIO_MIN_FR, type FrameRatios } from "@/config/slotLayout";
 import { getSlotLayout, getServerSlotLayout, subscribeSlotLayout, setFrameRatios } from "@/lib/slotLayout";
 import { getCanvases, getServerCanvases, subscribeCanvases } from "@/lib/canvases";
+import { reportFrameBox } from "@/lib/grid/regionMetrics";
 import { useLayout } from "@/components/dashboard/LayoutProvider";
 import { SlotRegion } from "@/components/framework/SlotRegion";
 
-// Nearly all space goes to center — left/right columns and base row collapse
-// to a hairline so grid gaps still render and the transition feels like a pull
-// rather than a hard cut.
-const FOCUS_RATIOS: FrameRatios = { columns: [0.05, 1, 0.05], centerRows: [1, 0.05] };
+// Focus mode no longer re-proportions the frame: the focused widget lifts out
+// of its cell and grows over the canvas (see SlotWidgetCell), so every other
+// widget keeps its place and simply dims behind the backdrop.
 
 /* canvas-switch entrance cascade — Central Base (NutBot, by default) goes first (STAGGER_BASE,
    which matches the outer .slot-frame's exit-fade duration below so the new
@@ -71,12 +71,13 @@ export function SlotDashboard() {
     () => getCanvases().activeId,
     () => getServerCanvases().activeId,
   );
-  const { editMode, focusWidgetId, isInstalling, setKeyboardFocusWidgetId } = useLayout();
+  const { editMode, focusWidgetId, exitFocusMode, isInstalling, setKeyboardFocusWidgetId } = useLayout();
   const isFocusMode = focusWidgetId !== null;
 
   const frameRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<RatioDragState | null>(null);
+  const frameObserverRef = useRef<ResizeObserver | null>(null);
   const [previewRatios, setPreviewRatios] = useState<FrameRatios | null>(null);
 
   const left = slotLayout.widgets.filter((w) => w.region === "left");
@@ -94,10 +95,7 @@ export function SlotDashboard() {
       w.region === "center" ? STAGGER_BASE : STAGGER_BASE + Math.min(++staggerStep, STAGGER_MAX_STEPS) * STAGGER_STEP;
   }
 
-  const ratios = previewRatios ?? slotLayout.frameRatios;
-  // In focus mode use collapsed side/base ratios; otherwise use the persisted
-  // (or drag-preview) ratios.
-  const activeRatios = isFocusMode ? FOCUS_RATIOS : ratios;
+  const activeRatios = previewRatios ?? slotLayout.frameRatios;
 
   // Framer-motion animates the grid template values by interpolating the
   // numbers inside the string (its "complex" type). Drag previews stay instant
@@ -108,6 +106,27 @@ export function SlotDashboard() {
 
   const animateFrameCols = `${activeRatios.columns[0]}fr ${activeRatios.columns[1]}fr ${activeRatios.columns[2]}fr`;
   const animateCenterRows = `${activeRatios.centerRows[0]}fr ${activeRatios.centerRows[1]}fr`;
+
+  // Report .slot-frame's box so the standard cell (lib/grid/standardCell.ts)
+  // follows the viewport. A callback ref rather than an effect: the frame is
+  // keyed by canvas, so a canvas switch mounts a new element and an effect
+  // keyed on the id would run before AnimatePresence's exit finishes.
+  const attachFrame = useCallback((el: HTMLDivElement | null) => {
+    frameRef.current = el;
+    frameObserverRef.current?.disconnect();
+    frameObserverRef.current = null;
+    if (!el) return;
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const gap = parseFloat(getComputedStyle(el).columnGap) || 12;
+      reportFrameBox({ width: rect.width, height: rect.height, gap }, window.innerWidth);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    frameObserverRef.current = observer;
+  }, []);
 
   function handleRatioPointerDown(axis: RatioAxis, e: ReactPointerEvent<HTMLDivElement>) {
     e.preventDefault();
@@ -195,8 +214,26 @@ export function SlotDashboard() {
 
   return (
     <div className="slot-page mx-auto max-w-[1800px] px-5 py-6" style={{ position: "relative" }}>
-      <div className="frame frame-with-tabs">
+      {/* inert (not just pointer-events) is what actually locks the page during
+          an install — it blocks clicks, keyboard/tab navigation and assistive
+          tech alike, and covers the HubCore edge dock that hangs outside this
+          box and so was never under the overlay. See .installing-overlay. */}
+      <div className="frame frame-with-tabs" inert={isInstalling}>
         <HubCorePanel />
+        {/* dims the canvas behind an expanded widget; clicking it collapses */}
+        <AnimatePresence>
+          {isFocusMode && (
+            <motion.div
+              key="focus-backdrop"
+              className="slot-focus-backdrop"
+              onClick={exitFocusMode}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+            />
+          )}
+        </AnimatePresence>
         <div
           className="frame-inner"
           onPointerDown={(e) => {
@@ -216,7 +253,7 @@ export function SlotDashboard() {
           <AnimatePresence mode="wait" initial={false}>
           <motion.div
             key={activeCanvasId}
-            ref={frameRef}
+            ref={attachFrame}
             className="slot-frame"
             data-focus-mode={isFocusMode ? "true" : undefined}
             data-installing={isInstalling ? "true" : undefined}
@@ -228,7 +265,7 @@ export function SlotDashboard() {
               gridTemplateColumns: layoutTransition,
             }}
           >
-            <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
+            <SlotRegion region="left" instances={left} dims={slotLayout.regionDims.left} frameRatios={slotLayout.frameRatios} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
 
             <motion.div
               ref={centerRef}
@@ -237,7 +274,7 @@ export function SlotDashboard() {
               transition={layoutTransition}
             >
               <div className="slot-center-region">
-                <SlotRegion region="center" instances={center} dims={slotLayout.regionDims.center} entranceDelays={entranceDelays} />
+                <SlotRegion region="center" instances={center} dims={slotLayout.regionDims.center} frameRatios={slotLayout.frameRatios} entranceDelays={entranceDelays} />
                 {editMode && (
                   <>
                     <div
@@ -264,10 +301,10 @@ export function SlotDashboard() {
                   </>
                 )}
               </div>
-              <SlotRegion region="base" instances={base} dims={slotLayout.regionDims.base} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
+              <SlotRegion region="base" instances={base} dims={slotLayout.regionDims.base} frameRatios={slotLayout.frameRatios} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
             </motion.div>
 
-            <SlotRegion region="right" instances={right} dims={slotLayout.regionDims.right} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
+            <SlotRegion region="right" instances={right} dims={slotLayout.regionDims.right} frameRatios={slotLayout.frameRatios} entranceDelays={entranceDelays} inFocusMode={isFocusMode} />
           </motion.div>
           </AnimatePresence>
         </div>

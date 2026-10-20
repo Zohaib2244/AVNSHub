@@ -1,3 +1,4 @@
+import type { HarnessId } from "./harnessAdapters";
 // Client-side project store for Widget Creator.
 // Each custom widget is a "project". Projects in In Progress = not yet built.
 // Projects in Created = their widget exists in the registry.
@@ -10,12 +11,24 @@
 // server — a second device saw bare "virtual" entries with no history.
 
 import type { GenerateSettings } from "@/app/api/widget-creator/generate/route";
+import type { FillMode, PresetId } from "@/config/sizePresets";
 import { deleteFromServer, pollWhileVisible, pullFromServer, pushToServer } from "@/lib/serverSync";
+import { randomId } from "@/lib/uuid";
 
 export type WidgetBrief = {
   title: string;
   slug: string;
   icon?: string;
+  /** size presets the widget ships in (config/sizePresets.ts) — the planner's
+      answer to "what shapes". When set, `sizes` and s/m/lContent below are
+      derived from these (lib/widget-creator/briefPresets.ts) for the stages
+      that still speak S/M/L. */
+  presets?: PresetId[];
+  defaultPreset?: PresetId;
+  /** how extra space inside a preset's range is used */
+  fill?: FillMode;
+  /** what each preset shows — same role as the per-size content fields */
+  presetContent?: Partial<Record<PresetId, string>>;
   sizes?: string[];
   /** the master record: EVERYTHING the user asked for — purpose, every
       field/control/behavior, data, interactions, persistence, edge cases.
@@ -64,7 +77,7 @@ export type WidgetProject = {
   ideateSessionId?: string;
   /** Build-mode CLI session, tagged with the slug it was minted for so a
       target change invalidates it (survives remounts, unlike the old ref). */
-  buildSession?: { id: string; forSlug: string | null };
+  buildSession?: { id: string; forSlug: string | null; harness?: HarnessId };
   /** A build finished but the widget isn't installed/placed yet — powers the
       "install widget" button. Lives here (synced) instead of sessionStorage so
       closing the tab can't strand generated files with no way to install them. */
@@ -122,6 +135,7 @@ export function sanitizeProjects(raw: unknown): WidgetProject[] {
       && typeof (p.buildSession as Record<string, unknown>).id === "string"
       ? {
           id: (p.buildSession as Record<string, unknown>).id as string,
+          harness: ["claude", "codex", "opencode"].includes(String((p.buildSession as Record<string, unknown>).harness)) ? (p.buildSession as Record<string, unknown>).harness as HarnessId : "claude",
           forSlug: typeof (p.buildSession as Record<string, unknown>).forSlug === "string"
             ? ((p.buildSession as Record<string, unknown>).forSlug as string)
             : null,
@@ -300,7 +314,7 @@ export function createProject(
   const hasIdentity = Boolean(name || icon || slug);
 
   const project: WidgetProject = {
-    id: crypto.randomUUID(),
+    id: randomId(),
     displayName: name || displayName,
     activeMode: entryMode,
     workflowMode: entryMode,
@@ -379,10 +393,11 @@ export type RegistryLike = Record<string, { title?: string }>;
 
 /**
  * The list every creator surface actually renders: stored projects corrected
- * against the current registry (a project whose slug left the registry drops
- * its Created status and any pending install pointing at deleted files), plus
- * virtual entries for registry widgets that have no stored project. Pure —
- * call it in a render body with the stable getStoredProjects() snapshot.
+ * against the current registry (the registry is the authoritative source of
+ * truth for "created" — hasBuildOutput is derived to match it both ways,
+ * not just corrected downward), plus virtual entries for registry widgets
+ * that have no stored project. Pure — call it in a render body with the
+ * stable getStoredProjects() snapshot.
  */
 export function buildProjectView(stored: WidgetProject[], registry: RegistryLike): WidgetProject[] {
   const registryKeys = Object.keys(registry);
@@ -390,8 +405,28 @@ export function buildProjectView(stored: WidgetProject[], registry: RegistryLike
 
   const corrected = stored.map((p) => {
     let next = p;
-    if (next.hasBuildOutput && next.slug && !registryKeySet.has(next.slug)) {
-      next = { ...next, hasBuildOutput: false, slug: undefined };
+
+    // onRunDone (ChatCanvas) writes pendingInstall (slug + registered) and
+    // hasBuildOutput/slug as two separate updateProject calls - if the tab
+    // closed/reloaded between them, or the run was only ever picked up by
+    // the server-side status poller, pendingInstall can land while the
+    // top-level slug never does. pendingInstall.slug + registered:true is
+    // just as authoritative a source for "which widget this project built",
+    // so fall back to it when the primary field is missing.
+    const effectiveSlug = next.slug ?? (next.pendingInstall?.registered ? next.pendingInstall.slug : undefined);
+
+    if (effectiveSlug) {
+      const inRegistry = registryKeySet.has(effectiveSlug);
+      if (next.hasBuildOutput && !inRegistry) {
+        // the widget was deleted from the registry after being created here
+        next = { ...next, hasBuildOutput: false, slug: undefined };
+      } else if (!next.hasBuildOutput && inRegistry) {
+        // build succeeded and the widget is live in the registry, but the
+        // local record never caught up to "Created" - the project would
+        // otherwise sit stuck in "in progress" forever despite the widget
+        // genuinely existing.
+        next = { ...next, hasBuildOutput: true, slug: effectiveSlug };
+      }
     }
     if (next.pendingInstall?.registered && !registryKeySet.has(next.pendingInstall.slug)) {
       // an installed-then-deleted widget must not resurrect an install button

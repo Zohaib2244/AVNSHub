@@ -1,9 +1,7 @@
 # AVN Hub — Wallpaper Engine build
 
 A static-export, serverless build of AVN Hub for use as a [Wallpaper
-Engine](https://www.wallpaperengine.io/) "Web" wallpaper. See the root
-[`CLAUDE.md`](../CLAUDE.md) for the architecture/decisions behind this — short
-version: no API routes, no secrets, no Node-only widgets (System Stats,
+Engine](https://www.wallpaperengine.io/) "Web" wallpaper. Short version of how it differs from the main app: no API routes, no secrets, no Node-only widgets (System Stats,
 NutBot's real shell/chat/creator, Spotify/Steam/GitHub). NutBot is a plain
 idle mascot here, and "Now Playing" reads Windows' OS-level media session via
 Wallpaper Engine's own API instead of the Spotify Web API — works with

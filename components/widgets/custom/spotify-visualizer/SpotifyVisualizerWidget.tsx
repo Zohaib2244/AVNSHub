@@ -1,9 +1,8 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef, useState, type MutableRefObject } from "react";
+import { type CSSProperties, useEffect, useRef, useState, type MutableRefObject, type RefObject } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { usePolling } from "@/lib/usePolling";
-import { startAnimationLoop } from "@/lib/animationLoop";
 import { ChevronLeft, ChevronRight, Music, Pause, Play } from "lucide-react";
 import type { NowPlaying as NowPlayingData, PlayerAction, SpotifyCreds } from "@/lib/spotify";
 
@@ -103,11 +102,18 @@ function runCanvas(
   stage: HTMLDivElement,
   trackRef: MutableRefObject<string>,
   isPlayingRef: MutableRefObject<boolean>,
+  fetchTimeRef: MutableRefObject<number>,
+  footer: {
+    bar: RefObject<HTMLDivElement | null>;
+    elapsed: RefObject<HTMLSpanElement | null>;
+    duration: RefObject<HTMLSpanElement | null>;
+  },
+  progressMsRef: MutableRefObject<number>,
+  durationMsRef: MutableRefObject<number>,
 ): () => void {
   const ctx = canvas.getContext("2d")!;
   if (!ctx) return () => {};
-  let ratio = 1;
-  let paletteReadAt = 0;
+  let animFrame = 0;
   let palette = readPalette(stage);
   let prevSeed = -1;
   let params: WaveParams = seedParams(0);
@@ -116,12 +122,12 @@ function runCanvas(
     const b = stage.getBoundingClientRect();
     const W = Math.max(120, Math.round(b.width || 300));
     const H = Math.max(48, Math.round(b.height || 80));
-    ratio = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = Math.round(W * ratio);
-    canvas.height = Math.round(H * ratio);
+    const r = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.round(W * r);
+    canvas.height = Math.round(H * r);
     canvas.style.width = `${W}px`;
     canvas.style.height = `${H}px`;
-    ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+    ctx.setTransform(r, 0, 0, r, 0, 0);
     palette = readPalette(stage);
   }
 
@@ -162,13 +168,10 @@ function runCanvas(
   }
 
   function tick(ts: number) {
-    if (paletteReadAt === 0 || ts - paletteReadAt >= 1000) {
-      palette = readPalette(stage);
-      paletteReadAt = ts;
-    }
+    if (Math.round(ts) % 30 === 0) palette = readPalette(stage);
 
-    const W = canvas.width / ratio;
-    const H = canvas.height / ratio;
+    const W = canvas.width / (window.devicePixelRatio || 1);
+    const H = canvas.height / (window.devicePixelRatio || 1);
     const midY = H / 2;
 
     ctx.clearRect(0, 0, W, H);
@@ -184,6 +187,7 @@ function runCanvas(
     const isPlaying = isPlayingRef.current;
     const [freqs, amps, modBase] = params;
     const wave: number[] = [];
+    let maxVal = 0;
 
     const beat = isPlaying ? 1 : 0.3;
     const energy = isPlaying ? 1 : 0.35;
@@ -201,6 +205,8 @@ function runCanvas(
       y *= modAmp;
       y = Math.max(-1, Math.min(1, y));
       wave.push(y);
+      const a = Math.abs(y);
+      if (a > maxVal) maxVal = a;
     }
 
     // Main cyan waveform
@@ -258,13 +264,27 @@ function runCanvas(
     ctx.arc(trigX, midY, trigR, 0, Math.PI * 2);
     ctx.fill();
 
+    // Live progress: written straight to the footer DOM every frame. It used
+    // to go into refs that the JSX read during render, so the time and bar
+    // only moved when a poll happened to re-render the widget.
+    if (isPlaying && progressMsRef.current > 0 && durationMsRef.current > 0) {
+      const liveMs = progressMsRef.current + (Date.now() - fetchTimeRef.current);
+      const capped = Math.min(liveMs, durationMsRef.current);
+      if (footer.bar.current) footer.bar.current.style.width = `${(capped / durationMsRef.current) * 100}%`;
+      if (footer.elapsed.current) footer.elapsed.current.textContent = fmtMs(capped);
+      if (footer.duration.current) footer.duration.current.textContent = fmtMs(durationMsRef.current);
+    } else if (!isPlaying && footer.bar.current) {
+      footer.bar.current.style.width = "0%";
+    }
+
+    animFrame = requestAnimationFrame(tick);
   }
 
-  const stopAnimation = startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
+  animFrame = requestAnimationFrame(tick);
 
   return () => {
     ro.disconnect();
-    stopAnimation();
+    cancelAnimationFrame(animFrame);
   };
 }
 
@@ -273,12 +293,22 @@ function runCanvas(
 export function SpotifyVisualizerWidget() {
   const { size, settings } = useWidget();
   const creds = spotifyCredsFrom(settings);
-  const { data, refresh } = usePolling<NowPlayingData>(POLL_URL, POLL_MS, creds);
+  const { data: polled, refresh } = usePolling<NowPlayingData | { notConfigured: true }>(POLL_URL, POLL_MS, creds);
+  // the route answers `{ notConfigured: true }` when no credentials are set
+  const notConfigured = !!polled && "notConfigured" in polled;
+  const data = notConfigured ? undefined : (polled as NowPlayingData | undefined);
 
   const stageRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const trackRef = useRef("");
   const isPlayingRef = useRef(false);
+  // set whenever poll data lands, before anything reads it
+  const fetchTimeRef = useRef(0);
+  const barRef = useRef<HTMLDivElement>(null);
+  const elapsedElRef = useRef<HTMLSpanElement>(null);
+  const durationElRef = useRef<HTMLSpanElement>(null);
+  const progressMsRef = useRef(0);
+  const durationMsRef = useRef(0);
 
   const [controlErr, setControlErr] = useState<string | null>(null);
 
@@ -289,6 +319,11 @@ export function SpotifyVisualizerWidget() {
   useEffect(() => {
     trackRef.current = data?.trackName ?? "";
     isPlayingRef.current = data?.isPlaying ?? false;
+    if (data) {
+      fetchTimeRef.current = Date.now();
+      progressMsRef.current = data.progressMs ?? 0;
+      durationMsRef.current = data.durationMs ?? 0;
+    }
   }, [data]);
 
   // Canvas animation (mount once)
@@ -296,7 +331,12 @@ export function SpotifyVisualizerWidget() {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
     if (!canvas || !stage) return;
-    return runCanvas(canvas, stage, trackRef, isPlayingRef);
+    return runCanvas(
+      canvas, stage,
+      trackRef, isPlayingRef, fetchTimeRef,
+      { bar: barRef, elapsed: elapsedElRef, duration: durationElRef },
+      progressMsRef, durationMsRef,
+    );
   }, []);
 
   const control = async (action: PlayerAction) => {
@@ -304,11 +344,6 @@ export function SpotifyVisualizerWidget() {
     setControlErr(await sendControl(action, refresh, creds));
   };
 
-  const progressPercent = data?.progressMs != null && data.durationMs
-    ? Math.min(100, Math.max(0, (data.progressMs / data.durationMs) * 100))
-    : 0;
-  const elapsed = fmtMs(data?.progressMs ?? 0);
-  const duration = fmtMs(data?.durationMs ?? 0);
 
   // ── S: compact ──────────────────────────────────────────────────
   if (compact) {
@@ -345,7 +380,6 @@ export function SpotifyVisualizerWidget() {
 
   // ── M / L: standard + rich ─────────────────────────────────────
   const albumArt = data?.albumArtUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element -- remote Spotify art is already delivered at thumbnail size
     <img src={data.albumArtUrl} alt="" style={{ display: "block", width: "100%", height: "100%", objectFit: "cover" }} />
   ) : (
     <Music size={showFooter ? 20 : 16} strokeWidth={1.75} />
@@ -419,7 +453,7 @@ export function SpotifyVisualizerWidget() {
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
             }}>
-              {data?.artist ?? "spotify idle"}
+              {data?.artist ?? (notConfigured ? "not configured — add credentials in settings" : "spotify idle")}
               {data && !data.isPlaying && data.playedAt && (
                 <span style={{ color: "var(--text-muted-dim)" }}>
                   {" · "}last played
@@ -511,8 +545,8 @@ export function SpotifyVisualizerWidget() {
               fontFamily: "var(--font-jetbrains-mono), monospace",
               fontSize: "0.55rem",
               flex: "none",
-            }}>
-              {elapsed}
+            }} ref={elapsedElRef}>
+              0:00
             </span>
             <div style={{
               background: "var(--bg-nested)",
@@ -522,14 +556,14 @@ export function SpotifyVisualizerWidget() {
               height: 6,
               overflow: "hidden",
             }}>
-              <div style={{
+              <div ref={barRef} style={{
                 background: data?.isPlaying
                   ? "linear-gradient(90deg, var(--accent-cyan), var(--accent-orange))"
                   : "var(--accent-cyan)",
                 borderRadius: 99,
                 height: "100%",
                 transition: "width 0.3s ease",
-                width: `${data ? progressPercent : 0}%`,
+                width: "0%",
               }} />
             </div>
             <span style={{
@@ -537,8 +571,8 @@ export function SpotifyVisualizerWidget() {
               fontFamily: "var(--font-jetbrains-mono), monospace",
               fontSize: "0.55rem",
               flex: "none",
-            }}>
-              {duration}
+            }} ref={durationElRef}>
+              0:00
             </span>
           </div>
         )}
