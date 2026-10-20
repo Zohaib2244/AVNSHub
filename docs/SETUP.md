@@ -8,7 +8,7 @@ The Widget Creator writes real `.tsx` files into the source tree while the app r
 
 ## Requirements
 
-- Node.js 20+ and npm
+- Node.js 20.9+ and npm (on Windows, `install.bat` checks this, installs packages and creates `.env.local`; `run.bat` starts the hub)
 - Optional, for the Widget Creator and NutBot chat: one signed-in agent CLI on the same machine - `claude`, `codex` or `opencode`
 - Optional: Docker, Tailscale, a local LLM (see [NUTBOT.md](NUTBOT.md))
 
@@ -21,7 +21,7 @@ git clone https://github.com/Zohaib2244/AVNSHub.git
 cd AVNSHub
 npm install            # also generates the Widget Creator's agent skills
 cp .env.example .env.local
-npm run dev            # http://localhost:3000
+npm run dev            # http://localhost:3000 (npm run dev:debug keeps server source maps)
 ```
 
 Stop it with `Ctrl+C`, or `npm run stop:hub` if it is running in the background.

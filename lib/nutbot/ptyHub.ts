@@ -22,8 +22,10 @@ export type PtySession = {
   /** ring buffer of recent output, replayed when a browser (re)connects so a
       tab switch / reconnect doesn't lose the visible scrollback */
   buffer: string[];
+  bufferChars: number;
   subscribers: Set<(chunk: string) => void>;
   exited: boolean;
+  orphanTimer: ReturnType<typeof setTimeout> | null;
 };
 
 // Survive Turbopack/HMR module reloads in dev so live sessions aren't orphaned
@@ -32,7 +34,46 @@ const globalForPty = globalThis as unknown as { __nutbotPtySessions?: Map<string
 const sessions: Map<string, PtySession> = globalForPty.__nutbotPtySessions ?? new Map();
 globalForPty.__nutbotPtySessions = sessions;
 
-const MAX_BUFFER_CHUNKS = 2000;
+// Dev HMR may preserve sessions created by an older module shape.
+for (const session of sessions.values()) {
+  if (typeof session.bufferChars !== "number") {
+    session.bufferChars = session.buffer.reduce((sum, chunk) => sum + chunk.length, 0);
+  }
+  session.orphanTimer ??= null;
+}
+
+// A chunk-count cap alone is not a memory bound because one terminal write can
+// be arbitrarily large. Keep at most about 1 MB of reconnect scrollback.
+const MAX_BUFFER_CHUNKS = 1000;
+const MAX_BUFFER_CHARS = 1_000_000;
+const ORPHAN_TTL_MS = 5 * 60_000;
+
+function clearOrphanTimer(session: PtySession) {
+  if (session.orphanTimer) clearTimeout(session.orphanTimer);
+  session.orphanTimer = null;
+}
+
+function scheduleOrphanCleanup(id: string, session: PtySession) {
+  clearOrphanTimer(session);
+  if (session.exited || session.subscribers.size > 0) return;
+  session.orphanTimer = setTimeout(() => {
+    const current = sessions.get(id);
+    if (current !== session || current.subscribers.size > 0) return;
+    killSession(id);
+  }, ORPHAN_TTL_MS);
+}
+
+function appendToBuffer(session: PtySession, chunk: string) {
+  const storedChunk = chunk.length > MAX_BUFFER_CHARS ? chunk.slice(-MAX_BUFFER_CHARS) : chunk;
+  session.buffer.push(storedChunk);
+  session.bufferChars += storedChunk.length;
+  while (
+    session.buffer.length > 1 &&
+    (session.buffer.length > MAX_BUFFER_CHUNKS || session.bufferChars > MAX_BUFFER_CHARS)
+  ) {
+    session.bufferChars -= session.buffer.shift()?.length ?? 0;
+  }
+}
 
 export function shellDisabled(): boolean {
   return process.env.NUTBOT_SHELL_DISABLED === "true";
@@ -65,11 +106,17 @@ export function createSession(): string {
   });
 
   const id = randomUUID();
-  const session: PtySession = { pty: term, buffer: [], subscribers: new Set(), exited: false };
+  const session: PtySession = {
+    pty: term,
+    buffer: [],
+    bufferChars: 0,
+    subscribers: new Set(),
+    exited: false,
+    orphanTimer: null,
+  };
 
   term.onData((chunk) => {
-    session.buffer.push(chunk);
-    if (session.buffer.length > MAX_BUFFER_CHUNKS) session.buffer.shift();
+    appendToBuffer(session, chunk);
     for (const fn of session.subscribers) {
       try { fn(chunk); } catch { /* a dead subscriber must not break the others */ }
     }
@@ -77,6 +124,7 @@ export function createSession(): string {
 
   term.onExit(() => {
     session.exited = true;
+    clearOrphanTimer(session);
     const bye = "\r\n\x1b[90m[process exited]\x1b[0m\r\n";
     for (const fn of session.subscribers) {
       try { fn(bye); } catch {}
@@ -86,6 +134,8 @@ export function createSession(): string {
   });
 
   sessions.set(id, session);
+  // Reap sessions whose client disappears between create and SSE connect.
+  scheduleOrphanCleanup(id, session);
   return id;
 }
 
@@ -100,6 +150,19 @@ export function writeSession(id: string, data: string): boolean {
   return true;
 }
 
+export function subscribeSession(id: string, listener: (chunk: string) => void): () => void {
+  const session = sessions.get(id);
+  if (!session || session.exited) return () => {};
+  clearOrphanTimer(session);
+  session.subscribers.add(listener);
+  return () => {
+    const current = sessions.get(id);
+    if (current !== session) return;
+    session.subscribers.delete(listener);
+    scheduleOrphanCleanup(id, session);
+  };
+}
+
 export function resizeSession(id: string, cols: number, rows: number): void {
   const session = sessions.get(id);
   if (!session || session.exited) return;
@@ -111,6 +174,7 @@ export function resizeSession(id: string, cols: number, rows: number): void {
 export function killSession(id: string): void {
   const session = sessions.get(id);
   if (!session) return;
+  clearOrphanTimer(session);
   try { session.pty.kill(); } catch {}
   sessions.delete(id);
 }

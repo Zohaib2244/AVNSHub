@@ -22,6 +22,10 @@ const _claude_usage = lazy(() => import("@/components/widgets/custom/claude-usag
 const _office_game_dev = lazy(() => import("@/components/widgets/custom/office-game-dev/OfficeGameDevWidget").then((m) => ({ default: m.OfficeGameDevWidget })));
 const _shift_tracker = lazy(() => import("@/components/widgets/custom/shift-tracker/ShiftTrackerWidget").then((m) => ({ default: m.ShiftTrackerWidget })));
 const _prayer_times = lazy(() => import("@/components/widgets/custom/prayer-times/PrayerTimesWidget").then((m) => ({ default: m.PrayerTimesWidget })));
+const _mini_ping_pong = lazy(() => import("@/components/widgets/custom/mini-ping-pong/MiniPingPongWidget").then((m) => ({ default: m.MiniPingPongWidget })));
+const _gym_ledger = lazy(() => import("@/components/widgets/custom/gym-ledger/GymLedgerWidget").then((m) => ({ default: m.GymLedgerWidget })));
+const _ambient_data = lazy(() => import("@/components/widgets/custom/ambient-data/AmbientDataWidget").then((m) => ({ default: m.AmbientDataWidget })));
+const _publishing_email_builder = lazy(() => import("@/components/widgets/custom/publishing-email-builder/PublishingEmailBuilderWidget").then((m) => ({ default: m.PublishingEmailBuilderWidget })));
 // --- custom-components end ---
 
 export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
@@ -38,5 +42,9 @@ export const CUSTOM_COMPONENT_MAP: Record<string, ComponentType> = {
   "office-game-dev": _office_game_dev,
   "shift-tracker": _shift_tracker,
   "prayer-times": _prayer_times,
+  "mini-ping-pong": _mini_ping_pong,
+  "gym-ledger": _gym_ledger,
+  "ambient-data": _ambient_data,
+  "publishing-email-builder": _publishing_email_builder,
 // --- custom-map end ---
 };

@@ -19,7 +19,7 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open http://localhost:3000. Node 20+ is required. The Widget Creator and NutBot chat additionally need one signed-in agent CLI (`claude`, `codex` or `opencode`); the rest of the dashboard works without it.
+Open http://localhost:3000. Node 20.9+ is required. On Windows, double-click `install.bat` once (it checks Node, installs packages, creates `.env.local` and sets up the database), then use `run.bat` to start the hub. The Widget Creator and NutBot chat additionally need one signed-in agent CLI (`claude`, `codex` or `opencode`); the rest of the dashboard works without it.
 
 AVN Hub deliberately runs the Next.js dev server as its runtime, because the Widget Creator writes real source files while it runs. It has no login of its own, so keep it on localhost, a LAN or Tailscale. See [docs/SETUP.md](docs/SETUP.md).
 

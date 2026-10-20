@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en" data-palette="ember" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AVN Hub — Homelab Widget Prototypes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ─── TOKENS (mirrors globals.css ember dark) ─── */
+:root {
+  --bg-page: #13100c;
+  --bg-card: #1e1a14;
+  --bg-nested: #1a1610;
+  --border: #3d3220;
+  --shadow: #070604;
+  --text-primary: #e8dfc8;
+  --text-muted: #9f9887;
+  --text-muted-dim: #8b8475;
+  --accent-orange: #ff6b2b;
+  --accent-cyan: #00b4c8;
+  --accent-warm: #e8dfc8;
+  --badge-text: #13100c;
+  --status-up: #1c6b30;
+  --status-down: #c84a12;
+  --status-warn: #c89812;
+  --font-dot: "DotGothic16", monospace;
+  --font-mono: "JetBrains Mono", monospace;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg-page);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 24px;
+  min-height: 100vh;
+}
+
+h2 {
+  font-family: var(--font-dot);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 32px 0 14px 2px;
+}
+
+h2:first-child { margin-top: 0; }
+
+/* ─── GRID ─── */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 14px; }
+.grid.wide { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* ─── CARD ─── */
+.card {
+  background: var(--bg-card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  padding: 14px 16px;
+  overflow: hidden;
+  transition: border-color 0.25s, box-shadow 0.25s;
+  display: flex;
+  flex-direction: column;
+}
+.card:hover {
+  border-color: var(--accent-orange);
+  box-shadow: 5px 5px 0 var(--shadow);
+}
+.card.accent-left { border-left: 3px solid var(--accent-orange); }
+
+/* ─── LABEL ─── */
+.label {
+  display: flex; align-items: center; gap: 6px;
+  font-family: var(--font-dot); font-size: 0.58rem;
+  letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.label svg { flex-shrink: 0; }
+
+/* ─── TYPOGRAPHY ─── */
+.stat {
+  font-family: var(--font-dot); font-size: 2rem; line-height: 1;
+  color: var(--accent-cyan); margin-bottom: 4px;
+}
+.value { font-size: 1.15rem; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.value.accent { color: var(--accent-orange); }
+.value.teal { color: var(--accent-cyan); }
+.sub { font-size: 0.72rem; color: var(--text-muted); }
+
+/* ─── STATUS DOTS ─── */
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.dot.up { background: var(--status-up); box-shadow: 0 0 6px var(--status-up); }
+.dot.down { background: var(--status-down); box-shadow: 0 0 6px var(--status-down); }
+.dot.warn { background: var(--status-warn); }
+
+.dot-row { display: flex; flex-wrap: wrap; gap: 5px 10px; font-size: 0.68rem; color: var(--text-muted); }
+.dot-row span { display: flex; align-items: center; gap: 5px; }
+
+/* ─── STAT GRID (2x2) ─── */
+.stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.stat-cell { text-align: center; }
+.stat-cell-label {
+  font-family: var(--font-dot); font-size: 0.52rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted-dim); margin-bottom: 3px;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+}
+.stat-cell-value { font-size: 1.05rem; color: var(--text-primary); }
+
+/* ─── PROGRESS BAR ─── */
+.progress-track {
+  background: var(--bg-nested); border-radius: 4px;
+  height: 6px; margin-top: 4px; overflow: hidden;
+}
+.progress-fill { height: 100%; border-radius: 4px; }
+.progress-fill.green { background: var(--status-up); }
+.progress-fill.orange { background: var(--accent-orange); }
+.progress-fill.cyan { background: var(--accent-cyan); }
+.progress-fill.warn { background: var(--status-warn); }
+.progress-fill.down { background: var(--status-down); }
+
+/* ─── DETAIL SECTION ─── */
+.detail {
+  margin-top: 10px; padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.detail-head {
+  font-family: var(--font-dot); font-size: 0.55rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted-dim); margin-bottom: 6px;
+}
+.detail-row { display: flex; justify-content: space-between; font-size: 0.7rem; padding: 2px 0; }
+.detail-row .meta { color: var(--text-muted); flex-shrink: 0; }
+
+/* ─── PIPELINE / QUEUE ─── */
+.pipeline { display: flex; gap: 6px; }
+.pipeline-stage {
+  flex: 1; text-align: center; padding: 6px 4px;
+  background: var(--bg-nested); border-radius: 8px;
+}
+.pipeline-stage .count { font-family: var(--font-dot); font-size: 1.4rem; color: var(--accent-cyan); }
+.pipeline-stage .tag {
+  font-family: var(--font-dot); font-size: 0.5rem;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-muted-dim); margin-top: 2px;
+}
+.pipeline-stage.active .count { color: var(--accent-orange); }
+.pipeline-stage.good .count { color: var(--status-up); }
+
+/* ─── GAUGE RING ─── */
+.gauge-ring { display: flex; align-items: center; gap: 12px; }
+.gauge-ring svg { flex-shrink: 0; }
+.gauge-ring .info { min-width: 0; }
+.gauge-ring .info .value { font-size: 1.1rem; }
+.gauge-ring .info .sub { font-size: 0.68rem; }
+
+/* ─── TIMELINE ─── */
+.timeline { display: flex; flex-direction: column; gap: 5px; }
+.timeline-item { display: flex; align-items: center; gap: 8px; font-size: 0.68rem; }
+.timeline-item .date {
+  font-family: var(--font-dot); font-size: 0.55rem;
+  color: var(--accent-cyan); min-width: 38px; text-align: right;
+}
+.timeline-item .title {
+  color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  flex: 1; min-width: 0;
+}
+.timeline-item .badge {
+  font-family: var(--font-dot); font-size: 0.48rem;
+  padding: 2px 6px; border-radius: 3px; flex-shrink: 0;
+}
+.badge.new { background: var(--accent-orange); color: var(--badge-text); }
+.badge.dl { background: var(--accent-cyan); color: var(--badge-text); }
+
+/* ─── SPEED METER ─── */
+.speed-dual { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.speed-bar { text-align: center; }
+.speed-bar .dir {
+  font-family: var(--font-dot); font-size: 0.5rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted-dim); margin-bottom: 4px;
+}
+.speed-bar .rate { font-family: var(--font-dot); font-size: 1.5rem; }
+.speed-bar .rate.dl { color: var(--status-up); }
+.speed-bar .rate.ul { color: var(--accent-orange); }
+.speed-bar .sub { font-size: 0.62rem; }
+
+/* ─── LED MATRIX ─── */
+.led-grid { display: flex; flex-wrap: wrap; gap: 3px; }
+.led {
+  width: 10px; height: 10px; border-radius: 2px;
+  background: var(--bg-nested); transition: background 0.3s;
+}
+.led.up { background: var(--status-up); box-shadow: 0 0 4px var(--status-up); }
+.led.down { background: var(--status-down); box-shadow: 0 0 4px var(--status-down); }
+.led.paused { background: var(--status-warn); }
+
+/* ─── CONTAINER FLEET ─── */
+.container-row { display: flex; align-items: center; gap: 6px; padding: 3px 0; font-size: 0.66rem; }
+.container-row .name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.container-row .state {
+  font-family: var(--font-dot); font-size: 0.48rem;
+  padding: 1px 5px; border-radius: 3px; flex-shrink: 0;
+}
+.state.running { background: var(--status-up); color: var(--badge-text); }
+.state.exited { background: var(--status-down); color: var(--badge-text); }
+.state.paused { background: var(--status-warn); color: var(--badge-text); }
+
+/* ─── TOOLTIP STYLE ─── */
+.tt {
+  font-family: var(--font-dot); font-size: 0.55rem;
+  color: var(--text-muted-dim); text-align: center; margin-top: 4px;
+}
+</style>
+</head>
+<body>
+
+<h2>Jellyfin — Now Screening</h2>
+<div class="grid">
+  <!-- S-h: Active streams stat -->
+  <div class="card">
+    <div class="label">▶ jellyfin</div>
+    <div class="stat">3</div>
+    <div class="sub">streams active now</div>
+    <div class="dot-row" style="margin-top:6px">
+      <span><span class="dot up"></span>zohaib</span>
+      <span><span class="dot up"></span>fatima</span>
+      <span><span class="dot up"></span>living room</span>
+    </div>
+  </div>
+  <!-- M-h: Now playing marquee -->
+  <div class="card" style="grid-column: span 2">
+    <div class="label">◉ jellyfin · now playing</div>
+    <div style="display:flex;gap:10px;overflow:hidden">
+      <div style="flex:1;min-width:0">
+        <div class="value" style="font-size:0.95rem">Dune: Part Two</div>
+        <div class="sub">zohaib · 1h 23m in · 1080p</div>
+        <div class="progress-track" style="margin-top:8px">
+          <div class="progress-fill orange" style="width:58%"></div>
+        </div>
+      </div>
+      <div class="stat" style="font-size:1.5rem;margin-bottom:0;align-self:center">3</div>
+    </div>
+    <div class="detail">
+      <div class="detail-row"><span>Living Room TV</span><span class="meta">idle</span></div>
+      <div class="detail-row"><span>iPad (Fatima)</span><span class="meta">Severance S2E4</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Jellyseerr — Request Pipeline</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">🎬 jellyseerr</div>
+    <div class="pipeline">
+      <div class="pipeline-stage active"><div class="count">4</div><div class="tag">pending</div></div>
+      <div class="pipeline-stage good"><div class="count">12</div><div class="tag">approved</div></div>
+      <div class="pipeline-stage"><div class="count">2</div><div class="tag">denied</div></div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">recent requests</div>
+      <div class="detail-row"><span>Alien: Romulus</span><span class="meta">pending 2d</span></div>
+      <div class="detail-row"><span>Furiosa</span><span class="meta">approved ✓</span></div>
+      <div class="detail-row"><span>Inside Out 2</span><span class="meta">approved ✓</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Radarr — Movie Pipeline</h2>
+<div class="grid">
+  <!-- S-h: Collection stat -->
+  <div class="card accent-left">
+    <div class="label">🎥 radarr</div>
+    <div class="stat">847</div>
+    <div class="sub">movies collected</div>
+  </div>
+  <!-- M-h: Coming soon + activity -->
+  <div class="card" style="grid-column: span 2">
+    <div class="label">🎞 radarr · watchlist radar</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">wanted</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">14</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">missing</div>
+        <div class="stat-cell-value" style="color:var(--accent-orange)">23</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">downloaded</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">5</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">this week</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">12</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">coming soon</div>
+      <div class="timeline">
+        <div class="timeline-item"><span class="date">AUG 02</span><span class="title">Deadpool & Wolverine</span><span class="badge new">new</span></div>
+        <div class="timeline-item"><span class="date">AUG 09</span><span class="title">Borderlands</span><span class="badge new">new</span></div>
+        <div class="timeline-item"><span class="date">AUG 16</span><span class="title">Alien: Romulus</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Sonarr — TV On Deck</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">📺 sonarr</div>
+    <div class="stat">142</div>
+    <div class="sub">series tracked</div>
+  </div>
+  <div class="card" style="grid-column: span 2">
+    <div class="label">📡 sonarr · on deck</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">episodes today</div>
+        <div class="stat-cell-value" style="color:var(--accent-cyan)">3</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">this week</div>
+        <div class="stat-cell-value" style="color:var(--accent-orange)">17</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">downloaded</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">7</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">wanted</div>
+        <div class="stat-cell-value" style="color:var(--status-warn)">9</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">next airing</div>
+      <div class="detail-row"><span>The Bear S3E8</span><span class="meta">in 6h</span></div>
+      <div class="detail-row"><span>House of the Dragon S2E8</span><span class="meta">in 2d</span></div>
+      <div class="detail-row"><span>Severance S2E5</span><span class="meta">in 4d</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>qBittorrent — Transfer Engine</h2>
+<div class="grid">
+  <!-- S-h: Active count badge -->
+  <div class="card accent-left">
+    <div class="label">↓↑ qbit</div>
+    <div class="stat">7</div>
+    <div class="sub">active transfers</div>
+  </div>
+  <!-- M-h: Speed gauges -->
+  <div class="card" style="grid-column: span 2">
+    <div class="label">⚡ qbit · transfer engine</div>
+    <div class="speed-dual">
+      <div class="speed-bar">
+        <div class="dir">▼ download</div>
+        <div class="rate dl">42.8</div>
+        <div class="sub">MB/s</div>
+        <div class="progress-track" style="margin-top:6px">
+          <div class="progress-fill green" style="width:68%"></div>
+        </div>
+      </div>
+      <div class="speed-bar">
+        <div class="dir">▲ upload</div>
+        <div class="rate ul">8.3</div>
+        <div class="sub">MB/s</div>
+        <div class="progress-track" style="margin-top:6px">
+          <div class="progress-fill orange" style="width:22%"></div>
+        </div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-row"><span>completed today</span><span class="meta">12</span></div>
+      <div class="detail-row"><span>seeding</span><span class="meta">34</span></div>
+      <div class="detail-row"><span>ratio</span><span class="meta">2.8x</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>NextCloud — Cloud Locker</h2>
+<div class="grid">
+  <!-- S-h: Storage ring gauge -->
+  <div class="card">
+    <div class="label">☁ nextcloud</div>
+    <div class="gauge-ring">
+      <svg width="56" height="56" viewBox="0 0 56 56">
+        <circle cx="28" cy="28" r="24" fill="none" stroke="var(--bg-nested)" stroke-width="5"/>
+        <circle cx="28" cy="28" r="24" fill="none" stroke="var(--accent-cyan)" stroke-width="5"
+          stroke-dasharray="150.8" stroke-dashoffset="48"
+          stroke-linecap="round" transform="rotate(-90 28 28)"/>
+        <text x="28" y="32" text-anchor="middle" fill="var(--text-primary)"
+          font-family="var(--font-dot)" font-size="12">68%</text>
+      </svg>
+      <div class="info">
+        <div class="value">1.4 TB</div>
+        <div class="sub">of 2.0 TB used</div>
+      </div>
+    </div>
+  </div>
+  <!-- M-h: Quick stats + recent -->
+  <div class="card" style="grid-column: span 2">
+    <div class="label">📁 nextcloud · locker</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">files</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">24.6k</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">shared</div>
+        <div class="stat-cell-value" style="color:var(--accent-orange)">47</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">users</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">5</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">free</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">620 GB</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">recent activity</div>
+      <div class="detail-row"><span>tax_2025.pdf</span><span class="meta">2m ago</span></div>
+      <div class="detail-row"><span>vacation_photos/</span><span class="meta">18m ago</span></div>
+      <div class="detail-row"><span>budget_sheet.xlsx</span><span class="meta">1h ago</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Immich — Photo Vault</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">🖼 immich</div>
+    <div class="stat">48.2k</div>
+    <div class="sub">photos total</div>
+  </div>
+  <div class="card" style="grid-column: span 2">
+    <div class="label">📸 immich · vault activity</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">today</div>
+        <div class="stat-cell-value" style="color:var(--accent-cyan)">127</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">this week</div>
+        <div class="stat-cell-value" style="color:var(--accent-orange)">583</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">videos</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">1.8k</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">faces</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">62</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">backup status</div>
+      <div class="detail-row"><span>zohaib (iPhone)</span><span class="meta">synced ✓</span></div>
+      <div class="detail-row"><span>fatima (Pixel)</span><span class="meta">synced ✓</span></div>
+      <div class="detail-row"><span>storage used</span><span class="meta">892 GB / 1.5 TB</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Dawarich — Pathfinder</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">📍 dawarich</div>
+    <div class="stat">14.3</div>
+    <div class="sub">km traveled today</div>
+  </div>
+  <div class="card" style="grid-column: span 2">
+    <div class="label">🗺 dawarich · pathfinder</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">places today</div>
+        <div class="stat-cell-value" style="color:var(--accent-cyan)">7</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">this month</div>
+        <div class="stat-cell-value" style="color:var(--accent-orange)">312 km</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">total</div>
+        <div class="stat-cell-value teal" style="color:var(--accent-cyan)">4.8k km</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">countries</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">5</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">recent visits</div>
+      <div class="detail-row"><span>🏠 Home</span><span class="meta">now</span></div>
+      <div class="detail-row"><span>🏢 Office</span><span class="meta">2h ago</span></div>
+      <div class="detail-row"><span>☕ Blue Bottle</span><span class="meta">4h ago</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>UpTime Kuma — Pulse Check</h2>
+<div class="grid">
+  <!-- S-h: Aggregate uptime stat -->
+  <div class="card accent-left">
+    <div class="label">🫀 kuma</div>
+    <div class="stat" style="color:var(--status-up)">99.8%</div>
+    <div class="sub">aggregate uptime</div>
+  </div>
+  <!-- M-h: LED monitor matrix -->
+  <div class="card" style="grid-column: span 2">
+    <div class="label">💚 kuma · pulse check</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">monitors</div>
+        <div class="stat-cell-value" style="color:var(--accent-cyan)">23</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">up</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">22</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">down</div>
+        <div class="stat-cell-value" style="color:var(--status-down)">1</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">incidents</div>
+        <div class="stat-cell-value" style="color:var(--status-warn)">2</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <div class="tt" style="text-align:left;margin-bottom:4px">MONITOR LEDS</div>
+      <div class="led-grid">
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led down"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span><span class="led up"></span>
+        <span class="led up"></span><span class="led up"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Glances — System Telemetry</h2>
+<div class="grid wide">
+  <div class="card">
+    <div class="label">🖥 glances</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">cpu</div>
+        <div class="stat-cell-value">23%</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">ram</div>
+        <div class="stat-cell-value">62%</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">swap</div>
+        <div class="stat-cell-value">4%</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">load</div>
+        <div class="stat-cell-value">1.42</div>
+      </div>
+    </div>
+    <div class="progress-track" style="margin-top:8px"><div class="progress-fill cyan" style="width:23%"></div></div>
+    <div class="sub" style="margin-top:4px">CPU 23%</div>
+    <div class="tt" style="margin-top:2px">RAM</div>
+    <div class="progress-track" style="margin-top:2px"><div class="progress-fill orange" style="width:62%"></div></div>
+    <div class="sub" style="margin-top:4px">RAM 62% · 9.9 / 16 GB</div>
+  </div>
+</div>
+
+<h2>Scrutiny — Drive Health</h2>
+<div class="grid wide">
+  <div class="card">
+    <div class="label">💽 scrutiny</div>
+    <div class="stat" style="color:var(--status-up);font-size:1.6rem">ALL HEALTHY</div>
+    <div class="sub">4 drives monitored</div>
+  </div>
+  <div class="card" style="grid-column: span 2">
+    <div class="label">🌡 scrutiny · drive health</div>
+    <div class="detail-head">SMART STATUS</div>
+    <div class="detail-row"><span>nvme0n1 (Samsung 980 1TB)</span><span class="meta" style="color:var(--status-up)">PASSED · 34°C</span></div>
+    <div class="detail-row"><span>sda (WD Red 4TB)</span><span class="meta" style="color:var(--status-up)">PASSED · 38°C</span></div>
+    <div class="detail-row"><span>sdb (WD Red 4TB)</span><span class="meta" style="color:var(--status-up)">PASSED · 36°C</span></div>
+    <div class="detail-row"><span>sdc (Seagate 8TB)</span><span class="meta" style="color:var(--status-warn)">WARN · 47°C</span></div>
+    <div class="detail" style="margin-top:8px;padding-top:8px">
+      <div class="detail-row">
+        <span>nvme0n1 power-on hours</span>
+        <span class="meta">8,742h</span>
+      </div>
+      <div class="detail-row">
+        <span>sdc reallocated sectors</span>
+        <span class="meta" style="color:var(--status-warn)">12</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Dozzle — Container Watch</h2>
+<div class="grid">
+  <div class="card">
+    <div class="label">🐳 dozzle</div>
+    <div class="stat">18</div>
+    <div class="sub">containers</div>
+  </div>
+  <div class="card" style="grid-column: span 2">
+    <div class="label">📦 dozzle · container fleet</div>
+    <div class="stat-grid">
+      <div class="stat-cell">
+        <div class="stat-cell-label">running</div>
+        <div class="stat-cell-value" style="color:var(--status-up)">16</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">stopped</div>
+        <div class="stat-cell-value" style="color:var(--status-down)">2</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">restarting</div>
+        <div class="stat-cell-value" style="color:var(--status-warn)">0</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-cell-label">errors 24h</div>
+        <div class="stat-cell-value" style="color:var(--status-down)">3</div>
+      </div>
+    </div>
+    <div class="detail">
+      <div class="detail-head">containers</div>
+      <div class="container-row"><span class="name">nginx-proxy</span><span class="state running">UP</span></div>
+      <div class="container-row"><span class="name">jellyfin</span><span class="state running">UP</span></div>
+      <div class="container-row"><span class="name">nextcloud-app</span><span class="state running">UP</span></div>
+      <div class="container-row"><span class="name">immich-server</span><span class="state running">UP</span></div>
+      <div class="container-row"><span class="name">scrutiny-collector</span><span class="state exited">DOWN</span></div>
+      <div class="container-row"><span class="name">uptime-kuma</span><span class="state running">UP</span></div>
+    </div>
+  </div>
+</div>
+
+<h2>Combined: Media Command Center (L-size panel)</h2>
+<div class="grid">
+  <div class="card accent-left" style="grid-column: 1 / -1">
+    <div class="label">🎬 media command · jellyfin + *arr stack</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px">
+      <!-- Row 1: Pipeline overview -->
+      <div style="grid-column:span 2">
+        <div class="detail-head">now streaming</div>
+        <div class="value" style="font-size:1rem">3 active · 1 transcoding</div>
+        <div class="sub">jellyfin</div>
+      </div>
+      <div>
+        <div class="detail-head">requests</div>
+        <div class="value" style="font-size:1rem;color:var(--accent-cyan)">4</div>
+        <div class="sub">jellyseerr</div>
+      </div>
+      <div>
+        <div class="detail-head">wanted</div>
+        <div class="value" style="font-size:1rem;color:var(--accent-orange)">23</div>
+        <div class="sub">radarr</div>
+      </div>
+      <div>
+        <div class="detail-head">on deck</div>
+        <div class="value" style="font-size:1rem;color:var(--accent-cyan)">17</div>
+        <div class="sub">sonarr</div>
+      </div>
+      <div>
+        <div class="detail-head">dl speed</div>
+        <div class="value" style="font-size:1rem;color:var(--status-up)">42.8</div>
+        <div class="sub">MB/s · qbit</div>
+      </div>
+    </div>
+    <div class="detail" style="margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <div class="detail-head">coming soon</div>
+          <div class="detail-row"><span>Deadpool & Wolverine</span><span class="meta">Aug 02</span></div>
+          <div class="detail-row"><span>House of the Dragon S2E8</span><span class="meta">Aug 04</span></div>
+          <div class="detail-row"><span>Borderlands</span><span class="meta">Aug 09</span></div>
+        </div>
+        <div>
+          <div class="detail-head">recently downloaded</div>
+          <div class="detail-row"><span>The Bear S3E7</span><span class="meta">12m ago</span></div>
+          <div class="detail-row"><span>Twisters (2024)</span><span class="meta">2h ago</span></div>
+          <div class="detail-row"><span>Severance S2E4</span><span class="meta">5h ago</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>Combined: Infrastructure Status (L-size panel)</h2>
+<div class="grid">
+  <div class="card accent-left" style="grid-column: 1 / -1">
+    <div class="label">⚙ infrastructure · health overview</div>
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px">
+      <div>
+        <div class="detail-head">system</div>
+        <div class="value" style="font-size:0.95rem">CPU 23%</div>
+        <div class="sub">RAM 62% · glances</div>
+      </div>
+      <div>
+        <div class="detail-head">uptime</div>
+        <div class="value" style="font-size:0.95rem;color:var(--status-up)">99.8%</div>
+        <div class="sub">23 monitors</div>
+      </div>
+      <div>
+        <div class="detail-head">drives</div>
+        <div class="value" style="font-size:0.95rem;color:var(--status-up)">3/4 OK</div>
+        <div class="sub">scrutiny</div>
+      </div>
+      <div>
+        <div class="detail-head">containers</div>
+        <div class="value" style="font-size:0.95rem;color:var(--accent-cyan)">16/18</div>
+        <div class="sub">running · dozzle</div>
+      </div>
+      <div>
+        <div class="detail-head">storage</div>
+        <div class="value" style="font-size:0.95rem">68%</div>
+        <div class="sub">nextcloud</div>
+      </div>
+      <div>
+        <div class="detail-head">photos</div>
+        <div class="value" style="font-size:0.95rem;color:var(--accent-cyan)">127</div>
+        <div class="sub">today · immich</div>
+      </div>
+    </div>
+    <div class="detail" style="margin-top:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div>
+          <div class="detail-head">service health</div>
+          <div class="dot-row" style="flex-direction:column;gap:3px">
+            <span><span class="dot up"></span>jellyfin</span>
+            <span><span class="dot up"></span>jellyseerr</span>
+            <span><span class="dot up"></span>radarr</span>
+            <span><span class="dot up"></span>sonarr</span>
+            <span><span class="dot up"></span>qbit</span>
+          </div>
+        </div>
+        <div>
+          <div class="detail-head"></div>
+          <div class="dot-row" style="flex-direction:column;gap:3px">
+            <span><span class="dot up"></span>nextcloud</span>
+            <span><span class="dot up"></span>immich</span>
+            <span><span class="dot up"></span>dawarich</span>
+            <span><span class="dot up"></span>uptime-kuma</span>
+            <span><span class="dot down"></span>scrutiny-collector</span>
+          </div>
+        </div>
+        <div>
+          <div class="detail-head">recent incidents</div>
+          <div class="detail-row"><span>scrutiny-collector</span><span class="meta">down 3h</span></div>
+          <div class="detail-row"><span>immich-db</span><span class="meta">restarted 1d</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

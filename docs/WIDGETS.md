@@ -79,6 +79,15 @@ The user can also pin a size from the gear popover, so an L layout may land in a
 
 Graph Layout spans, for reference: S 1x1 (v 1x2), M 2x1 (v 2x2), L 3x2 (v 2x3) on a 6-column grid.
 
+## Canvas and animated widgets
+
+Drive animation with `startAnimationLoop` from `@/lib/animationLoop` instead of a bare `requestAnimationFrame`. It caps the frame rate and pauses completely while the widget is off-screen or the tab is hidden. Use 20-30 fps for decorative motion and 60 only for interaction that needs it.
+
+```tsx
+const stop = startAnimationLoop({ element: canvas, fps: 30, onFrame: (time, deltaMs) => { /* advance by deltaMs, draw */ } });
+return () => stop();
+```
+
 ## Settings
 
 A `settings` array renders a form in the gear popover; values arrive in `useWidget().settings`.

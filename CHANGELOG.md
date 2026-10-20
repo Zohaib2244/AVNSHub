@@ -16,9 +16,11 @@ Add entries under `## [Unreleased]` as you work, grouped Added / Changed / Fixed
 - **NutBot.** A more expressive face (new expressions, speaking, themed colours, idles like something alive), chat wake-up animation, starter prompts, code blocks with copy buttons, prompt recall, scroll-lock, and chill | work modes. Work mode drives a CLI agent on the host.
 - **Personalisation.** Auto palette generated from the canvas wallpaper; per-widget name and icon dial; centred widget settings dialog.
 - Widget Manager multi-select, minimum sizes for Slot Layout resizing (`minPx`), a copy button in Notes, and the NutBot face as the site icon.
+- Windows `install.bat` / `run.bat` launcher scripts, and new Gym Ledger and Mini Ping-Pong custom widgets.
 - Accessibility: every palette passes contrast checks, reduced-motion support, ARIA labels on search and prompt inputs.
 
 ### Changed
+- **Lower always-on cost.** A shared `startAnimationLoop` caps frame rates and stops when off-screen or backgrounded, NutBot's terminal and creator are lazy-loaded, shared polling pauses in background tabs, and `npm run dev` disables server source maps (`npm run dev:debug` keeps them). Idle PTY sessions are reaped after five minutes and reconnect scrollback is bounded.
 - The Widget Creator's agent skills are generated on `npm install` from `lib/widget-creator/prompts/` instead of being committed.
 - Homelab-specific settings moved to env vars: `ALLOWED_DEV_ORIGINS` for extra dev origins, `UPTIME_KUMA_DB` for Kuma's database path.
 - Documentation consolidated into `README`, `docs/SETUP.md`, `docs/WIDGETS.md`, `docs/WIDGET_CREATOR.md` and `docs/NUTBOT.md`. Design notes moved to `docs/design/`.

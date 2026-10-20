@@ -5,7 +5,8 @@
   "scripts": {
     "postinstall": "node scripts/sync-widget-skill.mjs",
     "predev": "npm run db:setup",
-    "dev": "next dev",
+    "dev": "next dev --disable-source-maps",
+    "dev:debug": "npm run db:setup && next dev",
     "build": "next build",
     "start": "next start",
     "db:setup": "prisma generate && prisma migrate deploy",

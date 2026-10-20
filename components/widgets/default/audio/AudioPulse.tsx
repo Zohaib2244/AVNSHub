@@ -12,6 +12,7 @@ import { useEffect, useRef } from "react";
 import { AudioLines } from "lucide-react";
 import { useWidget } from "@/components/framework/WidgetContext";
 import { subscribeWallpaperAudio, getWallpaperAudio, useWallpaperPaused } from "@/lib/wallpaperEngineBridge";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 const BASELINE_SCALE = 1;
 const BASELINE_OPACITY = 0.35;
@@ -20,7 +21,6 @@ export function AudioPulse() {
   const { size } = useWidget();
   const paused = useWallpaperPaused();
   const dotRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (paused) {
@@ -28,6 +28,8 @@ export function AudioPulse() {
       dotRef.current?.style.setProperty("opacity", String(BASELINE_OPACITY));
       return;
     }
+    const dot = dotRef.current;
+    if (!dot) return;
 
     function tick() {
       const samples = getWallpaperAudio();
@@ -38,13 +40,12 @@ export function AudioPulse() {
       const opacity = Math.min(1, BASELINE_OPACITY + level * 0.65);
       dotRef.current?.style.setProperty("transform", `scale(${scale})`);
       dotRef.current?.style.setProperty("opacity", String(opacity));
-      rafRef.current = requestAnimationFrame(tick);
     }
-    rafRef.current = requestAnimationFrame(tick);
+    const stopAnimation = startAnimationLoop({ element: dot, fps: 30, onFrame: tick });
     const unsubscribe = subscribeWallpaperAudio(() => {});
 
     return () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      stopAnimation();
       unsubscribe();
     };
   }, [paused]);

@@ -2,6 +2,7 @@
 
 import { type CSSProperties, useEffect, useRef } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 const monoStyle: CSSProperties = {
   fontFamily: "var(--font-jetbrains-mono), monospace",
@@ -15,6 +16,7 @@ const labelStyle: CSSProperties = {
 };
 
 const MATRIX_SIZE = 50;
+const BRIGHTNESS_STEPS = 12;
 const SPEED: Record<string, number> = { slow: 0.35, normal: 1.0, fast: 2.8 };
 const DOT_SCALE: Record<string, number> = { small: 0.27, medium: 0.34, large: 0.43 };
 
@@ -123,7 +125,6 @@ export function GlyphMatrixWidget() {
   const { size, settings } = useWidget();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
   const tickRef = useRef(0);
   const stateRef = useRef<WidgetState>({
     animation: "glyph",
@@ -143,7 +144,7 @@ export function GlyphMatrixWidget() {
     stateRef.current = { animation, speed, color, dotScale };
   }, [animation, speed, color, dotScale]);
 
-  // One-time setup: ResizeObserver + RAF animation loop
+  // One-time setup: ResizeObserver + visibility-aware, frame-capped loop.
   useEffect(() => {
     const canvasEl = canvasRef.current;
     const wrap = wrapRef.current;
@@ -161,22 +162,34 @@ export function GlyphMatrixWidget() {
     });
     ro.observe(wrap);
 
-    let last = 0;
+    let palette = {
+      orange: "",
+      cyan: "",
+      primary: "",
+      muted: "",
+    };
+    let paletteReadAt = 0;
 
-    function draw(now: number) {
-      const dt = Math.min(now - last, 80);
-      last = now;
+    function readPalette(now: number) {
+      if (now - paletteReadAt < 1000 && paletteReadAt !== 0) return;
+      const cs = getComputedStyle(document.documentElement);
+      palette = {
+        orange: cs.getPropertyValue("--accent-orange").trim(),
+        cyan: cs.getPropertyValue("--accent-cyan").trim(),
+        primary: cs.getPropertyValue("--text-primary").trim(),
+        muted: cs.getPropertyValue("--text-muted").trim(),
+      };
+      paletteReadAt = now;
+    }
 
+    function draw(now: number, deltaMs: number) {
       const { animation, speed, color, dotScale } = stateRef.current;
-      tickRef.current += dt * 0.06 * (SPEED[speed] ?? 1);
+      tickRef.current += deltaMs * 0.06 * (SPEED[speed] ?? 1);
       const t = tickRef.current;
 
       const w = canvas.width;
       const h = canvas.height;
-      if (!w || !h) {
-        rafRef.current = requestAnimationFrame(draw);
-        return;
-      }
+      if (!w || !h) return;
 
       const cols = MATRIX_SIZE;
       const rows = MATRIX_SIZE;
@@ -188,13 +201,12 @@ export function GlyphMatrixWidget() {
       const cx = (cols - 1) / 2;
       const cy = (rows - 1) / 2;
       const circleR = (MATRIX_SIZE - 1) / 2;
+      const circleRSquared = circleR * circleR;
 
-      // Read theme tokens from CSS variables each frame so palette changes apply live
-      const cs = getComputedStyle(document.documentElement);
-      const orange = cs.getPropertyValue("--accent-orange").trim();
-      const cyan = cs.getPropertyValue("--accent-cyan").trim();
-      const primary = cs.getPropertyValue("--text-primary").trim();
-      const muted = cs.getPropertyValue("--text-muted").trim();
+      // CSS reads trigger style resolution, so refresh tokens at most once a
+      // second instead of doing four reads for every one of 2500 dots/frames.
+      readPalette(now);
+      const { orange, cyan, primary, muted } = palette;
 
       const active = color === "cyan" ? cyan : color === "white" ? primary : orange;
       const inactive = muted || primary || active;
@@ -202,46 +214,63 @@ export function GlyphMatrixWidget() {
 
       ctx.clearRect(0, 0, w, h);
 
+      // Filling every dot separately caused thousands of canvas state changes
+      // per frame. Bucket similar brightness values into a small set of paths
+      // so the same 50x50 matrix only needs a handful of fills.
+      const inactivePath = new Path2D();
+      const activePaths = Array.from({ length: BRIGHTNESS_STEPS }, () => new Path2D());
+      const secondaryPaths = color === "mixed"
+        ? Array.from({ length: BRIGHTNESS_STEPS }, () => new Path2D())
+        : null;
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const dc = c - cx;
           const dr = r - cy;
-          const insideCircle = Math.sqrt(dc ** 2 + dr ** 2) <= circleR;
-          if (!insideCircle) continue;
+          const distanceSquared = dc * dc + dr * dr;
+          if (distanceSquared > circleRSquared) continue;
 
           const br = Math.max(0, Math.min(1, animFn(c, r, cols, rows, t)));
           const x = ox + c * dotPitch;
           const y = oy + r * dotPitch;
 
-          ctx.beginPath();
-          ctx.arc(x, y, dotR, 0, Math.PI * 2);
-
           if (br < 0.07) {
-            ctx.globalAlpha = 0.13;
-            ctx.fillStyle = inactive;
+            inactivePath.moveTo(x + dotR, y);
+            inactivePath.arc(x, y, dotR, 0, Math.PI * 2);
           } else {
-            ctx.globalAlpha = 0.1 + br * 0.9;
-            if (color === "mixed") {
-              // Inner half orange, outer half cyan
-              const md = Math.sqrt(dc ** 2 + dr ** 2);
-              ctx.fillStyle = md / circleR < 0.5 ? orange || active : cyan || active;
-            } else {
-              ctx.fillStyle = active || primary || inactive;
-            }
+            const bucket = Math.min(
+              BRIGHTNESS_STEPS - 1,
+              Math.max(1, Math.round(br * (BRIGHTNESS_STEPS - 1))),
+            );
+            const path = secondaryPaths && distanceSquared >= circleRSquared * 0.25
+              ? secondaryPaths[bucket]
+              : activePaths[bucket];
+            path.moveTo(x + dotR, y);
+            path.arc(x, y, dotR, 0, Math.PI * 2);
           }
-
-          ctx.fill();
         }
       }
 
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = inactive;
+      ctx.fill(inactivePath);
+
+      for (let bucket = 1; bucket < BRIGHTNESS_STEPS; bucket++) {
+        ctx.globalAlpha = 0.1 + (bucket / (BRIGHTNESS_STEPS - 1)) * 0.9;
+        ctx.fillStyle = active || primary || inactive;
+        ctx.fill(activePaths[bucket]);
+        if (secondaryPaths) {
+          ctx.fillStyle = cyan || active || primary || inactive;
+          ctx.fill(secondaryPaths[bucket]);
+        }
+      }
       ctx.globalAlpha = 1;
-      rafRef.current = requestAnimationFrame(draw);
     }
 
-    rafRef.current = requestAnimationFrame(draw);
+    const stopAnimation = startAnimationLoop({ element: canvas, fps: 15, onFrame: draw });
     return () => {
       ro.disconnect();
-      cancelAnimationFrame(rafRef.current);
+      stopAnimation();
     };
   }, []);
 

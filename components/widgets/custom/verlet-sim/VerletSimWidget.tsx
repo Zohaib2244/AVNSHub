@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { useWidget } from "@/components/framework/WidgetContext";
+import { startAnimationLoop } from "@/lib/animationLoop";
 
 type AnchorMode = "left" | "suspended";
 
@@ -343,8 +344,8 @@ export function VerletSimWidget() {
 
     if (!canvas || !stage || !context) return;
 
-    let animationFrame = 0;
     let lastStatsAt = 0;
+    let paletteReadAt = 0;
     let palette = readPalette(stage);
 
     const resize = () => {
@@ -370,13 +371,11 @@ export function VerletSimWidget() {
 
     const tick = (time: number) => {
       const rope = ropeRef.current;
-      if (!rope) {
-        animationFrame = requestAnimationFrame(tick);
-        return;
-      }
+      if (!rope) return;
 
-      if (Math.round(time) % 30 === 0) {
+      if (paletteReadAt === 0 || time - paletteReadAt >= 1000) {
         palette = readPalette(stage);
+        paletteReadAt = time;
       }
 
       const wind = impulseRef.current;
@@ -423,14 +422,13 @@ export function VerletSimWidget() {
         });
       }
 
-      animationFrame = requestAnimationFrame(tick);
     };
 
-    animationFrame = requestAnimationFrame(tick);
+    const stopAnimation = startAnimationLoop({ element: canvas, fps: 30, onFrame: tick });
 
     return () => {
       observer.disconnect();
-      cancelAnimationFrame(animationFrame);
+      stopAnimation();
     };
   }, [resetToken, simConfig]);
 

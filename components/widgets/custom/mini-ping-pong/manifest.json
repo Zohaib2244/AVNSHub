@@ -1,6 +1,6 @@
 {
-  "title": "Life Admin Bureau",
-  "iconName": "Stamp",
+  "title": "Mini Ping Pong",
+  "iconName": "Gamepad2",
   "sizes": ["S", "M", "L"],
   "orientations": ["h"],
   "defaults": { "size": "M", "orientation": "h" },

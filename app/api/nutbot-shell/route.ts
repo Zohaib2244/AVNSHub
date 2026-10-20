@@ -10,6 +10,7 @@
 import {
   createSession,
   getSession,
+  subscribeSession,
   writeSession,
   resizeSession,
   killSession,
@@ -47,8 +48,7 @@ export async function GET(request: Request) {
       const listener = (chunk: string) => {
         try { send(chunk); } catch { /* controller closed — cleanup runs via cancel */ }
       };
-      session.subscribers.add(listener);
-      unsubscribe = () => session.subscribers.delete(listener);
+      unsubscribe = subscribeSession(id, listener);
 
       // heartbeat keeps intermediaries from closing an idle stream
       const ping = setInterval(() => {
