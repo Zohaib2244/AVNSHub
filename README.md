@@ -35,10 +35,22 @@ AVN Hub deliberately runs the Next.js dev server as its runtime, because the Wid
 ![Settings and palettes](docs/screenshots/hub-core.png)
 ![Widget manager](docs/screenshots/widget-manager.png)
 
+## Make it yours
+
+Every canvas has its own arrangement, palette, wallpaper and backdrop style (solid, blur, transparent or glass). A few examples, all from the same install:
+
+| | |
+| --- | --- |
+| ![Night city](docs/screenshots/gallery-night-city.png) | ![Rain](docs/screenshots/gallery-rain.png) |
+| ![Forest](docs/screenshots/gallery-forest.png) | ![Red room](docs/screenshots/gallery-red-room.png) |
+
+More in the [gallery](docs/GALLERY.md).
+
 ## Docs
 
 | Doc | For |
 | --- | --- |
+| [docs/GALLERY.md](docs/GALLERY.md) | Example canvases: palettes, wallpapers, backdrop modes |
 | [docs/SETUP.md](docs/SETUP.md) | Install, configuration, Docker, systemd, Tailscale |
 | [docs/WIDGET_CREATOR.md](docs/WIDGET_CREATOR.md) | Using the in-app creator |
 | [docs/WIDGETS.md](docs/WIDGETS.md) | Writing a widget by hand |

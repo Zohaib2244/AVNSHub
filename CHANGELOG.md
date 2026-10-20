@@ -6,6 +6,10 @@ Add entries under `## [Unreleased]` as you work, grouped Added / Changed / Fixed
 
 ## [Unreleased]
 
+### Changed
+- **New default arrangement.** A fresh install (and "reset layout" on the default canvas) now opens to the arrangement from the maintainer's own hub: clock, storage, weather and stats on the left, prayer times, Claude usage, rope and glyph toys on the right, GitHub and the dot matrix under NutBot. Ember stays the default palette.
+- Screenshots retaken on the new default, plus a [gallery](docs/GALLERY.md) of example canvases across palettes, wallpapers and backdrop modes.
+
 ## [2.4.0] — 2026-10-20
 
 ### Added
