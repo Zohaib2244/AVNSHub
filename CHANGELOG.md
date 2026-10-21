@@ -7,6 +7,7 @@ Add entries under `## [Unreleased]` as you work, grouped Added / Changed / Fixed
 ## [Unreleased]
 
 ### Changed
+- The README opens with a playable 42-second showcase video, hosted on GitHub with audio and compressed for the free attachment limit.
 - Front page rebuilt around a full-width night-city canvas, fresh light/dark captures of the avn-hub arrangement, and a linked visual gallery. Setup details and control-panel walkthroughs stay in the guides.
 - **New default arrangement.** A fresh install (and "reset layout" on the default canvas) now opens to the arrangement from the maintainer's own hub: clock, storage, weather and stats on the left, prayer times, Claude usage, rope and glyph toys on the right, GitHub and the dot matrix under NutBot. Ember stays the default palette.
 - Screenshots retaken on the new default, plus a [gallery](docs/GALLERY.md) of example canvases across palettes, wallpapers and backdrop modes.

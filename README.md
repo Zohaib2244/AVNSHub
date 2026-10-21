@@ -6,7 +6,7 @@ A self-hosted dashboard for your tools, live data and little distractions. Descr
 
 [Get started](#get-started) · [Explore the gallery](docs/GALLERY.md) · [Create a widget](docs/WIDGET_CREATOR.md) · [Setup guide](docs/SETUP.md)
 
-[![AVN Hub — the starter arrangement with a night-city wallpaper and a palette drawn from the image](docs/screenshots/gallery-night-city.png)](docs/GALLERY.md#night-city)
+https://github.com/user-attachments/assets/33e770f0-70b8-48e4-9704-aacf3421e95e
 
 ## At home in light or dark
 
